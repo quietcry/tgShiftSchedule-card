@@ -44,4 +44,4 @@ Die Card enthält drei Beispiel-Controls:
 - Auswahlmenü
 - Schalter
 
-Alle Änderungen werden automatisch in der Lovelace-Konfiguration gespeichert. 
+Alle Änderungen werden automatisch in der Lovelace-Konfiguration gespeichert. # Test
