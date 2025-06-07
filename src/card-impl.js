@@ -9,6 +9,10 @@ export class CardImpl extends CardBase {
     };
   }
 
+  static getConfigElement() {
+    return document.createElement('tgeditor-card-editor');
+  }
+
   async firstUpdated() {
     await super.firstUpdated();
   }
