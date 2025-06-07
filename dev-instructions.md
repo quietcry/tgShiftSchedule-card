@@ -236,4 +236,6 @@ Die Version der Card wird in `src/card-config.js` verwaltet und folgt dem Format
 
 Beispiel: `2025.06-0001`
 
-Die Version wird automatisch in der Card angezeigt (unten rechts) und wird bei jedem Commit automatisch erhöht. Dies geschieht durch den Git pre-commit Hook in `.git/hooks/pre-commit`, der das Skript `scripts/update-version.sh` ausführt. 
+Die Version wird automatisch in der Card angezeigt (unten rechts) und wird bei jedem Commit automatisch erhöht. Dies geschieht durch den Git pre-commit Hook in `.git/hooks/pre-commit`, der das zentrale Skript `/tgdata/coding/githook_scripts/update-version.sh` ausführt.
+
+Das Versionsupdate-Skript ist zentral in `/tgdata/coding/githook_scripts/` gespeichert und kann von allen Projekten verwendet werden, die das gleiche Versionsformat nutzen. 
