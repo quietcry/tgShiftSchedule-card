@@ -1,9 +1,9 @@
 import { html, css, LitElement } from 'lit';
 import { property } from 'lit/decorators.js';
 import { BaseCardEditor } from './editor-base';
-import { TGEditorCardEditorImpl } from './editor-impl';
+import { EditorImpl } from './editor-impl';
 
-export class TGEditorCardEditor extends TGEditorCardEditorImpl {
+export class TGEditorCardEditor extends EditorImpl {
   static get properties() {
     return {
       hass: {},
