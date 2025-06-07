@@ -1,18 +1,11 @@
 const path = require('path');
-const CopyWebpackPlugin = require('copy-webpack-plugin');
 
 module.exports = {
   mode: 'production',
   entry: './src/tgeditor-card.js',
   output: {
-    path: path.resolve(__dirname, 'dist'),
     filename: 'tgeditor-card.js',
-    library: {
-      type: 'module',
-    },
-  },
-  experiments: {
-    outputModule: true,
+    path: path.resolve(__dirname, 'dist'),
   },
   module: {
     rules: [
@@ -22,7 +15,10 @@ module.exports = {
         use: {
           loader: 'babel-loader',
           options: {
-            presets: ['@babel/preset-env']
+            presets: ['@babel/preset-env'],
+            plugins: [
+              ['@babel/plugin-proposal-decorators', { decoratorsBeforeExport: true }]
+            ]
           }
         }
       },
@@ -31,15 +27,5 @@ module.exports = {
         use: ['style-loader', 'css-loader']
       }
     ]
-  },
-  plugins: [
-    new CopyWebpackPlugin({
-      patterns: [
-        {
-          from: 'src/tgeditor-card.js',
-          to: 'tgeditor-card.js'
-        }
-      ]
-    })
-  ]
+  }
 }; 

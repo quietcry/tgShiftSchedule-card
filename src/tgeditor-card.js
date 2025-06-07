@@ -1,11 +1,13 @@
 import { LitElement, html, css } from 'lit';
-import { customElement, property } from 'lit/decorators.js';
+import { property } from 'lit/decorators.js';
 import { loadHaForm } from './load-ha-form';
 
 // Editor für die Karte
 class TGEditorCardEditor extends LitElement {
-  @property({ attribute: false }) hass;
-  @property({ attribute: false }) config;
+  static properties = {
+    hass: { type: Object },
+    config: { type: Object }
+  };
 
   async firstUpdated() {
     await loadHaForm();
@@ -99,13 +101,10 @@ class TGEditorCardEditor extends LitElement {
 
 // Hauptkomponente der Karte
 class TGEditorCard extends LitElement {
-  @property({ attribute: false }) hass;
-  @property({ attribute: false }) config;
-  @property({ attribute: false }) _config = {
-    type: 'custom:tgeditor-card',
-    text: '',
-    auswahl: 'option1',
-    schalter: false
+  static properties = {
+    hass: { type: Object },
+    config: { type: Object },
+    _config: { type: Object }
   };
 
   static get styles() {
