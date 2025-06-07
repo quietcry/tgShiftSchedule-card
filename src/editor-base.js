@@ -6,19 +6,24 @@ export class BaseCardEditor extends LitElement {
     config: { type: Object }
   };
 
-  static get styles() {
-    return css`
-      :host {
-        display: block;
-        padding: 16px;
-      }
-    `;
-  }
+  static styles = css`
+    :host {
+      display: block;
+    }
+  `;
 
-  firstUpdated() {
+  async firstUpdated() {
+    await this.loadHaForm();
     console.debug('Basis-Editor firstUpdated');
     if (this.config) {
-      this._config = { ...this.config };
+      console.debug('Basis-Editor config:', this.config);
+    }
+  }
+
+  async loadHaForm() {
+    if (!customElements.get('ha-form')) {
+      const cardHelpers = await import('custom-card-helpers');
+      await cardHelpers.loadHaForm();
     }
   }
 

@@ -1,14 +1,36 @@
 import { html } from 'lit';
-import { BaseCardEditor } from './base-card-editor';
-import { loadHaForm } from './load-ha-form';
+import { BaseCardEditor } from './editor-base';
 
 export class TGEditorCardEditorImpl extends BaseCardEditor {
+  static get properties() {
+    return {
+      hass: {},
+      config: {}
+    };
+  }
+
   async firstUpdated() {
-    await loadHaForm();
     await super.firstUpdated();
   }
 
-  renderEditor() {
+  setConfig(config) {
+    this.config = config;
+  }
+
+  _valueChanged(ev) {
+    const value = ev.detail.value;
+    this.dispatchEvent(new CustomEvent('config-changed', {
+      detail: { config: value },
+      bubbles: true,
+      composed: true
+    }));
+  }
+
+  render() {
+    if (!this.hass) {
+      return html`<div>Loading...</div>`;
+    }
+
     return html`
       <ha-form
         .hass=${this.hass}

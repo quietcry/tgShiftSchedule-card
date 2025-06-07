@@ -1,6 +1,5 @@
 import { html, css, LitElement } from 'lit';
 import { property } from 'lit/decorators.js';
-import { loadHaForm } from './utils/ha-form';
 import { BaseCardEditor } from './editor-base';
 import { TGEditorCardEditorImpl } from './editor-impl';
 

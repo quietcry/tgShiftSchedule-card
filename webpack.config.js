@@ -4,7 +4,7 @@ module.exports = {
   mode: 'production',
   entry: './src/card.js',
   output: {
-    filename: 'tg-editor-card.js',
+    filename: 'tgeditor-card.js',
     path: path.resolve(__dirname, 'dist'),
   },
   module: {
