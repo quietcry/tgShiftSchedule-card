@@ -2,8 +2,9 @@ import { html, css, LitElement } from 'lit';
 import { property } from 'lit/decorators.js';
 import { loadHaForm } from './utils/ha-form';
 import { BaseCardEditor } from './editor-base';
+import { TGEditorCardEditorImpl } from './editor-impl';
 
-export class TGEditorCardEditor extends BaseCardEditor {
+export class TGEditorCardEditor extends TGEditorCardEditorImpl {
   static get properties() {
     return {
       hass: {},
