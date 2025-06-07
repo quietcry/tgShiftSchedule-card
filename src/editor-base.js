@@ -1,6 +1,6 @@
 import { LitElement, html, css } from 'lit';
 
-export class BaseCardEditor extends LitElement {
+export class EditorBase extends LitElement {
   static properties = {
     hass: { type: Object },
     config: { type: Object }

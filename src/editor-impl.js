@@ -1,7 +1,7 @@
 import { html } from 'lit';
-import { BaseCardEditor } from './editor-base';
+import { EditorBase } from './editor-base';
 
-export class EditorImpl extends BaseCardEditor {
+export class EditorImpl extends EditorBase {
   static get properties() {
     return {
       hass: {},

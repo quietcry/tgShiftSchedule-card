@@ -1,6 +1,6 @@
 import { html, css, LitElement } from 'lit';
 import { property } from 'lit/decorators.js';
-import { BaseCardEditor } from './editor-base';
+import { EditorBase } from './editor-base';
 import { EditorImpl } from './editor-impl';
 
 export class TGEditorCardEditor extends EditorImpl {
