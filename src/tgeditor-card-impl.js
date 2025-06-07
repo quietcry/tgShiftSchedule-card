@@ -1,5 +1,5 @@
 import { html } from 'lit';
-import { BaseCard } from './base-card';
+import { BaseCard } from './card-base';
 
 export class TGEditorCardImpl extends BaseCard {
   static getConfigElement() {
