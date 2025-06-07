@@ -1,20 +1,15 @@
 # TG Editor Card
 
-Eine moderne Home Assistant Card mit visuellem Editor, basierend auf dem ha-editor-formbuilder.
+Eine moderne Home Assistant Card mit visuellem Editor, basierend auf dem ha-form als Boilerplate für zukünftige Projekte.
 
 ## Installation
 
-1. Kopieren Sie die `tgeditor-card.js` Datei in Ihren `config/www` Ordner in Home Assistant.
-2. Fügen Sie die folgende Ressource zu Ihrer `configuration.yaml` hinzu:
+1. Kopieren Sie die .js Datei im dist-Ordner  in Ihren `config/www` Ordner in Home Assistant.
+2. Fügen Sie die folgende Ressource `/local/????.js` im Dashbord hinzu:
 
-```yaml
-lovelace:
-  resources:
-    - url: /local/tgeditor-card.js
-      type: module
-```
 
 ## Entwicklung
+0. lesen sie die dev-instructions
 
 1. Installieren Sie die Abhängigkeiten:
 ```bash
