@@ -49,3 +49,4 @@ Alle Änderungen werden automatisch in der Lovelace-Konfiguration gespeichert. #
 # Test3
 # Test4
 # Test5
+# Test6
