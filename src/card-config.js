@@ -4,7 +4,7 @@ const CardDescription = 'Eine Karte für die EPG-Anzeige';
 const CardFilename = 'tgepg-card.js';
 const Version = '2025.06-0001';
 const IsTemplate = false;
-const DebugMode = false;
+const DebugMode = true;
 
 module.exports = {
   CardRegname,
