@@ -3,7 +3,7 @@ import { property } from 'lit/decorators.js';
 import { EditorBase } from './editor-base';
 import { EditorImpl } from './editor-impl';
 
-export class TGEditorCardEditor extends EditorImpl {
+export class Editor extends EditorImpl {
   static get properties() {
     return {
       hass: {},
@@ -75,4 +75,4 @@ export class TGEditorCardEditor extends EditorImpl {
   }
 }
 
-customElements.define('tgeditor-card-editor', TGEditorCardEditor); 
+customElements.define('tgeditor-card-editor', Editor); 
