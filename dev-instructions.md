@@ -87,6 +87,30 @@ Empfehlungen:
 2. Nutzen Sie einen Namespace-Prefix (z.B. `myapp-first-card`, `myapp-second-card`)
 3. Dokumentieren Sie die verwendeten Klassennamen
 
+### Vererbung und Unterklassen
+
+Die Basis-Klassen (`BaseCard` und `BaseCardEditor`) sind so konzipiert, dass sie als Grundlage für verschiedene Karten dienen können. Sie können mehrere Karten erstellen, die von diesen Basis-Klassen erben, ohne dass es zu Konflikten kommt:
+
+```javascript
+// Erste Karte
+class FirstCardImpl extends BaseCard {
+  // Spezifische Implementierung
+}
+customElements.define('first-card', FirstCardImpl);
+
+// Zweite Karte
+class SecondCardImpl extends BaseCard {
+  // Andere spezifische Implementierung
+}
+customElements.define('second-card', SecondCardImpl);
+```
+
+Vorteile der Vererbung:
+- Wiederverwendung von gemeinsamem Code
+- Konsistentes Verhalten durch die Basis-Klasse
+- Einfache Erweiterung durch Überschreiben von Methoden
+- Keine Konflikte zwischen verschiedenen Implementierungen
+
 ## Projektstruktur
 
 - `src/`: Quellcode
