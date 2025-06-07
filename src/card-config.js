@@ -13,5 +13,5 @@ module.exports = {
   CardFilename,
   Version,
   DebugMode,
-  showVersion, 
+  showVersion
 }; 
