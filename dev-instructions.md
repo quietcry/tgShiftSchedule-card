@@ -141,10 +141,37 @@ In diesem Beispiel:
 - Sie werden unter verschiedenen Element-Namen registriert
 - Es gibt keine Konflikte, da die Element-Namen eindeutig sind
 
+### Komponenten-Abhängigkeiten
+
+Jede Komponente ist für ihre eigenen Abhängigkeiten verantwortlich. Beispiel:
+
+```javascript
+// Editor-Komponente
+import { loadHaForm } from './load-ha-form';
+
+class Editor {
+  async firstUpdated() {
+    await loadHaForm(); // Editor lädt ha-form
+  }
+}
+
+// Karten-Komponente
+class Card {
+  // Karte muss ha-form nicht importieren,
+  // da sie es nicht direkt verwendet
+}
+```
+
+Wichtige Punkte:
+- Jede Komponente importiert nur die Abhängigkeiten, die sie selbst benötigt
+- Abhängigkeiten werden nicht automatisch an Kind-Komponenten weitergegeben
+- Die Karte muss nicht wissen, welche Abhängigkeiten der Editor hat
+- Dies fördert lose Kopplung und bessere Wartbarkeit
+
 ## Projektstruktur
 
 - `src/`: Quellcode
-  - `tgeditor-card.js`: Hauptdatei
+  - `card.js`: Hauptdatei
   - `tgeditor-card-editor.js`: Editor-Komponente
   - `base-card.js`: Basis-Karte
   - `base-card-editor.js`: Basis-Editor
