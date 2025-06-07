@@ -58,11 +58,34 @@ Die kompilierte Datei wird im `dist`-Ordner erstellt.
      }
      ```
    - Aktualisieren Sie die Ressourcen-URL in Ihrer Home Assistant Konfiguration entsprechend
+   - **Wichtig**: Ändern Sie den Klassennamen der Karte, wenn Sie mehrere Karten verwenden:
+     ```javascript
+     // In tgeditor-card.js
+     customElements.define('meine-eigene-karte', TGEditorCardImpl);
+     
+     // In tgeditor-card-editor.js
+     customElements.define('meine-eigene-karte-editor', TGEditorCardEditorImpl);
+     ```
 
 4. Karte bauen:
    ```bash
    npm run build
    ```
+
+## Wichtige Hinweise
+
+### Klassennamen-Konflikte
+
+Wenn Sie mehrere Karten in Home Assistant verwenden, müssen Sie sicherstellen, dass jede Karte einen eindeutigen Klassennamen hat. Andernfalls kann es zu Konflikten kommen, da:
+
+- Jeder Element-Name nur einmal registriert werden kann
+- Die zweite Registrierung würde die erste überschreiben
+- Unterschiedliche Methoden könnten sich gegenseitig beeinflussen
+
+Empfehlungen:
+1. Verwenden Sie eindeutige Klassennamen für jede Karte
+2. Nutzen Sie einen Namespace-Prefix (z.B. `myapp-first-card`, `myapp-second-card`)
+3. Dokumentieren Sie die verwendeten Klassennamen
 
 ## Projektstruktur
 
