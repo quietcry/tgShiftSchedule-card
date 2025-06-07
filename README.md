@@ -45,3 +45,4 @@ Die Card enthält drei Beispiel-Controls:
 - Schalter
 
 Alle Änderungen werden automatisch in der Lovelace-Konfiguration gespeichert. # Test
+# Test2
