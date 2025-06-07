@@ -1,11 +1,23 @@
 import { LitElement, html, css } from 'lit';
 
-export class BaseCard extends LitElement {
+export class CardBase extends LitElement {
+  static styles = css`
+    :host {
+      display: block;
+    }
+  `;
+
   static properties = {
     hass: { type: Object },
     config: { type: Object },
     _config: { type: Object }
   };
+
+  constructor() {
+    super();
+    this.hass = null;
+    this.config = null;
+  }
 
   static get styles() {
     return css`

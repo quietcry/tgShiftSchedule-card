@@ -1,34 +1,31 @@
 import { html } from 'lit';
-import { BaseCard } from './card-base';
+import { CardBase } from './card-base';
 
-export class TGEditorCardImpl extends BaseCard {
-  static getConfigElement() {
-    return document.createElement('tgeditor-card-editor');
-  }
-
-  static getStubConfig() {
+export class TGEditorCardImpl extends CardBase {
+  static get properties() {
     return {
-      type: 'custom:tgeditor-card',
-      text: '',
-      auswahl: 'option1',
-      schalter: false
+      hass: {},
+      config: {}
     };
   }
 
-  getDefaultConfig() {
-    return {
-      type: 'custom:tgeditor-card',
-      text: '',
-      auswahl: 'option1',
-      schalter: false
-    };
+  async firstUpdated() {
+    await super.firstUpdated();
   }
 
-  renderEditor() {
+  setConfig(config) {
+    this.config = config;
+  }
+
+  render() {
+    if (!this.hass) {
+      return html`<div>Loading...</div>`;
+    }
+
     return html`
       <ha-form
         .hass=${this.hass}
-        .data=${this._config}
+        .data=${this.config}
         .schema=${[
           {
             name: 'text',
@@ -55,16 +52,15 @@ export class TGEditorCardImpl extends BaseCard {
             }
           }
         ]}
-        @value-changed=${this._handleConfigChanged}
       ></ha-form>
     `;
   }
 
   renderValueDisplay() {
     return html`
-      <div>Text: ${this._config.text || ''}</div>
-      <div>Auswahl: ${this._config.auswahl || ''}</div>
-      <div>Schalter: ${this._config.schalter ? 'An' : 'Aus'}</div>
+      <div>Text: ${this.config.text || ''}</div>
+      <div>Auswahl: ${this.config.auswahl || ''}</div>
+      <div>Schalter: ${this.config.schalter ? 'An' : 'Aus'}</div>
     `;
   }
 } 
