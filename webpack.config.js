@@ -4,7 +4,7 @@ module.exports = {
   mode: 'production',
   entry: './src/tgeditor-card.js',
   output: {
-    filename: 'tgeditor-card.js',
+    filename: 'tg-editor-card.js',
     path: path.resolve(__dirname, 'dist'),
   },
   module: {
@@ -17,7 +17,10 @@ module.exports = {
           options: {
             presets: ['@babel/preset-env'],
             plugins: [
-              ['@babel/plugin-proposal-decorators', { decoratorsBeforeExport: true }]
+              ['@babel/plugin-proposal-decorators', { decoratorsBeforeExport: true, legacy: false }],
+              ['@babel/plugin-proposal-class-properties', { loose: true }],
+              ['@babel/plugin-proposal-private-methods', { loose: true }],
+              ['@babel/plugin-proposal-private-property-in-object', { loose: true }]
             ]
           }
         }
@@ -27,5 +30,8 @@ module.exports = {
         use: ['style-loader', 'css-loader']
       }
     ]
+  },
+  resolve: {
+    extensions: ['.js']
   }
 }; 
