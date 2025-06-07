@@ -2,8 +2,9 @@ const CardRegname = 'tgeditor-card';
 const CardName = 'TG Editor Card';
 const CardDescription = 'Eine Karte mit Editor-Funktionalität';
 const CardFilename = 'tgeditor-card.js';
-const Version = '2025.06-0005';
-const IsTemplate = true;
+const Version = '2025.06-0006';
+const DebugMode = false;
+
 
 module.exports = {
   CardRegname,
@@ -11,5 +12,5 @@ module.exports = {
   CardDescription,
   CardFilename,
   Version,
-  IsTemplate
+  DebugMode
 }; 
