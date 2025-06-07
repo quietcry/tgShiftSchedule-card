@@ -1,4 +1,4 @@
-import { TGEditorCardImpl } from './tgeditor-card-impl';
+import { TGEditorCardImpl } from './card-impl';
 import './tgeditor-card-editor';
 
 // Registriere die Karte
@@ -8,7 +8,7 @@ customElements.define('tgeditor-card', TGEditorCardImpl);
 window.customCards = window.customCards || [];
 window.customCards.push({
   type: 'tgeditor-card',
-  name: 'TGEditor Card',
+  name: 'TG Editor Card',
   description: 'Eine Karte mit Editor-Funktionalität',
   preview: true
 }); 
