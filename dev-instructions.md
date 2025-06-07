@@ -1,13 +1,20 @@
-# Entwicklungsanleitung für TGEditor Card
+# Entwicklungsanleitung für TG EPG Card
 
 ## Voraussetzungen
 
-- Node.js (Version 14 oder höher)
-- npm (Version 6 oder höher)
+- Node.js (v14 oder höher)
+- npm (v6 oder höher)
+- Git
+- Home Assistant Installation
 
 ## Installation
 
-1. Repository klonen
+1. Repository klonen:
+   ```bash
+   git clone git@192.168.1.160:tommy/tgEPG-card.git
+   cd tgEPG-card
+   ```
+
 2. Abhängigkeiten installieren:
    ```bash
    npm install
@@ -17,264 +24,76 @@
 
 1. Starten Sie den Entwicklungsserver:
    ```bash
-   npm run dev
+   npm run watch
    ```
 
-2. Die Karte wird automatisch neu gebaut, wenn Sie Änderungen vornehmen.
+2. Die Card wird automatisch neu gebaut, wenn Sie Änderungen vornehmen.
 
-## Build
+## Bauen
 
-Um die Karte zu bauen:
+Um die Card zu bauen:
 ```bash
 npm run build
 ```
 
-Die kompilierte Datei wird im `dist`-Ordner erstellt.
+Die gebaute Card finden Sie in `dist/tgepg-card.js`.
 
-## In Home Assistant einbinden
+## Integration in Home Assistant
 
-1. Kopieren Sie die Datei `dist/tg-editor-card.js` in den `www`-Ordner Ihrer Home Assistant Installation
+1. Kopieren Sie die gebaute Card (`dist/tgepg-card.js`) in Ihren `www` Ordner in Home Assistant.
+
 2. Fügen Sie die Ressource in Ihrer `configuration.yaml` hinzu:
    ```yaml
    resources:
-     - url: /local/tg-editor-card.js
+     - url: /local/tgepg-card.js
        type: module
    ```
 
-## In ein neues Projekt klonen
-
-1. Repository klonen
-2. Abhängigkeiten installieren:
-   ```bash
-   npm install
-   ```
-
-3. Anpassungen vornehmen:
-   - Passen Sie den Namen der Ausgabedatei in `webpack.config.js` an:
-     ```javascript
-     output: {
-       filename: 'tg-editor-card.js', // Hier den gewünschten Namen eintragen
-       path: path.resolve(__dirname, 'dist'),
-     }
-     ```
-   - Aktualisieren Sie die Ressourcen-URL in Ihrer Home Assistant Konfiguration entsprechend
-   - **Wichtig**: Ändern Sie den Klassennamen der Karte, wenn Sie mehrere Karten verwenden:
-     ```javascript
-     // In tgeditor-card.js
-     customElements.define('meine-eigene-karte', TGEditorCardImpl);
-     
-     // In tgeditor-card-editor.js
-     customElements.define('meine-eigene-karte-editor', TGEditorCardEditorImpl);
-     ```
-
-4. Karte bauen:
-   ```bash
-   npm run build
+3. Fügen Sie die Card zu Ihrem Dashboard hinzu:
+   ```yaml
+   type: 'custom:tgepg-card'
    ```
 
 ## Wichtige Hinweise
 
-### Klassennamen-Konflikte
-
-Wenn Sie mehrere Karten in Home Assistant verwenden, müssen Sie sicherstellen, dass jede Karte einen eindeutigen Klassennamen hat. Andernfalls kann es zu Konflikten kommen, da:
-
-- Jeder Element-Name nur einmal registriert werden kann
-- Die zweite Registrierung würde die erste überschreiben
-- Unterschiedliche Methoden könnten sich gegenseitig beeinflussen
-
-Empfehlungen:
-1. Verwenden Sie eindeutige Klassennamen für jede Karte
-2. Nutzen Sie einen Namespace-Prefix (z.B. `myapp-first-card`, `myapp-second-card`)
-3. Dokumentieren Sie die verwendeten Klassennamen
-
-### Vererbung und Unterklassen
-
-Die Basis-Klassen (`BaseCard` und `BaseCardEditor`) sind so konzipiert, dass sie als Grundlage für verschiedene Karten dienen können. Sie können mehrere Karten erstellen, die von diesen Basis-Klassen erben, ohne dass es zu Konflikten kommt:
-
-```javascript
-// Erste Karte
-class FirstCardImpl extends BaseCard {
-  // Spezifische Implementierung
-}
-customElements.define('first-card', FirstCardImpl);
-
-// Zweite Karte
-class SecondCardImpl extends BaseCard {
-  // Andere spezifische Implementierung
-}
-customElements.define('second-card', SecondCardImpl);
-```
-
-Vorteile der Vererbung:
-- Wiederverwendung von gemeinsamem Code
-- Konsistentes Verhalten durch die Basis-Klasse
-- Einfache Erweiterung durch Überschreiben von Methoden
-- Keine Konflikte zwischen verschiedenen Implementierungen
-
-### Klassen mit gleichem Namen
-
-Sie können in verschiedenen Karten Klassen mit dem gleichen Namen verwenden, solange die registrierten Element-Namen unterschiedlich sind. Beispiel:
-
-```javascript
-// Karte 1
-class Editor {
-  // Spezifische Implementierung für Karte 1
-  render() {
-    return html`<div>Editor für Karte 1</div>`;
-  }
-}
-customElements.define('karte1-editor', Editor);
-
-// Karte 2
-class Editor {
-  // Völlig andere Implementierung für Karte 2
-  render() {
-    return html`<div>Editor für Karte 2</div>`;
-  }
-}
-customElements.define('karte2-editor', Editor);
-```
-
-In diesem Beispiel:
-- Beide Klassen heißen `Editor`
-- Sie haben unterschiedliche Implementierungen
-- Sie werden unter verschiedenen Element-Namen registriert
-- Es gibt keine Konflikte, da die Element-Namen eindeutig sind
-
-### Komponenten-Abhängigkeiten
-
-Jede Komponente ist für ihre eigenen Abhängigkeiten verantwortlich. Beispiel:
-
-```javascript
-// Editor-Komponente
-import { loadHaForm } from './load-ha-form';
-
-class Editor {
-  async firstUpdated() {
-    await loadHaForm(); // Editor lädt ha-form
-  }
-}
-
-// Karten-Komponente
-class Card {
-  // Karte muss ha-form nicht importieren,
-  // da sie es nicht direkt verwendet
-}
-```
-
-Wichtige Punkte:
-- Jede Komponente importiert nur die Abhängigkeiten, die sie selbst benötigt
-- Abhängigkeiten werden nicht automatisch an Kind-Komponenten weitergegeben
-- Die Karte muss nicht wissen, welche Abhängigkeiten der Editor hat
-- Dies fördert lose Kopplung und bessere Wartbarkeit
+- Die Card verwendet die `ha-form` Komponente für den Editor
+- Stellen Sie sicher, dass Sie die richtigen Abhängigkeiten in Ihrer `package.json` haben
+- Die Card ist als Boilerplate für zukünftige Projekte gedacht
 
 ## Projektstruktur
 
-Das Projekt ist in verschiedene Komponenten aufgeteilt, die unterschiedliche Verantwortlichkeiten haben:
+- **Base files** (`card-base.js`, `editor-base.js`): Enthalten allgemeinen, wiederverwendbaren Code
+- **Impl files** (`card-impl.js`, `editor-impl.js`): Enthalten spezifische Implementierungen für die Karte
+- **Editor.js**: Dient nur als Wrapper für die spezifische Implementierung ohne spezifische Logik
 
-### Base-Dateien
-- `card-base.js`, `editor-base.js`
-- Enthalten den allgemeinen, wiederverwendbaren Code
-- Beispiel: `loadHaForm` in `editor-base.js`
-- Beispiel: Grundlegende Card-Funktionalität in `card-base.js`
-
-### Impl-Dateien
-- `card-impl.js`, `editor-impl.js`
-- Enthalten die spezifische Implementierung für diese Karte
-- Beispiel: Formular-Schema und spezifische Logik in `editor-impl.js`
-- Beispiel: Card-Darstellung in `card-impl.js`
-
-### Editor.js
-- Nur ein Wrapper für die spezifische Implementierung
-- Keine spezifische Logik
-- Nur Styling-Anpassungen
-
-### Neue Karte erstellen
-
-Um eine neue Karte basierend auf diesem Boilerplate zu erstellen, folge diesen Schritten:
-
-1. Erstelle ein neues Repository in Forgejo:
-   - Gehe zu http://192.168.1.160:3000/tommy
-   - Klicke auf "New Repository"
-   - Name: z.B. `tgSprinkler-card`
-   - Wähle "Private" oder "Public"
-   - Klicke auf "Create Repository"
-
-2. Klone das neue Repository:
-   ```bash
-   git clone git@192.168.1.160:tommy/tgSprinkler-card.git
-   cd tgSprinkler-card
-   ```
-
-3. Passe die Konfiguration in `card-config.js` an:
-   ```javascript
-   const CardRegname = 'tgsprinkler-card';  // Angepasst
-   const CardName = 'TG Sprinkler Card';    // Angepasst
-   const CardDescription = 'Eine Karte für die Sprinkler-Steuerung';  // Angepasst
-   const CardFilename = 'tgsprinkler-card.js';  // Angepasst
-   const Version = '2025.06-0001';  // Zurückgesetzt
-   ```
-
-4. Erste Commit und Push:
-   ```bash
-   git add .
-   git commit -m "init: Neue Karte basierend auf tgEditor-card"
-   git push -u origin master
-   ```
-
-5. Wenn du später Änderungen vom tgEditor-card einspielen möchtest:
-   - Gehe zu deinem Repository
-   - Klicke auf "Settings"
-   - Scrolle runter zu "Template"
-   - Aktiviere "Template Repository"
-   - Klicke auf "Save"
-   - Dann kannst du über "Use Template" neue Repositories erstellen
-
-Diese Methode hat mehrere Vorteile:
-- Saubere Trennung zwischen Template und neuen Karten
-- Einfaches Einspielen von Änderungen vom Template
-- Klare Dokumentation der Beziehung zwischen Template und Karten
-- Automatische Versionsverwaltung für jede Karte
+Um eine neue Karte zu erstellen, müssen Sie:
+1. `card.js` für die Registrierung anpassen
+2. `card-impl.js` für die spezifische Karten-Implementierung anpassen
+3. `editor-impl.js` für die spezifische Editor-Logik mit dem Form-Schema anpassen
 
 ## Zentrale Konfigurationsdatei: `card-config.js`
 
-Die Datei `src/card-config.js` enthält zentrale Konstanten, die für die gesamte Card-Implementierung verwendet werden. Sie dient dazu, wichtige Werte wie den Registrierungsnamen, den Anzeigenamen, die Beschreibung und den Dateinamen der Card an einer Stelle zu definieren und konsistent im Projekt zu verwenden.
+Die Datei `src/card-config.js` enthält alle wichtigen Konfigurationsvariablen für die Karte:
 
-**Beispielinhalt:**
-```js
-const CardRegname = 'tgeditor-card';
-const CardName = 'TG Editor Card';
-const CardDescription = 'Eine Karte mit Editor-Funktionalität';
-const CardFilename = 'tgeditor-card.js';
-
-module.exports = {
-  CardRegname,
-  CardName,
-  CardDescription,
-  CardFilename
-};
+```javascript
+const CardRegname = 'tgepg-card';  // Name für die Registrierung
+const CardName = 'TG EPG Card';    // Anzeigename
+const CardDescription = 'Eine Karte für die EPG-Anzeige';  // Beschreibung
+const CardFilename = 'tgepg-card.js';  // Dateiname
+const Version = '2025.06-0005';  // Version
+const IsTemplate = false;  // Template-Status
 ```
 
-**Verwendung:**
-- In der Webpack-Konfiguration (`webpack.config.js`) wird `CardFilename` für den Ausgabedateinamen verwendet.
-- In `card.js` und `editor.js` werden die Werte für die Registrierung und Beschreibung der Card genutzt.
+Diese Variablen werden an verschiedenen Stellen verwendet:
+- `CardRegname`: Für die Registrierung der Karte
+- `CardName`: Als Anzeigename im UI
+- `CardDescription`: Als Beschreibung im UI
+- `CardFilename`: Für den Build-Prozess
+- `Version`: Für die Versionskontrolle
+- `IsTemplate`: Um zu kennzeichnen, ob es sich um ein Template handelt
 
-**Vorteile:**
-- Änderungen an Namen oder Dateinamen müssen nur an einer Stelle erfolgen.
-- Konsistenz und Wartbarkeit im gesamten Projekt.
-
-**Hinweis:**
-Da Node.js (Webpack) keine ES6-Module direkt unterstützt, wird hier das CommonJS-Format (`module.exports`) verwendet. In den Quellcode-Dateien wird daher `require()` zum Import genutzt.
-
-### Versionsverwaltung
-
-Die Version der Card wird in `src/card-config.js` verwaltet und folgt dem Format `YYYY.MM-XXXX`:
-- `YYYY`: Jahr
-- `MM`: Monat
-- `XXXX`: Fortlaufende Nummer (4-stellig)
-
-Beispiel: `2025.06-0001`
-
-Die Version wird automatisch in der Card angezeigt (unten rechts) und wird bei jedem Commit automatisch erhöht. Dies geschieht durch den Git pre-commit Hook in `.git/hooks/pre-commit`, der das zentrale Skript `/tgdata/coding/githook_scripts/update-version.sh` ausführt.
-
-Das Versionsupdate-Skript ist zentral in `/tgdata/coding/githook_scripts/` gespeichert und kann von allen Projekten verwendet werden, die das gleiche Versionsformat nutzen. 
+Die Version wird automatisch durch den Git-Hook aktualisiert:
+- Format: `YYYY.MM-XXXX`
+- Beispiel: `2025.06-0001`
+- Wird bei jedem Commit automatisch inkrementiert
+- Wird monatlich zurückgesetzt 
