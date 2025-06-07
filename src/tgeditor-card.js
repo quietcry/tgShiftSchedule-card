@@ -1,6 +1,7 @@
 import { LitElement, html, css } from 'lit';
 import { property } from 'lit/decorators.js';
 import './tgeditor-card-editor';
+import { TGEditorCardImpl } from './tgeditor-card-impl';
 
 // Editor für die Karte
 class TGEditorCardEditor extends LitElement {
@@ -229,10 +230,8 @@ class TGEditorCard extends LitElement {
   }
 }
 
-// Registriere die Karte nur, wenn sie noch nicht registriert ist
-if (!customElements.get('tgeditor-card')) {
-  customElements.define('tgeditor-card', TGEditorCard);
-}
+// Registriere die Karte
+customElements.define('tgeditor-card', TGEditorCardImpl);
 
 if (!customElements.get('tgeditor-card-editor')) {
   customElements.define('tgeditor-card-editor', TGEditorCardEditor);
