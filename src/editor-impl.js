@@ -6,13 +6,6 @@ const { DebugMode } = require('./card-config');
 if (DebugMode) console.debug(`[${EditorBase.cardName}] EditorImpl-Modul wird geladen`);
 
 export class EditorImpl extends EditorBase {
-  static properties = {
-    hass: { type: Object },
-    config: { type: Object }
-  };
-
-  static cardName = EditorBase.cardName;
-
   constructor() {
     super();
     if (DebugMode) console.debug(`[${this.constructor.cardName}] EditorImpl-Konstruktor wird aufgerufen`);
