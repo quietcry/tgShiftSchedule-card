@@ -195,4 +195,34 @@ Um eine neue Karte zu erstellen, müssen nur folgende Dateien angepasst werden:
 2. `card-impl.js` - Spezifische Card-Implementierung
 3. `editor-impl.js` - Spezifischer Editor mit Formular-Schema
 
-Die `editor.js` ist ein allgemeiner Wrapper, der für alle Karten gleich bleibt. 
+Die `editor.js` ist ein allgemeiner Wrapper, der für alle Karten gleich bleibt.
+
+## Zentrale Konfigurationsdatei: `card-config.js`
+
+Die Datei `src/card-config.js` enthält zentrale Konstanten, die für die gesamte Card-Implementierung verwendet werden. Sie dient dazu, wichtige Werte wie den Registrierungsnamen, den Anzeigenamen, die Beschreibung und den Dateinamen der Card an einer Stelle zu definieren und konsistent im Projekt zu verwenden.
+
+**Beispielinhalt:**
+```js
+const CardRegname = 'tgeditor-card';
+const CardName = 'TG Editor Card';
+const CardDescription = 'Eine Karte mit Editor-Funktionalität';
+const CardFilename = 'tgeditor-card.js';
+
+module.exports = {
+  CardRegname,
+  CardName,
+  CardDescription,
+  CardFilename
+};
+```
+
+**Verwendung:**
+- In der Webpack-Konfiguration (`webpack.config.js`) wird `CardFilename` für den Ausgabedateinamen verwendet.
+- In `card.js` und `editor.js` werden die Werte für die Registrierung und Beschreibung der Card genutzt.
+
+**Vorteile:**
+- Änderungen an Namen oder Dateinamen müssen nur an einer Stelle erfolgen.
+- Konsistenz und Wartbarkeit im gesamten Projekt.
+
+**Hinweis:**
+Da Node.js (Webpack) keine ES6-Module direkt unterstützt, wird hier das CommonJS-Format (`module.exports`) verwendet. In den Quellcode-Dateien wird daher `require()` zum Import genutzt. 

@@ -1,10 +1,11 @@
 const path = require('path');
+const { CardFilename } = require('./src/card-config');
 
 module.exports = {
   mode: 'production',
   entry: './src/card.js',
   output: {
-    filename: 'tgeditor-card.js',
+    filename: CardFilename,
     path: path.resolve(__dirname, 'dist'),
   },
   module: {

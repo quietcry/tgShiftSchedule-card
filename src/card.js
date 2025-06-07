@@ -1,14 +1,15 @@
 import { CardImpl } from './card-impl';
 import './editor';
+const { CardRegname, CardName, CardDescription } = require('./card-config');
 
 // Registriere die Karte
-customElements.define('tgeditor-card', CardImpl);
+customElements.define(CardRegname, CardImpl);
 
 // Registriere die Karte in der UI
 window.customCards = window.customCards || [];
 window.customCards.push({
-  type: 'tgeditor-card',
-  name: 'TG Editor Card',
-  description: 'Eine Karte mit Editor-Funktionalität',
+  type: CardRegname,
+  name: CardName,
+  description: CardDescription,
   preview: true
 }); 
