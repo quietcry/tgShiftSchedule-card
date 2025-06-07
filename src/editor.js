@@ -73,6 +73,4 @@ export class Editor extends EditorImpl {
       ></ha-form>
     `;
   }
-}
-
-customElements.define('tgeditor-card-editor', Editor); 
+} 
