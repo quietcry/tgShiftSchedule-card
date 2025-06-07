@@ -1,13 +1,15 @@
-const CardRegname = 'tgeditor-card';
-const CardName = 'TG Editor Card';
-const CardDescription = 'Eine Karte mit Editor-Funktionalität';
-const CardFilename = 'tgeditor-card.js';
-const Version = '2025.06-0008';
+const CardRegname = 'tgepg-card';
+const CardName = 'TG EPG Card';
+const CardDescription = 'Eine Karte für die EPG-Anzeige';
+const CardFilename = 'tgepg-card.js';
+const Version = '2025.06-0005';
+const IsTemplate = false;
 
 module.exports = {
   CardRegname,
   CardName,
   CardDescription,
   CardFilename,
-  Version
+  Version,
+  IsTemplate
 }; 

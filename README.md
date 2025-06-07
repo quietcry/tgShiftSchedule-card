@@ -1,47 +1,21 @@
-# TG Editor Card
+# TG EPG Card
 
-Eine moderne Home Assistant Card mit visuellem Editor, basierend auf dem ha-editor-formbuilder.
+Eine Karte für die EPG-Anzeige in Home Assistant.
 
 ## Installation
 
-1. Kopieren Sie die `tgeditor-card.js` Datei in Ihren `config/www` Ordner in Home Assistant.
-2. Fügen Sie die folgende Ressource zu Ihrer `configuration.yaml` hinzu:
-
-```yaml
-lovelace:
-  resources:
-    - url: /local/tgeditor-card.js
-      type: module
-```
-
-## Entwicklung
-
-1. Installieren Sie die Abhängigkeiten:
-```bash
-npm install
-```
-
-2. Starten Sie den Entwicklungsserver:
-```bash
-npm run watch
-```
-
-3. Bauen Sie die Card:
-```bash
-npm run build
-```
+1. Kopiere die Datei `tgepg-card.js` in deinen `www` Ordner
+2. Füge die Ressource in deine `configuration.yaml` ein:
+   ```yaml
+   resources:
+     - url: /local/tgepg-card.js
+       type: module
+   ```
 
 ## Verwendung
 
-Fügen Sie die Card zu Ihrer Lovelace-Konfiguration hinzu:
+Füge die Karte zu deinem Dashboard hinzu und konfiguriere sie über den visuellen Editor.
 
-```yaml
-type: 'custom:tgeditor-card'
-```
+## Entwicklung
 
-Die Card enthält drei Beispiel-Controls:
-- Text Eingabe
-- Auswahlmenü
-- Schalter
-
-Alle Änderungen werden automatisch in der Lovelace-Konfiguration gespeichert. 
+Siehe [dev-instructions.md](dev-instructions.md) für Details zur Entwicklung.
