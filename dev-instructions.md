@@ -170,13 +170,29 @@ Wichtige Punkte:
 
 ## Projektstruktur
 
-- `src/`: Quellcode
-  - `card.js`: Hauptdatei
-  - `tgeditor-card-editor.js`: Editor-Komponente
-  - `base-card.js`: Basis-Karte
-  - `base-card-editor.js`: Basis-Editor
-  - `tgeditor-card-impl.js`: Spezifische Karten-Implementierung
-  - `tgeditor-card-editor-impl.js`: Spezifische Editor-Implementierung
-- `dist/`: Kompilierte Dateien
-- `webpack.config.js`: Webpack-Konfiguration
-- `.babelrc`: Babel-Konfiguration 
+Das Projekt ist in verschiedene Komponenten aufgeteilt, die unterschiedliche Verantwortlichkeiten haben:
+
+### Base-Dateien
+- `card-base.js`, `editor-base.js`
+- Enthalten den allgemeinen, wiederverwendbaren Code
+- Beispiel: `loadHaForm` in `editor-base.js`
+- Beispiel: Grundlegende Card-Funktionalität in `card-base.js`
+
+### Impl-Dateien
+- `card-impl.js`, `editor-impl.js`
+- Enthalten die spezifische Implementierung für diese Karte
+- Beispiel: Formular-Schema und spezifische Logik in `editor-impl.js`
+- Beispiel: Card-Darstellung in `card-impl.js`
+
+### Editor.js
+- Nur ein Wrapper für die spezifische Implementierung
+- Keine spezifische Logik
+- Nur Styling-Anpassungen
+
+### Neue Karte erstellen
+Um eine neue Karte zu erstellen, müssen nur folgende Dateien angepasst werden:
+1. `card.js` - Hauptdatei mit Registrierung
+2. `card-impl.js` - Spezifische Card-Implementierung
+3. `editor-impl.js` - Spezifischer Editor mit Formular-Schema
+
+Die `editor.js` ist ein allgemeiner Wrapper, der für alle Karten gleich bleibt. 
