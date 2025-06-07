@@ -6,9 +6,25 @@ const { DebugMode } = require('./card-config');
 if (DebugMode) console.debug(`[${EditorBase.cardName}] EditorImpl-Modul wird geladen`);
 
 export class EditorImpl extends EditorBase {
+  static properties = {
+    hass: { type: Object },
+    _config: { type: Object }
+  };
+
   constructor() {
     super();
     if (DebugMode) console.debug(`[${this.constructor.cardName}] EditorImpl-Konstruktor wird aufgerufen`);
+    this._config = {
+      entity: '',
+      time_window: 'C',
+      date: '',
+      max_items: 10,
+      show_channel: true,
+      show_time: true,
+      show_duration: true,
+      show_title: true,
+      show_description: true
+    };
   }
 
   async firstUpdated() {
@@ -22,36 +38,80 @@ export class EditorImpl extends EditorBase {
     if (!config) {
       throw new Error('Keine Konfiguration vorhanden');
     }
-    super.setConfig(config);
-    if (DebugMode) console.debug(`[${this.constructor.cardName}] EditorImpl config nach setConfig:`, this.config);
+    this._config = { ...this._config, ...config };
+    if (DebugMode) console.debug(`[${this.constructor.cardName}] EditorImpl config nach setConfig:`, this._config);
   }
 
   renderEditor() {
     return html`
       <ha-form
         .hass=${this.hass}
-        .data=${this.config}
+        .data=${this._config}
         .schema=${[
           {
-            name: 'text',
+            name: 'entity',
+            required: true,
             selector: {
-              text: {}
+              entity: {
+                domain: ['sensor']
+              }
             }
           },
           {
-            name: 'auswahl',
+            name: 'time_window',
             selector: {
               select: {
                 options: [
-                  { value: 'option1', label: 'Option 1' },
-                  { value: 'option2', label: 'Option 2' },
-                  { value: 'option3', label: 'Option 3' }
+                  { value: 'A', label: 'Vormittag (6-12 Uhr)' },
+                  { value: 'P', label: 'Nachmittag (12-18 Uhr)' },
+                  { value: 'R', label: 'Abend (18-23 Uhr)' },
+                  { value: 'C', label: 'Aktuelle Sendungen' }
                 ]
               }
             }
           },
           {
-            name: 'schalter',
+            name: 'date',
+            selector: {
+              date: {}
+            }
+          },
+          {
+            name: 'max_items',
+            selector: {
+              number: {
+                min: 1,
+                max: 50,
+                mode: 'box'
+              }
+            }
+          },
+          {
+            name: 'show_channel',
+            selector: {
+              boolean: {}
+            }
+          },
+          {
+            name: 'show_time',
+            selector: {
+              boolean: {}
+            }
+          },
+          {
+            name: 'show_duration',
+            selector: {
+              boolean: {}
+            }
+          },
+          {
+            name: 'show_title',
+            selector: {
+              boolean: {}
+            }
+          },
+          {
+            name: 'show_description',
             selector: {
               boolean: {}
             }
@@ -64,9 +124,9 @@ export class EditorImpl extends EditorBase {
 
   _valueChanged(ev) {
     const value = ev.detail.value;
-    this.config = { ...this.config, ...value };
+    this._config = { ...this._config, ...value };
     this.dispatchEvent(new CustomEvent('config-changed', {
-      detail: { config: this.config },
+      detail: { config: this._config },
       bubbles: true,
       composed: true
     }));
@@ -74,12 +134,12 @@ export class EditorImpl extends EditorBase {
 
   render() {
     if (DebugMode) console.debug(`[${this.constructor.cardName}] EditorImpl render wird aufgerufen`);
-    if (!this.hass || !this.config) {
-      if (DebugMode) console.debug(`[${this.constructor.cardName}] EditorImpl render: Kein hass oder config`);
-      return html`<div>Konfiguration fehlt</div>`;
+    if (!this.hass) {
+      if (DebugMode) console.debug(`[${this.constructor.cardName}] EditorImpl render: Kein hass`);
+      return html`<div>Loading...</div>`;
     }
 
-    if (DebugMode) console.debug(`[${this.constructor.cardName}] EditorImpl render mit config:`, this.config);
+    if (DebugMode) console.debug(`[${this.constructor.cardName}] EditorImpl render mit config:`, this._config);
     return html`
       <div class="editor-container">
         ${this.renderEditor()}

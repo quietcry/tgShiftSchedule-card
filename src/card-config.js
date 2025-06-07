@@ -1,9 +1,9 @@
 const CardRegname = 'tgepg-card';
-const CardName = 'TG-EPG Card';
+const CardName = 'TG EPG Card';
 const CardDescription = 'Eine Karte für die EPG-Anzeige';
 const CardFilename = 'tgepg-card.js';
 const Version = '2025.06-0001';
-const DebugMode = false;
+const DebugMode = true;  // Temporär auf true gesetzt für Debugging
 const showVersion = true;
 
 module.exports = {
