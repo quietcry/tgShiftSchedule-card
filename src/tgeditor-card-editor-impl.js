@@ -1,7 +1,13 @@
 import { html } from 'lit';
 import { BaseCardEditor } from './base-card-editor';
+import { loadHaForm } from './load-ha-form';
 
 export class TGEditorCardEditorImpl extends BaseCardEditor {
+  async firstUpdated() {
+    await loadHaForm();
+    await super.firstUpdated();
+  }
+
   renderEditor() {
     return html`
       <ha-form
