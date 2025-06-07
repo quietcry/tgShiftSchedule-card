@@ -14,7 +14,10 @@ export class EditorImpl extends EditorBase {
   }
 
   setConfig(config) {
-    this.config = config;
+    if (!config) {
+      throw new Error('Invalid configuration');
+    }
+    this.config = { ...config };
   }
 
   _valueChanged(ev) {
