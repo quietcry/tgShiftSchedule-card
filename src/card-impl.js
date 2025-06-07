@@ -1,11 +1,22 @@
-import { html } from 'lit';
+import { html, css, LitElement } from 'lit';
+import { property } from 'lit/decorators.js';
 import { CardBase } from './card-base';
+const { CardVersion } = require('./card-config');
 
 export class CardImpl extends CardBase {
-  static get properties() {
-    return {
-      hass: {},
-      config: {}
+  static properties = {
+    hass: { type: Object },
+    _config: { type: Object },
+    version: { type: String, reflect: true }
+  };
+
+  constructor() {
+    super();
+    this.version = CardVersion;
+    this._config = {
+      text: '',
+      auswahl: 'option1',
+      schalter: false
     };
   }
 
@@ -18,53 +29,46 @@ export class CardImpl extends CardBase {
   }
 
   setConfig(config) {
-    this.config = config;
+    if (!config) {
+      throw new Error('Keine Konfiguration vorhanden');
+    }
+    this._config = { ...this._config, ...config };
   }
 
   render() {
-    if (!this.hass) {
-      return html`<div>Loading...</div>`;
+    if (!this.hass || !this._config) {
+      return html`<div>Konfiguration fehlt</div>`;
     }
 
     return html`
-      <ha-form
-        .hass=${this.hass}
-        .data=${this.config}
-        .schema=${[
-          {
-            name: 'text',
-            selector: {
-              text: {}
-            }
-          },
-          {
-            name: 'auswahl',
-            selector: {
-              select: {
-                options: [
-                  { value: 'option1', label: 'Option 1' },
-                  { value: 'option2', label: 'Option 2' },
-                  { value: 'option3', label: 'Option 3' }
-                ]
-              }
-            }
-          },
-          {
-            name: 'schalter',
-            selector: {
-              boolean: {}
-            }
-          }
-        ]}
-      ></ha-form>
+      <ha-card>
+        <div class="card-content">
+          <div class="text">${this._config.text}</div>
+          <div class="auswahl">${this._config.auswahl}</div>
+          <div class="schalter">${this._config.schalter ? 'An' : 'Aus'}</div>
+          <div class="version">v${this.version}</div>
+        </div>
+      </ha-card>
     `;
   }
 
+  static styles = css`
+    .card-content {
+      padding: 16px;
+    }
+    .version {
+      font-size: 10px;
+      color: var(--secondary-text-color);
+      text-align: right;
+      margin-top: 8px;
+    }
+  `;
+
   renderValueDisplay() {
     return html`
-      <div>Text: ${this.config.text || ''}</div>
-      <div>Auswahl: ${this.config.auswahl || ''}</div>
-      <div>Schalter: ${this.config.schalter ? 'An' : 'Aus'}</div>
+      <div>Text: ${this._config.text || ''}</div>
+      <div>Auswahl: ${this._config.auswahl || ''}</div>
+      <div>Schalter: ${this._config.schalter ? 'An' : 'Aus'}</div>
     `;
   }
 } 

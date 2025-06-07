@@ -225,4 +225,15 @@ module.exports = {
 - Konsistenz und Wartbarkeit im gesamten Projekt.
 
 **Hinweis:**
-Da Node.js (Webpack) keine ES6-Module direkt unterstützt, wird hier das CommonJS-Format (`module.exports`) verwendet. In den Quellcode-Dateien wird daher `require()` zum Import genutzt. 
+Da Node.js (Webpack) keine ES6-Module direkt unterstützt, wird hier das CommonJS-Format (`module.exports`) verwendet. In den Quellcode-Dateien wird daher `require()` zum Import genutzt.
+
+### Versionsverwaltung
+
+Die Version der Card wird in `src/card-config.js` verwaltet und folgt dem Format `YYYY.MM-XXXX`:
+- `YYYY`: Jahr
+- `MM`: Monat
+- `XXXX`: Fortlaufende Nummer (4-stellig)
+
+Beispiel: `2025.06-0001`
+
+Die Version wird automatisch in der Card angezeigt (unten rechts) und sollte bei jeder Änderung aktualisiert werden. 

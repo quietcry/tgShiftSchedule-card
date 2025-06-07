@@ -1,11 +1,19 @@
-import { html } from 'lit';
+import { html, css, LitElement } from 'lit';
+import { property } from 'lit/decorators.js';
 import { EditorBase } from './editor-base';
 
 export class EditorImpl extends EditorBase {
-  static get properties() {
-    return {
-      hass: {},
-      config: {}
+  static properties = {
+    hass: { type: Object },
+    _config: { type: Object }
+  };
+
+  constructor() {
+    super();
+    this._config = {
+      text: '',
+      auswahl: 'option1',
+      schalter: false
     };
   }
 
@@ -15,29 +23,16 @@ export class EditorImpl extends EditorBase {
 
   setConfig(config) {
     if (!config) {
-      throw new Error('Invalid configuration');
+      throw new Error('Keine Konfiguration vorhanden');
     }
-    this.config = { ...config };
+    this._config = { ...this._config, ...config };
   }
 
-  _valueChanged(ev) {
-    const value = ev.detail.value;
-    this.dispatchEvent(new CustomEvent('config-changed', {
-      detail: { config: value },
-      bubbles: true,
-      composed: true
-    }));
-  }
-
-  render() {
-    if (!this.hass) {
-      return html`<div>Loading...</div>`;
-    }
-
+  renderEditor() {
     return html`
       <ha-form
         .hass=${this.hass}
-        .data=${this.config}
+        .data=${this._config}
         .schema=${[
           {
             name: 'text',
@@ -67,5 +62,23 @@ export class EditorImpl extends EditorBase {
         @value-changed=${this._valueChanged}
       ></ha-form>
     `;
+  }
+
+  _valueChanged(ev) {
+    const value = ev.detail.value;
+    this._config = { ...this._config, ...value };
+    this.dispatchEvent(new CustomEvent('config-changed', {
+      detail: { config: this._config },
+      bubbles: true,
+      composed: true
+    }));
+  }
+
+  render() {
+    if (!this.hass) {
+      return html`<div>Loading...</div>`;
+    }
+
+    return this.renderEditor();
   }
 } 
