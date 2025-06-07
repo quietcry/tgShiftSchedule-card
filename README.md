@@ -50,3 +50,4 @@ Alle Änderungen werden automatisch in der Lovelace-Konfiguration gespeichert. #
 # Test4
 # Test5
 # Test6
+# Test7
