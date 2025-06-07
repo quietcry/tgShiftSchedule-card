@@ -190,12 +190,51 @@ Das Projekt ist in verschiedene Komponenten aufgeteilt, die unterschiedliche Ver
 - Nur Styling-Anpassungen
 
 ### Neue Karte erstellen
-Um eine neue Karte zu erstellen, müssen nur folgende Dateien angepasst werden:
-1. `card.js` - Hauptdatei mit Registrierung
-2. `card-impl.js` - Spezifische Card-Implementierung
-3. `editor-impl.js` - Spezifischer Editor mit Formular-Schema
 
-Die `editor.js` ist ein allgemeiner Wrapper, der für alle Karten gleich bleibt.
+Um eine neue Karte basierend auf diesem Boilerplate zu erstellen, folge diesen Schritten:
+
+1. Erstelle ein neues Repository in Forgejo:
+   - Gehe zu http://192.168.1.160:3000/tommy
+   - Klicke auf "New Repository"
+   - Name: z.B. `tgSprinkler-card`
+   - Wähle "Private" oder "Public"
+   - Klicke auf "Create Repository"
+
+2. Klone das neue Repository:
+   ```bash
+   git clone git@192.168.1.160:tommy/tgSprinkler-card.git
+   cd tgSprinkler-card
+   ```
+
+3. Passe die Konfiguration in `card-config.js` an:
+   ```javascript
+   const CardRegname = 'tgsprinkler-card';  // Angepasst
+   const CardName = 'TG Sprinkler Card';    // Angepasst
+   const CardDescription = 'Eine Karte für die Sprinkler-Steuerung';  // Angepasst
+   const CardFilename = 'tgsprinkler-card.js';  // Angepasst
+   const Version = '2025.06-0001';  // Zurückgesetzt
+   ```
+
+4. Erste Commit und Push:
+   ```bash
+   git add .
+   git commit -m "init: Neue Karte basierend auf tgEditor-card"
+   git push -u origin master
+   ```
+
+5. Wenn du später Änderungen vom tgEditor-card einspielen möchtest:
+   - Gehe zu deinem Repository
+   - Klicke auf "Settings"
+   - Scrolle runter zu "Template"
+   - Aktiviere "Template Repository"
+   - Klicke auf "Save"
+   - Dann kannst du über "Use Template" neue Repositories erstellen
+
+Diese Methode hat mehrere Vorteile:
+- Saubere Trennung zwischen Template und neuen Karten
+- Einfaches Einspielen von Änderungen vom Template
+- Klare Dokumentation der Beziehung zwischen Template und Karten
+- Automatische Versionsverwaltung für jede Karte
 
 ## Zentrale Konfigurationsdatei: `card-config.js`
 
