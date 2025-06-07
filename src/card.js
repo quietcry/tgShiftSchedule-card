@@ -1,5 +1,5 @@
 import { TGEditorCardImpl } from './card-impl';
-import './tgeditor-card-editor';
+import './editor';
 
 // Registriere die Karte
 customElements.define('tgeditor-card', TGEditorCardImpl);
