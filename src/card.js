@@ -6,11 +6,14 @@ import './editor';
 const { CardRegname, CardName, CardDescription } = require('./card-config');
 
 export class Card extends CardImpl {
-  static styles = css`
-    :host {
-      padding: 16px;
-    }
-  `;
+  static styles = [
+    CardImpl.styles,
+    css`
+      :host {
+        
+      }
+    `
+  ];
 }
 
 // Registriere die Karte

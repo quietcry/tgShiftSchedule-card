@@ -13,6 +13,9 @@ export class EditorBase extends LitElement {
     :host {
       display: block;
     }
+    .editor-container {
+      padding: 16px;
+    }
   `;
 
   static cardName = CardName;
@@ -109,7 +112,7 @@ export class EditorBase extends LitElement {
     if (DebugMode) console.debug(`[${this.constructor.cardName}] EditorBase render wird aufgerufen`);
     if (!this.hass || !this.config) {
       if (DebugMode) console.debug(`[${this.constructor.cardName}] EditorBase render: Kein hass oder config`);
-      return html`<div>Loading...</div>`;
+      return html`<div>Konfiguration fehlt</div>`;
     }
 
     if (DebugMode) console.debug(`[${this.constructor.cardName}] EditorBase render mit config:`, this.config);
