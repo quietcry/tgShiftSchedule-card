@@ -1,8 +1,8 @@
-import { EditorImpl } from './card-impl';
+import { CardImpl } from './card-impl';
 import './editor';
 
 // Registriere die Karte
-customElements.define('tgeditor-card', EditorImpl);
+customElements.define('tgeditor-card', CardImpl);
 
 // Registriere die Karte in der UI
 window.customCards = window.customCards || [];
