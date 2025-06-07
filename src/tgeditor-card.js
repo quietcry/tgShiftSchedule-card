@@ -1,6 +1,6 @@
 import { LitElement, html, css } from 'lit';
 import { property } from 'lit/decorators.js';
-import { loadHaForm } from './load-ha-form';
+import './tgeditor-card-editor';
 
 // Editor für die Karte
 class TGEditorCardEditor extends LitElement {
