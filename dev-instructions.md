@@ -111,6 +111,36 @@ Vorteile der Vererbung:
 - Einfache Erweiterung durch Überschreiben von Methoden
 - Keine Konflikte zwischen verschiedenen Implementierungen
 
+### Klassen mit gleichem Namen
+
+Sie können in verschiedenen Karten Klassen mit dem gleichen Namen verwenden, solange die registrierten Element-Namen unterschiedlich sind. Beispiel:
+
+```javascript
+// Karte 1
+class Editor {
+  // Spezifische Implementierung für Karte 1
+  render() {
+    return html`<div>Editor für Karte 1</div>`;
+  }
+}
+customElements.define('karte1-editor', Editor);
+
+// Karte 2
+class Editor {
+  // Völlig andere Implementierung für Karte 2
+  render() {
+    return html`<div>Editor für Karte 2</div>`;
+  }
+}
+customElements.define('karte2-editor', Editor);
+```
+
+In diesem Beispiel:
+- Beide Klassen heißen `Editor`
+- Sie haben unterschiedliche Implementierungen
+- Sie werden unter verschiedenen Element-Namen registriert
+- Es gibt keine Konflikte, da die Element-Namen eindeutig sind
+
 ## Projektstruktur
 
 - `src/`: Quellcode
