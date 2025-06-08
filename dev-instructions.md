@@ -92,8 +92,27 @@ Diese Variablen werden an verschiedenen Stellen verwendet:
 - `Version`: Für die Versionskontrolle
 - `IsTemplate`: Um zu kennzeichnen, ob es sich um ein Template handelt
 
-Die Version wird automatisch durch den Git-Hook aktualisiert:
-- Format: `YYYY.MM-XXXX`
-- Beispiel: `2025.06-0001`
-- Wird bei jedem Commit automatisch inkrementiert
-- Wird monatlich zurückgesetzt 
+## Versionsverwaltung
+
+Die Card verwendet ein automatisches Versionssystem, das durch einen Git Pre-Commit Hook gesteuert wird. Der Hook befindet sich in `.git/hooks/pre-commit` und wird vor jedem Commit ausgeführt.
+
+### Funktionsweise
+
+1. Der Hook ruft das Script `/tgdata/coding/githook_scripts/update-version.sh` auf
+2. Das Script aktualisiert die Version in `src/card-config.js` nach dem Schema `YYYY.MM-XXXX`
+   - `YYYY`: Aktuelles Jahr
+   - `MM`: Aktueller Monat
+   - `XXXX`: Fortlaufende Nummer (wird bei jedem Commit erhöht, am Monatsanfang zurückgesetzt)
+3. Die aktualisierte Version wird automatisch zum Commit hinzugefügt
+
+### Beispiel
+
+- Erster Commit im März 2024: `2024.03-0001`
+- Zweiter Commit im März 2024: `2024.03-0002`
+- Erster Commit im April 2024: `2024.04-0001`
+
+### Hinweise
+
+- Der Hook muss ausführbar sein (`chmod +x .git/hooks/pre-commit`)
+- Bei Fehlern im Script wird der Commit abgebrochen
+- Die Versionsdatei muss das Format `Version = 'YYYY.MM-XXXX'` enthalten
