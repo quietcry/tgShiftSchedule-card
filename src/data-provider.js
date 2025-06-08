@@ -20,18 +20,18 @@ export class DataProvider {
 
   async fetchEpgData(entity, timeWindow, date) {
     this._debug('Starte EPG-Datenabfrage', { entity, timeWindow, date });
-    
+
     try {
       const response = await this.hass.connection.sendMessagePromise({
-        type: "call_service",
-        domain: "tgvdr",
-        service: "get_epg_data",
+        type: 'call_service',
+        domain: 'tgvdr',
+        service: 'get_epg_data',
         service_data: {
           entity_id: entity,
           time_window: timeWindow,
-          date: date
+          date: date,
         },
-        return_response: true
+        return_response: true,
       });
 
       this._debug('EPG-Daten empfangen', response);
@@ -40,7 +40,7 @@ export class DataProvider {
         hasResponseResponse: !!response?.response,
         hasEpgData: !!response?.response?.epg_data,
         responseKeys: response ? Object.keys(response) : [],
-        responseResponseKeys: response?.response ? Object.keys(response.response) : []
+        responseResponseKeys: response?.response ? Object.keys(response.response) : [],
       });
 
       if (!response || !response.response?.epg_data) {
@@ -52,7 +52,7 @@ export class DataProvider {
       this._debug('Verarbeitete EPG-Daten', {
         anzahlKanäle: epgData.length,
         beispielKanal: epgData[0],
-        beispielSendungen: epgData[0]?.epg
+        beispielSendungen: epgData[0]?.epg,
       });
 
       return epgData;
@@ -61,4 +61,4 @@ export class DataProvider {
       throw error;
     }
   }
-} 
+}

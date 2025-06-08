@@ -10,7 +10,8 @@ if (DebugMode) console.debug(`[${CardName}] CardImpl-Modul wird geladen`);
 
 export class CardImpl extends CardBase {
   static get properties() {
-    if (DebugMode) console.debug(`[${CardName}] [CardImpl] CardImpl static properties wird aufgerufen`);
+    if (DebugMode)
+      console.debug(`[${CardName}] [CardImpl] CardImpl static properties wird aufgerufen`);
     return {
       _config: { type: Object },
       _hass: { type: Object },
@@ -19,17 +20,19 @@ export class CardImpl extends CardBase {
       _epgData: { type: Array, reflect: true },
       _dataProvider: { type: Object },
       _currentView: { type: Object },
-      _selectedTab: { type: Number }
+      _selectedTab: { type: Number },
     };
   }
 
   static getConfigElement() {
-    if (DebugMode) console.debug(`[${CardName}] [CardImpl] CardImpl static getConfigElement wird aufgerufen`);
+    if (DebugMode)
+      console.debug(`[${CardName}] [CardImpl] CardImpl static getConfigElement wird aufgerufen`);
     return document.createElement(`${CardRegname}-editor`);
   }
 
   static getStubConfig() {
-    if (DebugMode) console.debug(`[${CardName}] [CardImpl] CardImpl static getStubConfig wird aufgerufen`);
+    if (DebugMode)
+      console.debug(`[${CardName}] [CardImpl] CardImpl static getStubConfig wird aufgerufen`);
     return {
       entity: 'sensor.vdr_vdr_epg_info',
       time_window: 'C',
@@ -40,7 +43,7 @@ export class CardImpl extends CardBase {
       show_time: true,
       show_duration: true,
       show_title: true,
-      show_description: true
+      show_description: true,
     };
   }
 
@@ -70,14 +73,14 @@ export class CardImpl extends CardBase {
   setConfig(config) {
     this._debug('CardImpl setConfig wird aufgerufen mit:', config);
     super.setConfig(config);
-    
+
     // Aktualisiere die View basierend auf der Konfiguration
     if (this._selectedTab === 0) {
       this._currentView = new TableView(this.config, []);
     } else if (this._selectedTab === 1) {
       this._currentView = new EPGView(this.config, []);
     }
-    
+
     this._debug('CardImpl _currentView nach setConfig:', this._currentView);
   }
 
@@ -98,7 +101,7 @@ export class CardImpl extends CardBase {
     if (!this._dataProvider || !this.config.entity) {
       this._debug('_loadEpgDataNew: Übersprungen - dataProvider oder entity fehlt', {
         dataProvider: !!this._dataProvider,
-        entity: this.config.entity
+        entity: this.config.entity,
       });
       return;
     }
@@ -110,7 +113,7 @@ export class CardImpl extends CardBase {
       this._debug('Neuer Serviceaufruf wird gestartet:', {
         entity: this.config.entity,
         time_window: this.config.time_window,
-        date: this.config.date
+        date: this.config.date,
       });
 
       const newData = await this._dataProvider.fetchEpgData(
@@ -124,7 +127,7 @@ export class CardImpl extends CardBase {
       this._debug('_epgData aktualisiert:', {
         anzahlKanäle: this._epgData.length,
         beispielKanal: this._epgData[0],
-        beispielSendungen: this._epgData[0]?.epg
+        beispielSendungen: this._epgData[0]?.epg,
       });
 
       // View basierend auf Konfiguration auswählen
@@ -178,39 +181,37 @@ export class CardImpl extends CardBase {
         <div class="tabs">
           <button
             class="tab-button ${this._selectedTab === 0 ? 'active' : ''}"
-            @click=${() => this._selectedTab = 0}
+            @click=${() => (this._selectedTab = 0)}
           >
             Liste
           </button>
           <button
             class="tab-button ${this._selectedTab === 1 ? 'active' : ''}"
-            @click=${() => this._selectedTab = 1}
+            @click=${() => (this._selectedTab = 1)}
           >
             EPG
           </button>
           <button
             class="tab-button ${this._selectedTab === 2 ? 'active' : ''}"
-            @click=${() => this._selectedTab = 2}
+            @click=${() => (this._selectedTab = 2)}
           >
             Aktiv
           </button>
         </div>
         <div class="tab-content">
-          ${this._selectedTab === 0 ? html`
-            <div class="list-view">
-              ${this._currentView.render()}
-            </div>
-          ` : ''}
-          ${this._selectedTab === 1 ? html`
-            <div class="epg-view">
-              ${this._currentView.render()}
-            </div>
-          ` : ''}
-          ${this._selectedTab === 2 ? html`
-            <div class="active-view">
-              <!-- Aktiv View -->
-            </div>
-          ` : ''}
+          ${this._selectedTab === 0
+            ? html` <div class="list-view">${this._currentView.render()}</div> `
+            : ''}
+          ${this._selectedTab === 1
+            ? html` <div class="epg-view">${this._currentView.render()}</div> `
+            : ''}
+          ${this._selectedTab === 2
+            ? html`
+                <div class="active-view">
+                  <!-- Aktiv View -->
+                </div>
+              `
+            : ''}
         </div>
         <div class="version">Version: ${this.version}</div>
       </div>
@@ -245,7 +246,8 @@ export class CardImpl extends CardBase {
       width: 100%;
       border-collapse: collapse;
     }
-    th, td {
+    th,
+    td {
       padding: 8px;
       text-align: left;
       border-bottom: 1px solid var(--divider-color);
@@ -286,7 +288,8 @@ export class CardImpl extends CardBase {
   `;
 
   getDefaultConfig() {
-    if (DebugMode) console.debug(`[${this.constructor.cardName}] CardImpl getDefaultConfig wird aufgerufen`);
+    if (DebugMode)
+      console.debug(`[${this.constructor.cardName}] CardImpl getDefaultConfig wird aufgerufen`);
     return {
       entity: '',
       time_window: 'C',
@@ -297,7 +300,7 @@ export class CardImpl extends CardBase {
       show_duration: true,
       show_title: true,
       show_description: true,
-      view_mode: 'Liste'
+      view_mode: 'Liste',
     };
   }
 }

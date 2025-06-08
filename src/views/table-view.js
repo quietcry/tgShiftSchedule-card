@@ -38,20 +38,24 @@ export class TableView {
             </tr>
           </thead>
           <tbody>
-            ${this._epgData.slice(0, this._config.max_items).map(channel => 
-              channel.epg.map(show => html`
-                <tr>
-                  ${this._config.show_channel ? html`<td>${channel.channel_name}</td>` : ''}
-                  ${this._config.show_time ? html`<td>${this._formatTime(show.start)}</td>` : ''}
-                  ${this._config.show_duration ? html`<td>${this._formatDuration(show.start, show.stop)}</td>` : ''}
-                  ${this._config.show_title ? html`<td>${show.title}</td>` : ''}
-                  ${this._config.show_description ? html`<td>${show.shorttext || ''}</td>` : ''}
-                </tr>
-              `)
+            ${this._epgData.slice(0, this._config.max_items).map(channel =>
+              channel.epg.map(
+                show => html`
+                  <tr>
+                    ${this._config.show_channel ? html`<td>${channel.channel_name}</td>` : ''}
+                    ${this._config.show_time ? html`<td>${this._formatTime(show.start)}</td>` : ''}
+                    ${this._config.show_duration
+                      ? html`<td>${this._formatDuration(show.start, show.stop)}</td>`
+                      : ''}
+                    ${this._config.show_title ? html`<td>${show.title}</td>` : ''}
+                    ${this._config.show_description ? html`<td>${show.shorttext || ''}</td>` : ''}
+                  </tr>
+                `
+              )
             )}
           </tbody>
         </table>
       </div>
     `;
   }
-} 
+}

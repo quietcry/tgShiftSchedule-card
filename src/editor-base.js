@@ -9,7 +9,7 @@ if (DebugMode) console.debug(`[${CardName}] EditorBase-Modul wird geladen`);
 export class EditorBase extends SuperBase {
   static properties = {
     ...super.properties,
-    _selectedTab: { type: Number }
+    _selectedTab: { type: Number },
   };
 
   static styles = css`
@@ -26,7 +26,7 @@ export class EditorBase extends SuperBase {
     this._debug('[EditorBase] EditorBase-Konstruktor wird aufgerufen');
     this.config = {
       type: 'custom:tgeditor-card',
-      ...defaultConfig
+      ...defaultConfig,
     };
     this._debug('[EditorBase] EditorBase config nach Konstruktor:', this.config);
   }
@@ -47,7 +47,10 @@ export class EditorBase extends SuperBase {
         await cardHelpers.loadHaForm();
         this._debug('[EditorBase] EditorBase ha-form geladen');
       } catch (error) {
-        console.error(`[${CardName}] [EditorBase] Fehler beim Laden von custom-card-helpers:`, error);
+        console.error(
+          `[${CardName}] [EditorBase] Fehler beim Laden von custom-card-helpers:`,
+          error
+        );
         throw error;
       }
     } else {
@@ -70,24 +73,24 @@ export class EditorBase extends SuperBase {
     if (!config) {
       throw new Error('Keine Konfiguration angegeben');
     }
-    
+
     // Prüfe, ob es sich um eine neue Konfiguration handelt
     const isNewConfig = !this.config || Object.keys(this.config).length === 0;
-    
+
     // Wenn es eine neue Konfiguration ist, verwende sie direkt
     if (isNewConfig) {
       this.config = {
         ...this.getDefaultConfig(),
-        ...config
+        ...config,
       };
     } else {
       // Ansonsten behalte die bestehende Konfiguration bei und aktualisiere nur geänderte Werte
       this.config = {
         ...this.config,
-        ...config
+        ...config,
       };
     }
-    
+
     this._debug('[EditorBase] EditorBase config nach setConfig:', this.config);
   }
 
@@ -99,14 +102,16 @@ export class EditorBase extends SuperBase {
     }
     const newConfig = {
       ...this.config,
-      ...ev.detail.value
+      ...ev.detail.value,
     };
     this._debug('[EditorBase] EditorBase neue Konfiguration:', newConfig);
-    this.dispatchEvent(new CustomEvent('config-changed', {
-      detail: { config: newConfig },
-      bubbles: true,
-      composed: true
-    }));
+    this.dispatchEvent(
+      new CustomEvent('config-changed', {
+        detail: { config: newConfig },
+        bubbles: true,
+        composed: true,
+      })
+    );
   }
 
   render() {

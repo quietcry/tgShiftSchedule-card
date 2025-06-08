@@ -9,7 +9,7 @@ if (DebugMode) console.debug(`[${EditorBase.cardName}] EditorImpl-Modul wird gel
 export class EditorImpl extends EditorBase {
   static properties = {
     ...super.properties,
-    _selectedTab: { type: Number }
+    _selectedTab: { type: Number },
   };
 
   constructor() {
@@ -23,16 +23,19 @@ export class EditorImpl extends EditorBase {
       show_duration: true,
       show_title: true,
       show_description: true,
-      view_mode: 'Liste'
+      view_mode: 'Liste',
     });
-    if (DebugMode) console.debug(`[${this.constructor.cardName}] EditorImpl-Konstruktor wird aufgerufen`);
+    if (DebugMode)
+      console.debug(`[${this.constructor.cardName}] EditorImpl-Konstruktor wird aufgerufen`);
     this._selectedTab = 0;
   }
 
   async firstUpdated() {
-    if (DebugMode) console.debug(`[${this.constructor.cardName}] EditorImpl firstUpdated wird aufgerufen`);
+    if (DebugMode)
+      console.debug(`[${this.constructor.cardName}] EditorImpl firstUpdated wird aufgerufen`);
     await super.firstUpdated();
-    if (DebugMode) console.debug(`[${this.constructor.cardName}] EditorImpl firstUpdated abgeschlossen`);
+    if (DebugMode)
+      console.debug(`[${this.constructor.cardName}] EditorImpl firstUpdated abgeschlossen`);
   }
 
   render() {
@@ -42,39 +45,40 @@ export class EditorImpl extends EditorBase {
       return html`<div>Loading...</div>`;
     }
 
-    if (DebugMode) console.debug(`[${this.constructor.cardName}] EditorImpl render mit config:`, this.config);
+    if (DebugMode)
+      console.debug(`[${this.constructor.cardName}] EditorImpl render mit config:`, this.config);
     return html`
       <div class="card-config">
         <ha-expansion-panel>
           <span slot="header">Allgemein</span>
-      <ha-form
-        .hass=${this.hass}
-        .data=${this.config}
-        .schema=${[
-          {
+          <ha-form
+            .hass=${this.hass}
+            .data=${this.config}
+            .schema=${[
+              {
                 name: 'entity',
-            selector: {
-                  entity: {}
-            }
-          },
-          {
+                selector: {
+                  entity: {},
+                },
+              },
+              {
                 name: 'time_window',
-            selector: {
-              select: {
-                options: [
+                selector: {
+                  select: {
+                    options: [
                       { value: 'C', label: 'Aktuell' },
                       { value: 'D', label: 'Heute' },
-                      { value: 'W', label: 'Diese Woche' }
-                ]
-              }
-            }
-          },
-          {
+                      { value: 'W', label: 'Diese Woche' },
+                    ],
+                  },
+                },
+              },
+              {
                 name: 'date',
                 selector: {
-                  text: {}
-                }
-              }
+                  text: {},
+                },
+              },
             ]}
             .computeLabel=${this._computeLabel}
             @value-changed=${this._valueChanged}
@@ -94,10 +98,10 @@ export class EditorImpl extends EditorBase {
                     options: [
                       { value: 'Liste', label: 'Liste' },
                       { value: 'epg', label: 'EPG' },
-                      { value: 'activ', label: 'Aktiv' }
-                    ]
-                  }
-                }
+                      { value: 'activ', label: 'Aktiv' },
+                    ],
+                  },
+                },
               },
               {
                 name: 'max_items',
@@ -105,10 +109,10 @@ export class EditorImpl extends EditorBase {
                   number: {
                     min: 1,
                     max: 100,
-                    mode: 'box'
-                  }
-                }
-              }
+                    mode: 'box',
+                  },
+                },
+              },
             ]}
             .computeLabel=${this._computeLabel}
             @value-changed=${this._valueChanged}
@@ -124,37 +128,37 @@ export class EditorImpl extends EditorBase {
               {
                 name: 'show_channel',
                 selector: {
-                  boolean: {}
-                }
+                  boolean: {},
+                },
               },
               {
                 name: 'show_time',
                 selector: {
-                  boolean: {}
-                }
+                  boolean: {},
+                },
               },
               {
                 name: 'show_duration',
                 selector: {
-                  boolean: {}
-                }
+                  boolean: {},
+                },
               },
               {
                 name: 'show_title',
                 selector: {
-                  boolean: {}
-                }
+                  boolean: {},
+                },
               },
               {
                 name: 'show_description',
-            selector: {
-              boolean: {}
-            }
-          }
-        ]}
+                selector: {
+                  boolean: {},
+                },
+              },
+            ]}
             .computeLabel=${this._computeLabel}
-        @value-changed=${this._valueChanged}
-      ></ha-form>
+            @value-changed=${this._valueChanged}
+          ></ha-form>
         </ha-expansion-panel>
       </div>
     `;
@@ -190,11 +194,13 @@ export class EditorImpl extends EditorBase {
   _valueChanged(ev) {
     const value = ev.detail.value;
     this.config = { ...this.config, ...value };
-    this.dispatchEvent(new CustomEvent('config-changed', {
-      detail: { config: this.config },
-      bubbles: true,
-      composed: true
-    }));
+    this.dispatchEvent(
+      new CustomEvent('config-changed', {
+        detail: { config: this.config },
+        bubbles: true,
+        composed: true,
+      })
+    );
   }
 
   static styles = css`
@@ -206,6 +212,6 @@ export class EditorImpl extends EditorBase {
     }
     ha-expansion-panel {
       margin-bottom: 8px;
-  }
+    }
   `;
-} 
+}

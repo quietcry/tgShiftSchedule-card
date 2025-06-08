@@ -8,7 +8,7 @@ if (DebugMode) console.debug(`[${CardName}] CardBase-Modul wird geladen`);
 export class CardBase extends SuperBase {
   static properties = {
     ...super.properties,
-    _selectedTab: { type: Number }
+    _selectedTab: { type: Number },
   };
 
   constructor() {
@@ -27,24 +27,24 @@ export class CardBase extends SuperBase {
     if (!config) {
       throw new Error('Keine Konfiguration angegeben');
     }
-    
+
     // Prüfe, ob es sich um eine neue Konfiguration handelt
     const isNewConfig = !this.config || Object.keys(this.config).length === 0;
-    
+
     // Wenn es eine neue Konfiguration ist, verwende sie direkt
     if (isNewConfig) {
       this.config = {
         ...this.getDefaultConfig(),
-        ...config
+        ...config,
       };
     } else {
       // Ansonsten behalte die bestehende Konfiguration bei und aktualisiere nur geänderte Werte
       this.config = {
         ...this.config,
-        ...config
+        ...config,
       };
     }
-    
+
     this._debug('config nach setConfig:', this.config);
   }
 
@@ -60,7 +60,7 @@ export class CardBase extends SuperBase {
       show_duration: true,
       show_title: true,
       show_description: true,
-      view_mode: 'Liste'
+      view_mode: 'Liste',
     };
   }
 
@@ -69,4 +69,4 @@ export class CardBase extends SuperBase {
       display: block;
     }
   `;
-} 
+}

@@ -10,9 +10,8 @@ export class Card extends CardImpl {
     CardImpl.styles,
     css`
       :host {
-        
       }
-    `
+    `,
   ];
 }
 
@@ -25,5 +24,5 @@ window.customCards.push({
   type: CardRegname,
   name: CardName,
   description: CardDescription,
-  preview: true
-}); 
+  preview: true,
+});
