@@ -37,7 +37,7 @@ export class CardImpl extends CardBase {
       entity: 'sensor.vdr_vdr_epg_info',
       time_window: 'C',
       date: '',
-      view_mode: 'table',
+      view_mode: 'epg',
       max_items: 10,
       show_channel: true,
       show_time: true,
@@ -54,7 +54,7 @@ export class CardImpl extends CardBase {
     this._epgData = [];
     this._dataProvider = null;
     this._selectedTab = 0;
-    this._currentView = new TableView(this.config, []);
+    this._currentView = null;
   }
 
   set hass(hass) {
@@ -74,14 +74,28 @@ export class CardImpl extends CardBase {
     this._debug('CardImpl setConfig wird aufgerufen mit:', config);
     super.setConfig(config);
 
-    // Aktualisiere die View basierend auf der Konfiguration
-    if (this._selectedTab === 0) {
-      this._currentView = new TableView(this.config, []);
-    } else if (this._selectedTab === 1) {
-      this._currentView = new EPGView(this.config, []);
+    // Normalisiere den view_mode
+    if (this.config.view_mode === 'Liste') {
+      this.config.view_mode = 'table';
     }
 
-    this._debug('CardImpl _currentView nach setConfig:', this._currentView);
+    // Initialisiere die View basierend auf der Konfiguration
+    if (this.config.view_mode === 'epg') {
+      this._debug('CardImpl setConfig: Initialisiere EPG-View');
+      this._currentView = new EPGView();
+      this._currentView.config = this.config;
+      this._currentView.epgData = this._epgData;
+    } else {
+      this._debug('CardImpl setConfig: Initialisiere Table-View');
+      this._currentView = new TableView();
+      this._currentView.config = this.config;
+      this._currentView.epgData = this._epgData;
+    }
+
+    this._debug('CardImpl setConfig: View initialisiert:', {
+      viewMode: this.config.view_mode,
+      viewType: this._currentView.constructor.name,
+    });
   }
 
   async firstUpdated() {
@@ -156,6 +170,34 @@ export class CardImpl extends CardBase {
     }
   }
 
+  async _fetchData() {
+    if (this._loading) return;
+
+    this._loading = true;
+    this._error = null;
+
+    try {
+      this._debug('CardImpl _fetchData: Starte Datenabruf');
+      const data = await this._dataProvider.fetchData();
+      this._debug('CardImpl _fetchData: Daten empfangen:', data);
+
+      if (data && Array.isArray(data)) {
+        this._epgData = data;
+        // Aktualisiere die View mit den neuen Daten
+        if (this._currentView) {
+          this._currentView.epgData = this._epgData;
+        }
+      } else {
+        this._error = 'Ungültiges Datenformat';
+      }
+    } catch (error) {
+      this._error = `Fehler beim Laden der Daten: ${error.message}`;
+      this._debug('CardImpl _fetchData: Fehler:', error);
+    } finally {
+      this._loading = false;
+    }
+  }
+
   _formatTime(timestamp) {
     if (!timestamp) return '';
     const date = new Date(timestamp * 1000);
@@ -176,46 +218,23 @@ export class CardImpl extends CardBase {
     }
 
     this._debug('CardImpl render mit config:', this.config);
-    return html`
+    return super.render(html`
       <div class="card-content">
-        <div class="tabs">
-          <button
-            class="tab-button ${this._selectedTab === 0 ? 'active' : ''}"
-            @click=${() => (this._selectedTab = 0)}
-          >
-            Liste
-          </button>
-          <button
-            class="tab-button ${this._selectedTab === 1 ? 'active' : ''}"
-            @click=${() => (this._selectedTab = 1)}
-          >
-            EPG
-          </button>
-          <button
-            class="tab-button ${this._selectedTab === 2 ? 'active' : ''}"
-            @click=${() => (this._selectedTab = 2)}
-          >
-            Aktiv
-          </button>
-        </div>
-        <div class="tab-content">
-          ${this._selectedTab === 0
-            ? html` <div class="list-view">${this._currentView.render()}</div> `
-            : ''}
-          ${this._selectedTab === 1
-            ? html` <div class="epg-view">${this._currentView.render()}</div> `
-            : ''}
-          ${this._selectedTab === 2
-            ? html`
-                <div class="active-view">
-                  <!-- Aktiv View -->
-                </div>
-              `
-            : ''}
-        </div>
-        <div class="version">Version: ${this.version}</div>
+        ${this._selectedTab === 0
+          ? html` <div class="list-view">${this._currentView.render()}</div> `
+          : ''}
+        ${this._selectedTab === 1
+          ? html` <div class="epg-view">${this._currentView.render()}</div> `
+          : ''}
+        ${this._selectedTab === 2
+          ? html`
+              <div class="active-view">
+                <!-- Aktiv View -->
+              </div>
+            `
+          : ''}
       </div>
-    `;
+    `);
   }
 
   static styles = css`
@@ -264,6 +283,7 @@ export class CardImpl extends CardBase {
       color: var(--secondary-text-color);
       text-align: right;
       margin-top: 8px;
+      margin-right: 8px;
     }
     .tabs {
       display: flex;
@@ -287,20 +307,49 @@ export class CardImpl extends CardBase {
     }
   `;
 
-  getDefaultConfig() {
+  static getDefaultConfig() {
     if (DebugMode)
-      console.debug(`[${this.constructor.cardName}] CardImpl getDefaultConfig wird aufgerufen`);
+      console.debug(`[${CardName}] [CardImpl] CardImpl static getDefaultConfig wird aufgerufen`);
     return {
-      entity: '',
+      entity: 'sensor.vdr_vdr_epg_info',
       time_window: 'C',
       date: '',
+      view_mode: 'epg', // Standardmäßig EPG-View
       max_items: 10,
       show_channel: true,
       show_time: true,
       show_duration: true,
       show_title: true,
       show_description: true,
-      view_mode: 'Liste',
     };
+  }
+
+  _debug(message, ...args) {
+    if (DebugMode) {
+      console.debug(`[${CardName}] [CardImpl] ${message}`, ...args);
+    }
+  }
+
+  _updateView() {
+    this._debug('CardImpl _updateView: Aktualisiere View mit neuen Daten');
+
+    if (this._currentView) {
+      this._currentView.epgData = this._epgData;
+      this._debug('CardImpl _updateView: View aktualisiert', {
+        viewMode: this.config.view_mode,
+        viewType: this._currentView.constructor.name,
+        dataCount: this._epgData.length,
+      });
+    } else {
+      this._debug('CardImpl _updateView: Keine View vorhanden');
+    }
+  }
+
+  _onEpgDataReceived(data) {
+    this._debug('CardImpl _onEpgDataReceived: Neue EPG-Daten empfangen, aktualisiere _epgData');
+    this._epgData = data;
+    this._debug('CardImpl _onEpgDataReceived: _epgData aktualisiert:', this._epgData);
+    this.requestUpdate('_epgData');
+    this._updateView();
   }
 }

@@ -1,10 +1,10 @@
-import { LitElement, css } from 'lit';
+import { LitElement } from 'lit';
 import { property } from 'lit/decorators.js';
-import { CardName, CardVersion, DebugMode, showVersion } from './card-config';
+import { CardName, Version, DebugMode, showVersion } from './card-config';
 
 export class SuperBase extends LitElement {
   static cardName = CardName;
-  static version = CardVersion;
+  static version = Version;
   static debugMode = DebugMode;
   static showVersion = showVersion;
 
@@ -32,10 +32,4 @@ export class SuperBase extends LitElement {
       }
     }
   }
-
-  static styles = css`
-    :host {
-      display: block;
-    }
-  `;
 }

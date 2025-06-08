@@ -63,6 +63,15 @@ export class CardBase extends SuperBase {
       view_mode: 'Liste',
     };
   }
+  render(content = '') {
+    this._debug('render wird aufgerufen');
+    return html`
+      <ha-card>
+        <div class="card-content">${content}</div>
+        ${this.showVersion ? html` <div class="version">Version: ${this.version}</div> ` : ''}
+      </ha-card>
+    `;
+  }
 
   static styles = css`
     :host {
