@@ -35,11 +35,12 @@ export class CardBase extends LitElement {
 
   constructor() {
     super();
-    if (DebugMode) console.debug(`[${this.constructor.cardName}] CardBase-Konstruktor wird aufgerufen`);
+    this._debug('CardBase-Konstruktor wird aufgerufen');
     this._config = this.getDefaultConfig();
+    this._debug('CardBase _config nach Konstruktor:', this._config);
+    this.DebugMode = DebugMode;  // DebugMode von card-config verwenden
     this.version = Version;
     this._showVersion = showVersion;
-    if (DebugMode) console.debug(`[${this.constructor.cardName}] CardBase _config nach Konstruktor:`, this._config);
   }
 
   static getConfigElement() {
@@ -47,13 +48,24 @@ export class CardBase extends LitElement {
     return document.createElement('tgeditor-card-editor');
   }
 
-  async firstUpdated() {
-    if (DebugMode) console.debug(`[${this.constructor.cardName}] CardBase firstUpdated wird aufgerufen`);
-    if (DebugMode) console.debug(`[${this.constructor.cardName}] CardBase firstUpdated abgeschlossen`);
+  firstUpdated() {
+    this._debug('CardBase firstUpdated wird aufgerufen');
+    super.firstUpdated();
+    this._debug('CardBase firstUpdated abgeschlossen');
+  }
+
+  _debug(message, data = null) {
+    if (this.DebugMode) {
+      if (data) {
+        console.debug(`[${CardName}] ${message}`, data);
+      } else {
+        console.debug(`[${CardName}] ${message}`);
+      }
+    }
   }
 
   getDefaultConfig() {
-    if (DebugMode) console.debug(`[${this.constructor.cardName}] CardBase getDefaultConfig wird aufgerufen`);
+    this._debug('CardBase getDefaultConfig wird aufgerufen');
     return {
       text: '',
       auswahl: 'option1',

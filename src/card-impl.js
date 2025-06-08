@@ -1,22 +1,35 @@
 import { html, css, LitElement } from 'lit';
 import { property } from 'lit/decorators.js';
 import { CardBase } from './card-base';
-const { DebugMode } = require('./card-config');
+import { CardName, CardVersion } from './card-config'; // kann entfallen
+import { DataProvider } from './data-provider';
+import { TableView } from './views/table-view';
 
 export class CardImpl extends CardBase {
-  static properties = {
-    ...CardBase.properties,
-    _epgData: { type: Array },
-    _loading: { type: Boolean }
-  };
+  static get properties() {
+    console.debug('CardImpl static properties wird aufgerufen');
+    return {
+      _config: { type: Object },
+      _hass: { type: Object },
+      _loading: { type: Boolean },
+      _error: { type: String },
+      _epgData: { type: Array, reflect: true },
+      _dataProvider: { type: Object }
+    };
+  }
 
-  constructor() {
-    super();
-    if (DebugMode) console.debug(`[${this.constructor.cardName}] CardImpl-Konstruktor wird aufgerufen`);
-    this._config = {
-      entity: '',
+  static getConfigElement() {
+    console.debug('CardImpl static getConfigElement wird aufgerufen');
+    return document.createElement('tg-epg-editor');
+  }
+
+  static getStubConfig() {
+    console.debug('CardImpl static getStubConfig wird aufgerufen');
+    return {
+      entity: 'sensor.vdr_vdr_epg_info',
       time_window: 'C',
       date: '',
+      view_mode: 'list',
       max_items: 10,
       show_channel: true,
       show_time: true,
@@ -24,32 +37,60 @@ export class CardImpl extends CardBase {
       show_title: true,
       show_description: true
     };
-    this._epgData = [];
+  }
+
+  constructor() {
+    super();
+    this._config = this.getDefaultConfig();
     this._loading = false;
+    this._error = null;
+    this._epgData = [];
+    this._dataProvider = null;
   }
 
-  static getConfigElement() {
-    return document.createElement('tgepg-card-editor');
+  set hass(hass) {
+    this._debug('CardImpl set hass wird aufgerufen');
+    this._hass = hass;
+    if (!this._dataProvider) {
+      this._debug('CardImpl set hass: Initialisiere DataProvider');
+      this._dataProvider = new DataProvider(hass);
+    }
   }
 
-  async firstUpdated() {
-    await super.firstUpdated();
-    if (DebugMode) console.debug(`[${this.constructor.cardName}] firstUpdated: Starte _loadEpgData`);
-    this._loadEpgData();
+  get hass() {
+    return this._hass;
   }
 
   setConfig(config) {
-    if (!config) {
-      throw new Error('Keine Konfiguration vorhanden');
+    this._debug('CardImpl setConfig wird aufgerufen mit:', config);
+    this._config = {
+      ...this.getDefaultConfig(),
+      ...config
+    };
+    this._debug('CardImpl setConfig: _config aktualisiert:', this._config);
+    
+    if (this._config.entity) {
+      this._debug('CardImpl setConfig: Starte _loadEpgDataNew');
+      this._loadEpgDataNew();
+    } else {
+      this._debug('CardImpl setConfig: Keine Entity in Config');
     }
-    if (DebugMode) console.debug(`[${this.constructor.cardName}] setConfig: Starte _loadEpgData`);
-    this._config = { ...this._config, ...config };
-    this._loadEpgData();
+  }
+
+  async firstUpdated() {
+    super.firstUpdated();
+    this._debug('CardImpl firstUpdated wird aufgerufen');
+    if (this._config.entity) {
+      this._debug('CardImpl firstUpdated: Starte _loadEpgDataNew');
+      this._loadEpgDataNew();
+    } else {
+      this._debug('CardImpl firstUpdated: Keine Entity in Config');
+    }
   }
 
   async _loadEpgData() {
     if (!this.hass || !this._config.entity) {
-      if (DebugMode) console.debug(`[${this.constructor.cardName}] _loadEpgData: Übersprungen - hass oder entity fehlt`, {
+      this._debug('_loadEpgData: Übersprungen - hass oder entity fehlt', {
         hass: !!this.hass,
         entity: this._config.entity
       });
@@ -57,8 +98,9 @@ export class CardImpl extends CardBase {
     }
 
     this._loading = true;
+
     try {
-      if (DebugMode) console.debug(`[${this.constructor.cardName}] Serviceaufruf wird gestartet:`, {
+      this._debug('Serviceaufruf wird gestartet:', {
         entity: this._config.entity,
         time_window: this._config.time_window,
         date: this._config.date
@@ -76,10 +118,10 @@ export class CardImpl extends CardBase {
         return_response: true
       });
 
-      if (DebugMode) console.debug(`[${this.constructor.cardName}] Serviceaufruf erfolgreich:`, response);
+      this._debug('Serviceaufruf erfolgreich:', response);
 
       this._epgData = response.response?.epg_data || [];
-      if (DebugMode) console.debug(`[${this.constructor.cardName}] EPG-Daten verarbeitet:`, {
+      this._debug('EPG-Daten verarbeitet:', {
         anzahlKanäle: this._epgData.length,
         beispielKanal: this._epgData[0],
         beispielSendungen: this._epgData[0]?.epg
@@ -91,65 +133,96 @@ export class CardImpl extends CardBase {
     this._loading = false;
   }
 
+  async _loadEpgDataNew() {
+   console.debug('_loadEpgDataNew direkt');
+   this._debug('_loadEpgDataNew indirekt');
+    if (!this._dataProvider || !this._config.entity) {
+      this._debug('_loadEpgDataNew: Übersprungen - dataProvider oder entity fehlt', {
+        dataProvider: !!this._dataProvider,
+        entity: this._config.entity
+      });
+      return;
+    }
+
+    this._loading = true;
+    this._debug('Starte Datenabfrage');
+
+    try {
+      this._debug('Neuer Serviceaufruf wird gestartet:', {
+        entity: this._config.entity,
+        time_window: this._config.time_window,
+        date: this._config.date
+      });
+
+      const newData = await this._dataProvider.fetchEpgData(
+        this._config.entity,
+        this._config.time_window,
+        this._config.date
+      );
+
+      this._debug('Neue EPG-Daten empfangen, aktualisiere _epgData');
+      this._epgData = newData;
+      this._debug('_epgData aktualisiert:', {
+        anzahlKanäle: this._epgData.length,
+        beispielKanal: this._epgData[0],
+        beispielSendungen: this._epgData[0]?.epg
+      });
+
+      // Explizit Rendering triggern
+      this.requestUpdate('_epgData');
+      this._debug('requestUpdate für _epgData aufgerufen');
+    } catch (error) {
+      console.error('Fehler beim Laden der EPG-Daten (neu):', error);
+      this._epgData = [];
+    } finally {
+      this._loading = false;
+    }
+  }
+
   _formatTime(timestamp) {
+    if (!timestamp) return '';
     const date = new Date(timestamp * 1000);
     return date.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
   }
 
   _formatDuration(start, stop) {
-    const duration = (stop - start) / 60; // in Minuten
-    const hours = Math.floor(duration / 60);
-    const minutes = Math.floor(duration % 60);
-    return `${hours > 0 ? hours + 'h ' : ''}${minutes}min`;
+    if (!start || !stop) return '';
+    const duration = (stop - start) / 60;
+    return `${duration} min`;
   }
 
   render() {
+    this._debug('CardImpl render wird aufgerufen');
+    if (!this._hass) {
+      this._debug('CardImpl render: Kein hass');
+      return html`<div>Loading...</div>`;
+    }
 
-    return super.render(html`
- 
- 
-          ${this._config.show_header ? html`
-            <div class="header">
-              <div class="title">EPG Anzeige</div>
-            </div>
-          ` : ''}
-          
-          ${this._loading ? html`
-            <div class="loading">Lade EPG-Daten...</div>
-          ` : html`
-            <div class="epg-content">
-              ${this._epgData.length === 0 ? html`
-                <div class="no-data">Keine EPG-Daten verfügbar</div>
-              ` : html`
-                <table>
-                  <thead>
-                    <tr>
-                      ${this._config.show_channel ? html`<th>Kanal</th>` : ''}
-                      ${this._config.show_time ? html`<th>Zeit</th>` : ''}
-                      ${this._config.show_duration ? html`<th>Dauer</th>` : ''}
-                      ${this._config.show_title ? html`<th>Titel</th>` : ''}
-                      ${this._config.show_description ? html`<th>Beschreibung</th>` : ''}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    ${this._epgData.slice(0, this._config.max_items).map(channel => 
-                      channel.epg.map(show => html`
-                        <tr>
-                          ${this._config.show_channel ? html`<td>${channel.channel_name}</td>` : ''}
-                          ${this._config.show_time ? html`<td>${this._formatTime(show.start)}</td>` : ''}
-                          ${this._config.show_duration ? html`<td>${this._formatDuration(show.start, show.stop)}</td>` : ''}
-                          ${this._config.show_title ? html`<td>${show.title}</td>` : ''}
-                          ${this._config.show_description ? html`<td>${show.shorttext || ''}</td>` : ''}
-                        </tr>
-                      `)
-                    )}
-                  </tbody>
-                </table>
-              `}
-            </div>
-          `}
+    this._debug('CardImpl render mit config und epgData:', {
+      config: this._config,
+      epgDataLength: this._epgData?.length,
+      loading: this._loading
+    });
 
-    `);
+    if (this._loading) {
+      return html`<div>Lade EPG-Daten...</div>`;
+    }
+
+    if (this._error) {
+      return html`<div class="error">${this._error}</div>`;
+    }
+
+    const tableView = new TableView(this._config, this._epgData);
+
+    return html`
+      <div class="card-content">
+        <div class="header">
+          <div class="title">${this._config.entity}</div>
+        </div>
+        ${tableView.render()}
+        <div class="version">Version: ${this.version}</div>
+      </div>
+    `;
   }
 
   static styles = css`
@@ -199,4 +272,4 @@ export class CardImpl extends CardBase {
       margin-top: 8px;
     }
   `;
-} 
+}
