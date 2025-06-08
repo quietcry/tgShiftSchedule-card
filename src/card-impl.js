@@ -1,7 +1,6 @@
 import { html, css, LitElement } from 'lit';
 import { property } from 'lit/decorators.js';
 import { CardBase } from './card-base';
-import { CardName, CardVersion } from './card-config'; // kann entfallen
 import { DataProvider } from './data-provider';
 import { TableView } from './views/table-view';
 
