@@ -9,14 +9,11 @@ if (DebugMode) console.debug(`[${EditorBase.cardName}] EditorImpl-Modul wird gel
 export class EditorImpl extends EditorBase {
   static properties = {
     ...super.properties,
-    _config: { type: Object },
     _selectedTab: { type: Number }
   };
 
   constructor() {
-    super();
-    if (DebugMode) console.debug(`[${this.constructor.cardName}] EditorImpl-Konstruktor wird aufgerufen`);
-    this._config = {
+    super({
       entity: '',
       time_window: 'C',
       date: '',
@@ -27,7 +24,8 @@ export class EditorImpl extends EditorBase {
       show_title: true,
       show_description: true,
       view_mode: 'Liste'
-    };
+    });
+    if (DebugMode) console.debug(`[${this.constructor.cardName}] EditorImpl-Konstruktor wird aufgerufen`);
     this._selectedTab = 0;
   }
 
@@ -37,25 +35,6 @@ export class EditorImpl extends EditorBase {
     if (DebugMode) console.debug(`[${this.constructor.cardName}] EditorImpl firstUpdated abgeschlossen`);
   }
 
-  setConfig(config) {
-    if (DebugMode) console.debug(`[${this.constructor.cardName}] EditorImpl setConfig wird aufgerufen mit:`, config);
-    if (!config) {
-      throw new Error('Keine Konfiguration vorhanden');
-    }
-    this._config = { ...this._config, ...config };
-    if (DebugMode) console.debug(`[${this.constructor.cardName}] EditorImpl config nach setConfig:`, this._config);
-  }
-
-  _debug(message, data = null) {
-    if (this.constructor.DebugMode) {
-      if (data) {
-        console.debug(`[${this.constructor.cardName}] ${message}`, data);
-      } else {
-        console.debug(`[${this.constructor.cardName}] ${message}`);
-      }
-    }
-  }
-
   render() {
     this._debug('EditorImpl render wird aufgerufen');
     if (!this.hass) {
@@ -63,14 +42,14 @@ export class EditorImpl extends EditorBase {
       return html`<div>Loading...</div>`;
     }
 
-    if (DebugMode) console.debug(`[${this.constructor.cardName}] EditorImpl render mit config:`, this._config);
+    if (DebugMode) console.debug(`[${this.constructor.cardName}] EditorImpl render mit config:`, this.config);
     return html`
       <div class="card-config">
         <ha-expansion-panel>
           <span slot="header">Allgemein</span>
       <ha-form
         .hass=${this.hass}
-        .data=${this._config}
+        .data=${this.config}
         .schema=${[
           {
                 name: 'entity',
@@ -106,7 +85,7 @@ export class EditorImpl extends EditorBase {
           <span slot="header">Anzeige</span>
           <ha-form
             .hass=${this.hass}
-            .data=${this._config}
+            .data=${this.config}
             .schema=${[
               {
                 name: 'view_mode',
@@ -140,7 +119,7 @@ export class EditorImpl extends EditorBase {
           <span slot="header">Erweitert</span>
           <ha-form
             .hass=${this.hass}
-            .data=${this._config}
+            .data=${this.config}
             .schema=${[
               {
                 name: 'show_channel',
@@ -210,9 +189,9 @@ export class EditorImpl extends EditorBase {
 
   _valueChanged(ev) {
     const value = ev.detail.value;
-    this._config = { ...this._config, ...value };
+    this.config = { ...this.config, ...value };
     this.dispatchEvent(new CustomEvent('config-changed', {
-      detail: { config: this._config },
+      detail: { config: this.config },
       bubbles: true,
       composed: true
     }));

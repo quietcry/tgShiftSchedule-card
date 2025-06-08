@@ -1,7 +1,7 @@
 import { html, css, LitElement } from 'lit';
 import { property } from 'lit/decorators.js';
 import { EditorImpl } from './editor-impl';
-const { CardRegname } = require('./card-config');
+import { CardName, CardRegname } from './card-config.js';
 
 export class Editor extends EditorImpl {
   static styles = css`
@@ -11,4 +11,5 @@ export class Editor extends EditorImpl {
   `;
 }
 
-customElements.define(CardRegname+'-editor', Editor);
+// Registriere die Editor-Komponente mit dem Namen aus card-config
+customElements.define(`${CardRegname}-editor`, Editor);

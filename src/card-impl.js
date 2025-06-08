@@ -3,32 +3,38 @@ import { property } from 'lit/decorators.js';
 import { CardBase } from './card-base';
 import { DataProvider } from './data-provider';
 import { TableView } from './views/table-view';
+import { EPGView } from './views/epg-view';
+import { CardName, CardVersion, DebugMode, CardRegname } from './card-config';
+
+if (DebugMode) console.debug(`[${CardName}] CardImpl-Modul wird geladen`);
 
 export class CardImpl extends CardBase {
   static get properties() {
-    console.debug('CardImpl static properties wird aufgerufen');
+    if (DebugMode) console.debug(`[${CardName}] [CardImpl] CardImpl static properties wird aufgerufen`);
     return {
       _config: { type: Object },
       _hass: { type: Object },
       _loading: { type: Boolean },
       _error: { type: String },
       _epgData: { type: Array, reflect: true },
-      _dataProvider: { type: Object }
+      _dataProvider: { type: Object },
+      _currentView: { type: Object },
+      _selectedTab: { type: Number }
     };
   }
 
   static getConfigElement() {
-    console.debug('CardImpl static getConfigElement wird aufgerufen');
-    return document.createElement('tg-epg-editor');
+    if (DebugMode) console.debug(`[${CardName}] [CardImpl] CardImpl static getConfigElement wird aufgerufen`);
+    return document.createElement(`${CardRegname}-editor`);
   }
 
   static getStubConfig() {
-    console.debug('CardImpl static getStubConfig wird aufgerufen');
+    if (DebugMode) console.debug(`[${CardName}] [CardImpl] CardImpl static getStubConfig wird aufgerufen`);
     return {
       entity: 'sensor.vdr_vdr_epg_info',
       time_window: 'C',
       date: '',
-      view_mode: 'list',
+      view_mode: 'table',
       max_items: 10,
       show_channel: true,
       show_time: true,
@@ -40,11 +46,12 @@ export class CardImpl extends CardBase {
 
   constructor() {
     super();
-    this._config = this.getDefaultConfig();
     this._loading = false;
     this._error = null;
     this._epgData = [];
     this._dataProvider = null;
+    this._selectedTab = 0;
+    this._currentView = new TableView(this.config, []);
   }
 
   set hass(hass) {
@@ -62,24 +69,23 @@ export class CardImpl extends CardBase {
 
   setConfig(config) {
     this._debug('CardImpl setConfig wird aufgerufen mit:', config);
-    this._config = {
-      ...this.getDefaultConfig(),
-      ...config
-    };
-    this._debug('CardImpl setConfig: _config aktualisiert:', this._config);
+    super.setConfig(config);
     
-    if (this._config.entity) {
-      this._debug('CardImpl setConfig: Starte _loadEpgDataNew');
-      this._loadEpgDataNew();
-    } else {
-      this._debug('CardImpl setConfig: Keine Entity in Config');
+    // Aktualisiere die View basierend auf der Konfiguration
+    if (this._selectedTab === 0) {
+      this._currentView = new TableView(this.config, []);
+    } else if (this._selectedTab === 1) {
+      this._currentView = new EPGView(this.config, []);
     }
+    
+    this._debug('CardImpl _currentView nach setConfig:', this._currentView);
   }
 
   async firstUpdated() {
-    super.firstUpdated();
     this._debug('CardImpl firstUpdated wird aufgerufen');
-    if (this._config.entity) {
+    await super.firstUpdated();
+    this._debug('CardImpl firstUpdated abgeschlossen');
+    if (this.config.entity) {
       this._debug('CardImpl firstUpdated: Starte _loadEpgDataNew');
       this._loadEpgDataNew();
     } else {
@@ -87,58 +93,12 @@ export class CardImpl extends CardBase {
     }
   }
 
-  async _loadEpgData() {
-    if (!this.hass || !this._config.entity) {
-      this._debug('_loadEpgData: Übersprungen - hass oder entity fehlt', {
-        hass: !!this.hass,
-        entity: this._config.entity
-      });
-      return;
-    }
-
-    this._loading = true;
-
-    try {
-      this._debug('Serviceaufruf wird gestartet:', {
-        entity: this._config.entity,
-        time_window: this._config.time_window,
-        date: this._config.date
-      });
-
-      const response = await this.hass.connection.sendMessagePromise({
-        type: "call_service",
-        domain: "tgvdr",
-        service: "get_epg_data",
-        service_data: {
-          entity_id: this._config.entity,
-          time_window: this._config.time_window,
-          date: this._config.date
-        },
-        return_response: true
-      });
-
-      this._debug('Serviceaufruf erfolgreich:', response);
-
-      this._epgData = response.response?.epg_data || [];
-      this._debug('EPG-Daten verarbeitet:', {
-        anzahlKanäle: this._epgData.length,
-        beispielKanal: this._epgData[0],
-        beispielSendungen: this._epgData[0]?.epg
-      });
-    } catch (error) {
-      console.error('Fehler beim Laden der EPG-Daten:', error);
-      this._epgData = [];
-    }
-    this._loading = false;
-  }
-
   async _loadEpgDataNew() {
-   console.debug('_loadEpgDataNew direkt');
-   this._debug('_loadEpgDataNew indirekt');
-    if (!this._dataProvider || !this._config.entity) {
+    this._debug('_loadEpgDataNew wird aufgerufen');
+    if (!this._dataProvider || !this.config.entity) {
       this._debug('_loadEpgDataNew: Übersprungen - dataProvider oder entity fehlt', {
         dataProvider: !!this._dataProvider,
-        entity: this._config.entity
+        entity: this.config.entity
       });
       return;
     }
@@ -148,15 +108,15 @@ export class CardImpl extends CardBase {
 
     try {
       this._debug('Neuer Serviceaufruf wird gestartet:', {
-        entity: this._config.entity,
-        time_window: this._config.time_window,
-        date: this._config.date
+        entity: this.config.entity,
+        time_window: this.config.time_window,
+        date: this.config.date
       });
 
       const newData = await this._dataProvider.fetchEpgData(
-        this._config.entity,
-        this._config.time_window,
-        this._config.date
+        this.config.entity,
+        this.config.time_window,
+        this.config.date
       );
 
       this._debug('Neue EPG-Daten empfangen, aktualisiere _epgData');
@@ -167,11 +127,26 @@ export class CardImpl extends CardBase {
         beispielSendungen: this._epgData[0]?.epg
       });
 
+      // View basierend auf Konfiguration auswählen
+      switch (this.config.view_mode) {
+        case 'table':
+          this._debug('TableView wird verwendet');
+          this._currentView = new TableView(this.config, this._epgData);
+          break;
+        case 'epg':
+          this._debug('EPGView wird verwendet');
+          this._currentView = new EPGView(this.config, this._epgData);
+          break;
+        default:
+          this._debug('Standardmäßig TableView wird verwendet');
+          this._currentView = new TableView(this.config, this._epgData);
+      }
+
       // Explizit Rendering triggern
       this.requestUpdate('_epgData');
       this._debug('requestUpdate für _epgData aufgerufen');
     } catch (error) {
-      console.error('Fehler beim Laden der EPG-Daten (neu):', error);
+      console.error('[CardImpl] Fehler beim Laden der EPG-Daten (neu):', error);
       this._epgData = [];
     } finally {
       this._loading = false;
@@ -192,33 +167,51 @@ export class CardImpl extends CardBase {
 
   render() {
     this._debug('CardImpl render wird aufgerufen');
-    if (!this._hass) {
+    if (!this.hass) {
       this._debug('CardImpl render: Kein hass');
       return html`<div>Loading...</div>`;
     }
 
-    this._debug('CardImpl render mit config und epgData:', {
-      config: this._config,
-      epgDataLength: this._epgData?.length,
-      loading: this._loading
-    });
-
-    if (this._loading) {
-      return html`<div>Lade EPG-Daten...</div>`;
-    }
-
-    if (this._error) {
-      return html`<div class="error">${this._error}</div>`;
-    }
-
-    const tableView = new TableView(this._config, this._epgData);
-
+    this._debug('CardImpl render mit config:', this.config);
     return html`
       <div class="card-content">
-        <div class="header">
-          <div class="title">${this._config.entity}</div>
+        <div class="tabs">
+          <button
+            class="tab-button ${this._selectedTab === 0 ? 'active' : ''}"
+            @click=${() => this._selectedTab = 0}
+          >
+            Liste
+          </button>
+          <button
+            class="tab-button ${this._selectedTab === 1 ? 'active' : ''}"
+            @click=${() => this._selectedTab = 1}
+          >
+            EPG
+          </button>
+          <button
+            class="tab-button ${this._selectedTab === 2 ? 'active' : ''}"
+            @click=${() => this._selectedTab = 2}
+          >
+            Aktiv
+          </button>
         </div>
-        ${tableView.render()}
+        <div class="tab-content">
+          ${this._selectedTab === 0 ? html`
+            <div class="list-view">
+              ${this._currentView.render()}
+            </div>
+          ` : ''}
+          ${this._selectedTab === 1 ? html`
+            <div class="epg-view">
+              ${this._currentView.render()}
+            </div>
+          ` : ''}
+          ${this._selectedTab === 2 ? html`
+            <div class="active-view">
+              <!-- Aktiv View -->
+            </div>
+          ` : ''}
+        </div>
         <div class="version">Version: ${this.version}</div>
       </div>
     `;
@@ -270,5 +263,41 @@ export class CardImpl extends CardBase {
       text-align: right;
       margin-top: 8px;
     }
+    .tabs {
+      display: flex;
+      margin-bottom: 16px;
+      border-bottom: 1px solid var(--divider-color);
+    }
+    .tab-button {
+      padding: 8px 16px;
+      border: none;
+      background: none;
+      cursor: pointer;
+      color: var(--primary-text-color);
+      opacity: 0.7;
+    }
+    .tab-button.active {
+      opacity: 1;
+      border-bottom: 2px solid var(--primary-color);
+    }
+    .tab-content {
+      min-height: 200px;
+    }
   `;
+
+  getDefaultConfig() {
+    if (DebugMode) console.debug(`[${this.constructor.cardName}] CardImpl getDefaultConfig wird aufgerufen`);
+    return {
+      entity: '',
+      time_window: 'C',
+      date: '',
+      max_items: 10,
+      show_channel: true,
+      show_time: true,
+      show_duration: true,
+      show_title: true,
+      show_description: true,
+      view_mode: 'Liste'
+    };
+  }
 }

@@ -1,17 +1,19 @@
 import { DebugMode, CardName } from './card-config';
 
+if (DebugMode) console.debug(`[${CardName}] DataProvider-Modul wird geladen`);
+
 export class DataProvider {
   constructor(hass) {
     this.hass = hass;
-    this._debug('initialisiert');
+    this._debug('DataProvider initialisiert');
   }
 
   _debug(message, data = null) {
     if (DebugMode) {
       if (data) {
-        console.debug(`[${CardName}] DataProvider ${message}`, data);
+        console.debug(`[${CardName}] ${message}`, data);
       } else {
-        console.debug(`[${CardName}] DataProvider ${message}`);
+        console.debug(`[${CardName}] ${message}`);
       }
     }
   }
