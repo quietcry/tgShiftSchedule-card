@@ -116,3 +116,39 @@ Die Card verwendet ein automatisches Versionssystem, das durch einen Git Pre-Com
 - Der Hook muss ausführbar sein (`chmod +x .git/hooks/pre-commit`)
 - Bei Fehlern im Script wird der Commit abgebrochen
 - Die Versionsdatei muss das Format `Version = 'YYYY.MM-XXXX'` enthalten
+
+### Hook-Code
+
+```bash
+#!/bin/sh
+#
+# Pre-Commit Hook für die TG EPG Card
+# Führt die Versionsverwaltung durch und prüft auf Whitespace-Fehler
+# Wird automatisch vor jedem Commit ausgeführt
+#
+
+# Versionsdatei definieren
+VERSION_FILE="src/card-config.js"
+
+# Versionsverwaltung durchführen
+/tgdata/coding/githook_scripts/update-version.sh "$VERSION_FILE"
+
+# Prüfen ob die Versionsverwaltung erfolgreich war
+if [ $? -ne 0 ]; then
+    echo "Fehler: Versionsverwaltung fehlgeschlagen"
+    exit 1
+fi
+
+# Basis für Diff-Checks ermitteln
+if git rev-parse --verify HEAD >/dev/null 2>&1; then
+    against=HEAD
+else
+    # Bei erstem Commit: Leeren Tree als Basis verwenden
+    against=$(git hash-object -t tree /dev/null)
+fi
+
+# Whitespace-Checks durchführen
+exec git diff-index --check --cached $against --
+
+exit 0
+```
