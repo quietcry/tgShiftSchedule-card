@@ -73,9 +73,28 @@ export class CardBase extends SuperBase {
     `;
   }
 
-  static styles = css`
-    :host {
-      display: block;
-    }
-  `;
+  static styles = [
+    SuperBase.styles,
+    css`
+      :host {
+        display: block;
+      }
+
+      ha-card {
+        padding: 16px;
+      }
+
+      .loading {
+        text-align: center;
+        padding: 20px;
+        color: var(--secondary-text-color);
+      }
+
+      .error {
+        text-align: center;
+        padding: 20px;
+        color: var(--error-color);
+      }
+    `,
+  ];
 }

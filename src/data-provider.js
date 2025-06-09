@@ -3,61 +3,98 @@ import { DebugMode, CardName } from './card-config';
 if (DebugMode) console.debug(`[${CardName}] DataProvider-Modul wird geladen`);
 
 export class DataProvider {
-  constructor(hass) {
-    this.hass = hass;
+  constructor() {
+    this._hass = null;
     this._debug('DataProvider initialisiert');
   }
 
-  _debug(message, data = null) {
-    if (DebugMode) {
-      if (data) {
-        console.debug(`[${CardName}] ${message}`, data);
-      } else {
-        console.debug(`[${CardName}] ${message}`);
-      }
+  set hass(value) {
+    this._debug(
+      'DataProvider: hass wird gesetzt:',
+      value ? 'hass vorhanden' : 'hass ist null',
+      value
+    );
+    if (this._hass !== value) {
+      this._hass = value;
+      this._debug('DataProvider: hass aktualisiert:', this._hass);
     }
   }
 
-  async fetchEpgData(entity, timeWindow, date) {
-    this._debug('Starte EPG-Datenabfrage', { entity, timeWindow, date });
+  get hass() {
+    this._debug(
+      'DataProvider: hass wird abgerufen:',
+      this._hass ? 'hass vorhanden' : 'hass ist null',
+      this._hass
+    );
+    return this._hass;
+  }
 
+  _debug(message, ...args) {
+    if (DebugMode) {
+      console.debug(`[${CardName}] [DataProvider] ${message}`, ...args);
+    }
+  }
+
+  async _callService(entity, params = {}) {
+    this._debug('_callService wird aufgerufen mit:', { entity, params, hass: this._hass });
+    if (!this._hass) {
+      this._debug('Fehler - hass ist nicht initialisiert');
+      throw new Error('hass ist nicht initialisiert');
+    }
     try {
-      const response = await this.hass.connection.sendMessagePromise({
+      const response = await this._hass.connection.sendMessagePromise({
         type: 'call_service',
         domain: 'tgvdr',
         service: 'get_epg_data',
         service_data: {
           entity_id: entity,
-          time_window: timeWindow,
-          date: date,
+          ...params,
         },
         return_response: true,
       });
+      this._debug('Service-Antwort erhalten:', response);
+      return response;
+    } catch (error) {
+      this._debug('Fehler beim Service-Aufruf:', error);
+      throw error;
+    }
+  }
 
-      this._debug('EPG-Daten empfangen', response);
-      this._debug('Response Struktur:', {
-        hasResponse: !!response,
-        hasResponseResponse: !!response?.response,
-        hasEpgData: !!response?.response?.epg_data,
-        responseKeys: response ? Object.keys(response) : [],
-        responseResponseKeys: response?.response ? Object.keys(response.response) : [],
-      });
+  async fetchChannelList(entity) {
+    this._debug('DataProvider: Hole Kanal-Liste');
+    return this._callService(entity, {
+      channel_id: '?',
+    });
+  }
 
-      if (!response || !response.response?.epg_data) {
-        this._debug('Keine EPG-Daten in der Antwort');
-        return [];
+  async fetchChannelEpg(entity, channelId, timeWindow, date) {
+    this._debug('DataProvider: Hole EPG-Daten für Kanal', channelId);
+    const channelIdStr = String(channelId);
+    this._debug('DataProvider: Konvertierte channel_id:', channelIdStr);
+    return this._callService(entity, {
+      channel_id: channelIdStr,
+      time_window: timeWindow,
+      date: date,
+    });
+  }
+
+  async fetchEpgData(entity, timeWindow, date) {
+    this._debug('DataProvider: Hole EPG-Daten');
+    try {
+      const channels = await this.fetchChannelList(entity);
+      const epgData = [];
+
+      for (const channel of channels) {
+        const channelEpg = await this.fetchChannelEpg(entity, channel.id, timeWindow, date);
+        epgData.push({
+          channel: channel,
+          programs: channelEpg,
+        });
       }
-
-      const epgData = response.response.epg_data;
-      this._debug('Verarbeitete EPG-Daten', {
-        anzahlKanäle: epgData.length,
-        beispielKanal: epgData[0],
-        beispielSendungen: epgData[0]?.epg,
-      });
 
       return epgData;
     } catch (error) {
-      this._debug('Fehler beim Abrufen der EPG-Daten', error);
+      this._debug('Fehler beim Abrufen der EPG-Daten:', error);
       throw error;
     }
   }

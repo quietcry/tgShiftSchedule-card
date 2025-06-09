@@ -214,4 +214,55 @@ export class EditorImpl extends EditorBase {
       margin-bottom: 8px;
     }
   `;
+
+  static getConfigElement() {
+    return document.createElement(`${CardRegname}-editor`);
+  }
+
+  static getStubConfig() {
+    return {
+      entity: 'sensor.vdr_vdr_epg_info',
+      time_window: 'C',
+      date: '',
+      view_mode: 'epg',
+      max_items: 10,
+      show_channel: true,
+      show_time: true,
+      show_duration: true,
+      show_title: true,
+      show_description: true,
+      blacklist: '',
+      whitelist: '',
+      importantlist: '',
+    };
+  }
+
+  getConfigSchema() {
+    return [
+      {
+        type: 'string',
+        name: 'entity',
+        label: 'Entity',
+        required: true,
+      },
+      {
+        type: 'string',
+        name: 'blacklist',
+        label: 'Blacklist (RegEx, kommagetrennt)',
+        description: 'Kanäle, die ausgeschlossen werden sollen',
+      },
+      {
+        type: 'string',
+        name: 'whitelist',
+        label: 'Whitelist (RegEx, kommagetrennt)',
+        description: 'Kanäle, die eingeschlossen werden sollen',
+      },
+      {
+        type: 'string',
+        name: 'importantlist',
+        label: 'Wichtige Kanäle (RegEx, kommagetrennt)',
+        description: 'Kanäle, die zuerst angezeigt werden sollen',
+      },
+    ];
+  }
 }

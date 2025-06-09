@@ -1,9 +1,28 @@
-import { html } from 'lit';
+import { html, css } from 'lit';
+import { ViewBase } from './view-base';
+import { CardName, DebugMode } from '../card-config';
 
-export class TableView {
-  constructor(config, epgData) {
-    this._config = config;
-    this._epgData = epgData;
+export class TableView extends ViewBase {
+  static properties = {
+    ...ViewBase.properties,
+    _maxItems: { type: Number },
+  };
+
+  constructor() {
+    super();
+    this._maxItems = 10; // Standard: 10 Einträge
+  }
+
+  async _fetchViewData() {
+    this._debug('TableView _fetchViewData wird aufgerufen');
+    const data = await this._dataProvider.fetchEpgData(
+      this.config.entity,
+      'C', // Immer aktuelle Zeit für die Tabelle
+      ''
+    );
+
+    // Begrenze die Anzahl der Einträge
+    return data.slice(0, this.config.max_items || this._maxItems);
   }
 
   _formatTime(time) {

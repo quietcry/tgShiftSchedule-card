@@ -1,6 +1,7 @@
 import { LitElement } from 'lit';
 import { property } from 'lit/decorators.js';
 import { CardName, Version, DebugMode, showVersion } from './card-config';
+import { css } from 'lit';
 
 export class SuperBase extends LitElement {
   static cardName = CardName;
@@ -13,6 +14,12 @@ export class SuperBase extends LitElement {
     config: { type: Object },
   };
 
+  static styles = css`
+    :host {
+      display: block;
+    }
+  `;
+
   constructor() {
     super();
     this.cardName = this.constructor.cardName;
@@ -23,8 +30,16 @@ export class SuperBase extends LitElement {
   }
 
   _debug(message, data = null) {
-    if (this.debugMode) {
-      const className = this.constructor.name;
+    if (!DebugMode) return;
+
+    const className = this.constructor.name;
+    const debugList = DebugMode.split(',').map(item => item.trim().toLowerCase());
+    const shouldDebug =
+      debugList[0] === 'true'
+        ? !debugList.slice(1).includes(className.toLowerCase())
+        : debugList.includes(className.toLowerCase());
+
+    if (shouldDebug) {
       if (data) {
         console.debug(`[${this.cardName}] [${className}] ${message}`, data);
       } else {
