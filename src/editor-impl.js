@@ -49,110 +49,184 @@ export class EditorImpl extends EditorBase {
       console.debug(`[${this.constructor.cardName}] EditorImpl render mit config:`, this.config);
     return html`
       <div class="card-config">
-        <ha-expansion-panel>
-          <span slot="header">Allgemein</span>
-          <ha-form
-            .hass=${this.hass}
-            .data=${this.config}
-            .schema=${[
-              {
-                name: 'entity',
-                selector: {
-                  entity: {},
-                },
-              },
-              {
-                name: 'time_window',
-                selector: {
-                  select: {
-                    options: [
-                      { value: 'C', label: 'Aktuell' },
-                      { value: 'D', label: 'Heute' },
-                      { value: 'W', label: 'Diese Woche' },
-                    ],
+        <ha-form
+          .hass=${this.hass}
+          .data=${this.config}
+          .schema=${[
+            {
+              name: 'entity',
+              selector: {
+                entity: {
+                  domain: 'sensor',
+                  filter: {
+                    attribute: 'epg_info',
                   },
                 },
               },
-              {
-                name: 'date',
-                selector: {
-                  text: {},
-                },
-              },
-            ]}
-            .computeLabel=${this._computeLabel}
-            @value-changed=${this._valueChanged}
-          ></ha-form>
-        </ha-expansion-panel>
+            },
+          ]}
+          .computeLabel=${this._computeLabel}
+          @value-changed=${this._valueChanged}
+        ></ha-form>
 
         <ha-expansion-panel>
           <span slot="header">Anzeige</span>
-          <ha-form
-            .hass=${this.hass}
-            .data=${this.config}
-            .schema=${[
-              {
-                name: 'view_mode',
-                selector: {
-                  select: {
-                    options: [
-                      { value: 'Liste', label: 'Liste' },
-                      { value: 'epg', label: 'EPG' },
-                      { value: 'activ', label: 'Aktiv' },
-                    ],
+          <div class="expander-content">
+            <ha-expansion-panel>
+              <div slot="header" class="expander-header">
+                <ha-switch
+                  .checked=${this.config.view_mode === 'Liste'}
+                  @change=${(e) => this._handleViewModeChange('Liste', e)}
+                  @click=${(e) => e.stopPropagation()}
+                ></ha-switch>
+                <span>Liste</span>
+              </div>
+              <ha-form
+                .hass=${this.hass}
+                .data=${this.config}
+                .schema=${[
+                  {
+                    name: 'show_channel',
+                    selector: { boolean: {} },
                   },
-                },
-              },
-              {
-                name: 'max_items',
-                selector: {
-                  number: {
-                    min: 1,
-                    max: 100,
-                    mode: 'box',
+                  {
+                    name: 'show_time',
+                    selector: { boolean: {} },
                   },
-                },
-              },
-            ]}
-            .computeLabel=${this._computeLabel}
-            @value-changed=${this._valueChanged}
-          ></ha-form>
+                  {
+                    name: 'show_duration',
+                    selector: { boolean: {} },
+                  },
+                  {
+                    name: 'show_title',
+                    selector: { boolean: {} },
+                  },
+                  {
+                    name: 'show_description',
+                    selector: { boolean: {} },
+                  },
+                ]}
+                .computeLabel=${this._computeLabel}
+                @value-changed=${this._valueChanged}
+              ></ha-form>
+            </ha-expansion-panel>
+
+            <ha-expansion-panel>
+              <div slot="header" class="expander-header">
+                <ha-switch
+                  .checked=${this.config.view_mode === 'epg'}
+                  @change=${(e) => this._handleViewModeChange('epg', e)}
+                  @click=${(e) => e.stopPropagation()}
+                ></ha-switch>
+                <span>epg</span>
+              </div>
+              <ha-form
+                .hass=${this.hass}
+                .data=${this.config}
+                .schema=${[
+                  {
+                    name: 'sortierung',
+                    selector: {
+                      template: {
+                        multiline: true,
+                      },
+                    },
+                  },
+                ]}
+                .computeLabel=${this._computeLabel}
+                @value-changed=${this._valueChanged}
+              ></ha-form>
+            </ha-expansion-panel>
+
+            <ha-expansion-panel>
+              <div slot="header" class="expander-header">
+                <ha-switch
+                  .checked=${this.config.view_mode === 'Tabelle'}
+                  @change=${(e) => this._handleViewModeChange('Tabelle', e)}
+                  @click=${(e) => e.stopPropagation()}
+                ></ha-switch>
+                <span>Tabelle</span>
+              </div>
+              <ha-form
+                .hass=${this.hass}
+                .data=${this.config}
+                .schema=${[
+                  {
+                    name: 'show_channel',
+                    selector: { boolean: {} },
+                  },
+                  {
+                    name: 'show_time',
+                    selector: { boolean: {} },
+                  },
+                  {
+                    name: 'show_duration',
+                    selector: { boolean: {} },
+                  },
+                  {
+                    name: 'show_title',
+                    selector: { boolean: {} },
+                  },
+                  {
+                    name: 'show_description',
+                    selector: { boolean: {} },
+                  },
+                  {
+                    name: 'time_window',
+                    selector: {
+                      select: {
+                        options: [
+                          { value: 'C', label: 'Aktuell' },
+                          { value: 'D', label: 'Heute' },
+                          { value: 'W', label: 'Diese Woche' },
+                        ],
+                      },
+                    },
+                  },
+                  {
+                    name: 'date',
+                    selector: {
+                      text: {},
+                    },
+                  },
+                  {
+                    name: 'max_items',
+                    selector: {
+                      number: {
+                        min: 1,
+                        max: 100,
+                        mode: 'box',
+                      },
+                    },
+                  },
+                ]}
+                .computeLabel=${this._computeLabel}
+                @value-changed=${this._valueChanged}
+              ></ha-form>
+            </ha-expansion-panel>
+          </div>
         </ha-expansion-panel>
 
         <ha-expansion-panel>
-          <span slot="header">Erweitert</span>
+          <span slot="header">Filter</span>
           <ha-form
             .hass=${this.hass}
             .data=${this.config}
             .schema=${[
               {
-                name: 'show_channel',
+                name: 'whitelist',
                 selector: {
-                  boolean: {},
+                  template: {
+                    multiline: true,
+                  },
                 },
               },
               {
-                name: 'show_time',
+                name: 'blacklist',
                 selector: {
-                  boolean: {},
-                },
-              },
-              {
-                name: 'show_duration',
-                selector: {
-                  boolean: {},
-                },
-              },
-              {
-                name: 'show_title',
-                selector: {
-                  boolean: {},
-                },
-              },
-              {
-                name: 'show_description',
-                selector: {
-                  boolean: {},
+                  template: {
+                    multiline: true,
+                  },
                 },
               },
             ]}
@@ -172,8 +246,6 @@ export class EditorImpl extends EditorBase {
         return 'Zeitfenster';
       case 'date':
         return 'Datum (YYYY-MM-DD)';
-      case 'view_mode':
-        return 'Ansicht';
       case 'max_items':
         return 'Maximale Anzahl Einträge';
       case 'show_channel':
@@ -186,14 +258,40 @@ export class EditorImpl extends EditorBase {
         return 'Titel anzeigen';
       case 'show_description':
         return 'Beschreibung anzeigen';
+      case 'whitelist':
+        return 'Whitelist (YAML)';
+      case 'blacklist':
+        return 'Blacklist (YAML)';
+      case 'sortierung':
+        return 'Sortierung (YAML)';
       default:
         return schema.name;
     }
   }
 
   _valueChanged(ev) {
-    const value = ev.detail.value;
-    this.config = { ...this.config, ...value };
+    this._debug('EditorImpl _valueChanged wird aufgerufen mit:', ev.detail);
+    const newValue = ev.detail.value;
+
+    // Prüfe, ob ein Unter-Expander geöffnet wurde
+    if (newValue.expanded) {
+      // Schließe alle anderen Unter-Expander
+      const allExpanders = ['Liste', 'epg', 'Tabelle'];
+      allExpanders.forEach(expander => {
+        if (expander !== newValue.name) {
+          this.config[`${expander.toLowerCase()}_expanded`] = false;
+        }
+      });
+
+      // Setze den view_mode basierend auf dem geöffneten Expander
+      this.config.view_mode = newValue.name;
+    }
+
+    this.config = {
+      ...this.config,
+      ...newValue,
+    };
+    this._debug('EditorImpl config nach _valueChanged:', this.config);
     this.dispatchEvent(
       new CustomEvent('config-changed', {
         detail: { config: this.config },
@@ -203,15 +301,50 @@ export class EditorImpl extends EditorBase {
     );
   }
 
+  _handleViewModeChange(mode, event) {
+    this._debug('EditorImpl _handleViewModeChange wird aufgerufen mit:', mode, event);
+
+    // Nur wenn der Schalter aktiviert wird, ändern wir den view_mode
+    if (event.target.checked) {
+      this.config.view_mode = mode;
+      this.requestUpdate();
+      this.dispatchEvent(
+        new CustomEvent('config-changed', {
+          detail: { config: this.config },
+          bubbles: true,
+          composed: true,
+        })
+      );
+    } else {
+      // Wenn der Schalter deaktiviert werden soll, setzen wir ihn wieder auf checked
+      event.target.checked = true;
+    }
+  }
+
   static styles = css`
     .card-config {
       padding: 16px;
     }
-    .config-row {
-      margin-bottom: 16px;
+    .expander-content {
+      padding: 16px;
+    }
+    .expander-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
     ha-expansion-panel {
-      margin-bottom: 8px;
+      --expansion-panel-header-color: var(--primary-color);
+      --expansion-panel-header-background: var(--primary-background-color);
+      --expansion-panel-header-padding: 16px;
+      --expansion-panel-header-border-radius: 4px;
+      --expansion-panel-header-margin: 8px 0;
+    }
+    ha-expansion-panel[expanded] {
+      --expansion-panel-header-background: var(--secondary-background-color);
+    }
+    ha-expansion-panel:not([expanded]) {
+      --expansion-panel-header-background: var(--primary-background-color);
     }
   `;
 
