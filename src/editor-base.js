@@ -93,33 +93,4 @@ export class EditorBase extends SuperBase {
 
     this._debug('[EditorBase] EditorBase config nach setConfig:', this.config);
   }
-
-  _valueChanged(ev) {
-    this._debug('[EditorBase] EditorBase valueChanged:', ev.detail);
-    if (!this.config) {
-      this._debug('[EditorBase] EditorBase valueChanged: Keine Konfiguration vorhanden');
-      return;
-    }
-    const newConfig = {
-      ...this.config,
-      ...ev.detail.value,
-    };
-    this._debug('[EditorBase] EditorBase neue Konfiguration:', newConfig);
-    this.dispatchEvent(
-      new CustomEvent('config-changed', {
-        detail: { config: newConfig },
-        bubbles: true,
-        composed: true,
-      })
-    );
-  }
-
-  render() {
-    this._debug('[EditorBase] EditorBase render wird aufgerufen');
-    if (!this.hass || !this.config) {
-      this._debug('[EditorBase] EditorBase render: Keine hass oder config vorhanden');
-      return html`<div class="editor-container">Lade Editor...</div>`;
-    }
-    return html`<div class="editor-container">Editor wird geladen...</div>`;
-  }
 }
