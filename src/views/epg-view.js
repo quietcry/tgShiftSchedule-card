@@ -59,6 +59,12 @@ export class EPGView extends ViewBase {
       border-bottom: 1px solid var(--divider-color);
     }
 
+    epg-box {
+      grid-area: scrollBox;
+      width: 100%;
+      height: 100%;
+    }
+
     .timeSlot {
       padding: 4px 8px;
       border-right: 1px solid var(--divider-color);
