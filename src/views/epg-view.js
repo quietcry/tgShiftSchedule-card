@@ -27,6 +27,38 @@ export class EPGView extends ViewBase {
       height: 100%;
     }
 
+    .gridcontainer {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      grid-template-rows: auto 1fr;
+      grid-template-areas:
+        "superbutton timeBar"
+        "scrollBox scrollBox";
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    .superbutton {
+      grid-area: superbutton;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 8px;
+      background-color: var(--primary-background-color);
+      border-right: 1px solid var(--divider-color);
+    }
+
+    .timeBar {
+      grid-area: timeBar;
+      display: flex;
+      align-items: center;
+      padding: 8px;
+      background-color: var(--primary-background-color);
+      border-bottom: 1px solid var(--divider-color);
+    }
+
     .timeSlot {
       padding: 4px 8px;
       border-right: 1px solid var(--divider-color);
@@ -450,27 +482,29 @@ export class EPGView extends ViewBase {
 
   render() {
     return html`
-      <epg-box
-        .channels=${this.config.channels}
-        .programs=${this._programs}
-        .currentTime=${this._currentTime}
-        .timeWindow=${this.config.time_window}
-        .showChannel=${this.config.show_channel}
-        .showTime=${this.config.show_time}
-        .showDuration=${this.config.show_duration}
-        .showTitle=${this.config.show_title}
-        .showDescription=${this.config.show_description}
-      >
-        <div slot="superbutton">
+      <div class="gridcontainer">
+        <div class="superbutton">
           ${this._renderSuperButton()}
         </div>
-        <div slot="timebar">
+        <div class="timeBar">
           ${this._renderTimeBar()}
         </div>
-        <div slot="content">
-          ${this._renderContent()}
-        </div>
-      </epg-box>
+        <epg-box
+          .channels=${this.config.channels}
+          .programs=${this._programs}
+          .currentTime=${this._currentTime}
+          .timeWindow=${this.config.time_window}
+          .showChannel=${this.config.show_channel}
+          .showTime=${this.config.show_time}
+          .showDuration=${this.config.show_duration}
+          .showTitle=${this.config.show_title}
+          .showDescription=${this.config.show_description}
+        >
+          <div slot="content">
+            ${this._renderContent()}
+          </div>
+        </epg-box>
+      </div>
     `;
   }
 

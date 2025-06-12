@@ -22,34 +22,13 @@ export class EpgBox extends LitElement {
 
     .epgbox {
       display: grid;
-      grid-template-columns: auto 1fr;
-      grid-template-rows: auto 1fr;
+      grid-template-columns: 1fr;
+      grid-template-rows: 1fr;
       grid-template-areas:
-        "superbutton timeBar"
-        "scrollBox scrollBox";
+        "scrollBox";
       width: 100%;
       height: 100%;
       overflow: hidden;
-    }
-
-    .superbutton {
-      grid-area: superbutton;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 8px;
-      background-color: var(--primary-background-color);
-      border-right: 1px solid var(--divider-color);
-    }
-
-    .timeBar {
-      grid-area: timeBar;
-      display: flex;
-      align-items: center;
-      padding: 8px;
-      background-color: var(--primary-background-color);
-      border-bottom: 1px solid var(--divider-color);
     }
 
     .scrollBox {
@@ -62,12 +41,6 @@ export class EpgBox extends LitElement {
   render() {
     return html`
       <div class="epgbox">
-        <div class="superbutton">
-          <slot name="superbutton"></slot>
-        </div>
-        <div class="timeBar">
-          <slot name="timebar"></slot>
-        </div>
         <div class="scrollBox">
           <slot name="content"></slot>
         </div>
