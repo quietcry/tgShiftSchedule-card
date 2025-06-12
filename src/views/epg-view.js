@@ -464,7 +464,6 @@ export class EPGView extends ViewBase {
   }
 
   _onProgramSelected(e) {
-    // Programm-Auswahl-Handler
     this._debug('EPGView _onProgramSelected:', e.detail.program);
   }
 
@@ -496,7 +495,7 @@ export class EPGView extends ViewBase {
           ${this._renderTimeBar()}
         </div>
         <epg-box
-          .channels=${this.config.channels}
+          .channels=${this._filteredChannels}
           .programs=${this._programs}
           .currentTime=${this._currentTime}
           .timeWindow=${this.config.time_window}
@@ -505,11 +504,10 @@ export class EPGView extends ViewBase {
           .showDuration=${this.config.show_duration}
           .showTitle=${this.config.show_title}
           .showDescription=${this.config.show_description}
-        >
-          <div slot="content">
-            ${this._renderContent()}
-          </div>
-        </epg-box>
+          .selectedChannel=${this._selectedChannel}
+          @channel-selected=${this._onChannelSelected}
+          @program-selected=${this._onProgramSelected}
+        ></epg-box>
       </div>
     `;
   }
