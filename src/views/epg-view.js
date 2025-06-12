@@ -6,6 +6,7 @@ import { EPGTimebar } from '../lib/epgElements/epg-timebar';
 import { EPGChannelList } from '../lib/epgElements/epg-channel-list';
 import { EPGProgramList } from '../lib/epgElements/epg-program-list';
 import { DataProvider } from '../data-provider';
+import { EpgBox } from '../lib/epgElements/epg-box.js';
 
 export class EPGView extends ViewBase {
   static properties = {
@@ -19,144 +20,59 @@ export class EPGView extends ViewBase {
     _lastUpdate: { type: String },
   };
 
-  static get styles() {
-    return css`
-      :host {
-        display: block;
-        height: 100%;
-        width: 100%;
-        --tgepg-topBarHeight: 40px;
-        --tgepg-channelRowWidth: 120px;
-        --tgepg-appHeight: 100%;
-        --tgepg-programHeight: 60px;
-        --tgepg-timeSlotWidth: 120px;
-      }
+  static styles = css`
+    :host {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
 
-      .gridcontainer {
-        display: grid;
-        grid-auto-rows: 1fr;
-        grid-template-columns: var(--tgepg-channelRowWidth) 1fr;
-        grid-template-rows: var(--tgepg-topBarHeight) calc(100% - var(--tgepg-topBarHeight));
-        gap: 0px 0px;
-        grid-template-areas:
-          "superbutton timeBar"
-          "scrollBox scrollBox";
-        width: 100%;
-        height: var(--tgepg-appHeight);
-        overflow: hidden;
-      }
+    .timeSlot {
+      padding: 4px 8px;
+      border-right: 1px solid var(--divider-color);
+      min-width: 60px;
+      text-align: center;
+    }
 
-      .superbutton {
-        grid-area: superbutton;
-        background-color: #b3e5fc;
-        padding: 5px;
-      }
+    .timeSlot.current {
+      background-color: var(--accent-color);
+      color: var(--text-primary-color);
+    }
 
-      .timeBar {
-        grid-area: timeBar;
-        background-color: #bdbdbd;
-        white-space: nowrap;
-        overflow-x: auto;
-        height: var(--tgepg-topBarHeight);
-        padding: 5px;
-        display: flex;
-      }
+    .channelRow {
+      padding: 8px;
+      border-bottom: 1px solid var(--divider-color);
+      cursor: pointer;
+    }
 
-      .timeSlot {
-        min-width: var(--tgepg-timeSlotWidth);
-        text-align: center;
-        padding: 5px;
-        border-right: 1px solid #9e9e9e;
-      }
+    .channelRow.selected {
+      background-color: var(--accent-color);
+      color: var(--text-primary-color);
+    }
 
-      .timeSlot.current {
-        background-color: #81c784;
-        color: white;
-      }
+    .programSlot {
+      padding: 8px;
+      border: 1px solid var(--divider-color);
+      margin: 4px;
+      cursor: pointer;
+      min-width: 100px;
+    }
 
-      .scrollBox {
-        grid-area: scrollBox;
-        position: relative;
-        width: 100%;
-        height: 100%;
-        overflow: hidden;
-        background-color: #f5f5f5;
-      }
+    .programSlot.current {
+      background-color: var(--accent-color);
+      color: var(--text-primary-color);
+    }
 
-      [name="epgOutBox"] {
-        position: relative;
-        width: 100%;
-        height: 100%;
-        overflow: hidden;
-      }
+    .programTitle {
+      font-weight: bold;
+      margin-bottom: 4px;
+    }
 
-      [name="epgBox"] {
-        display: grid;
-        grid-auto-rows: 1fr;
-        grid-template-columns: var(--tgepg-channelRowWidth) 1fr;
-        grid-template-rows: minmax(min-content, max-content);
-        gap: 0px 0px;
-        grid-template-areas:
-          "channelBox programBox";
-        width: 100%;
-        height: 100%;
-        grid-auto-flow: dense;
-        overflow-x: auto;
-        overflow-y: auto;
-      }
-
-      [name="channelBox"] {
-        grid-area: channelBox;
-        background-color: #e3f2fd;
-        padding: 5px;
-      }
-
-      .channelRow {
-        height: var(--tgepg-programHeight);
-        display: flex;
-        align-items: center;
-        padding: 5px;
-        border-bottom: 1px solid #bbdefb;
-      }
-
-      [name="programBox"] {
-        grid-area: programBox;
-        background-color: #e8f5e9;
-        padding: 5px;
-        position: relative;
-      }
-
-      .programRow {
-        height: var(--tgepg-programHeight);
-        display: flex;
-        position: relative;
-        border-bottom: 1px solid #c8e6c9;
-      }
-
-      .programSlot {
-        height: 100%;
-        padding: 5px;
-        border-right: 1px solid #c8e6c9;
-        overflow: hidden;
-        background-color: #f1f8e9;
-      }
-
-      .programSlot.current {
-        background-color: #81c784;
-        color: white;
-      }
-
-      .programTitle {
-        font-weight: bold;
-        margin-bottom: 4px;
-      }
-
-      .programTime {
-        font-size: 0.8em;
-        opacity: 0.8;
-      }
-    `;
-  }
+    .programTime {
+      font-size: 0.8em;
+      color: var(--secondary-text-color);
+    }
+  `;
 
   constructor() {
     super();
@@ -422,31 +338,68 @@ export class EPGView extends ViewBase {
     return processedData;
   }
 
-  _renderContent() {
-    // Leeres EPG mit Platzhaltern rendern
+  _renderSuperButton() {
     return html`
-      <epg-view-base>
-        <epg-timebar
-          slot="timebar"
-          .startTime=${this._currentTime}
-          .endTime=${this._currentTime + 7200}
-          .currentTime=${this._currentTime}
-        ></epg-timebar>
-        <epg-channel-list
-          slot="channels"
-          .channels=${this._isDataReady ? this.epgData : this._getPlaceholderChannels()}
-          .selectedChannel=${this._selectedChannel}
-          @channel-selected=${this._onChannelSelected}
-        ></epg-channel-list>
-        <epg-program-list
-          slot="programs"
-          .programs=${this._isDataReady ? this._getSelectedChannelPrograms() : []}
-          .currentTime=${this._currentTime}
-          .startTime=${this._currentTime}
-          .endTime=${this._currentTime + 7200}
-          @program-selected=${this._onProgramSelected}
-        ></epg-program-list>
-      </epg-view-base>
+      <ha-button @click=${this._handleRefresh}>Aktualisieren</ha-button>
+    `;
+  }
+
+  _renderTimeBar() {
+    if (!this._isDataReady) return '';
+
+    const timeSlots = this._generateTimeSlots();
+    const currentTime = new Date();
+
+    return html`
+      ${timeSlots.map(slot => html`
+        <div class="timeSlot ${this._isCurrentTimeSlot(slot, currentTime) ? 'current' : ''}">
+          ${this._formatTime(slot)}
+        </div>
+      `)}
+    `;
+  }
+
+  _renderContent() {
+    if (!this._isDataReady) {
+      this._debug('Rendere Ladebildschirm');
+      return this._renderLoading();
+    }
+
+    const channels = this._filteredChannels;
+    this._debug('Rendere EPG mit Kanälen:', channels.length);
+
+    const timeSlots = this._generateTimeSlots();
+
+    return html`
+      <div name="epgOutBox">
+        <div name="epgBox">
+          <div name="channelBox">
+            ${channels.map(channel => html`
+              <div class="channelRow ${this._selectedChannel === channel.id ? 'selected' : ''}"
+                   @click=${() => this._onChannelSelected(channel)}>
+                ${channel.name}
+              </div>
+            `)}
+          </div>
+          <div name="programBox">
+            ${channels.map(channel => html`
+              <div class="programRow">
+                ${this._getProgramsForChannel(channel, timeSlots).map(program => html`
+                  <div class="programSlot ${this._isCurrentProgram(program) ? 'current' : ''}"
+                       style="width: ${this._calculateProgramWidth(program)}px"
+                       @click=${() => this._onProgramSelected(program)}>
+                    <div class="programTitle">${program.title}</div>
+                    <div class="programTime">
+                      ${this._formatTime(new Date(program.start))} -
+                      ${this._formatTime(new Date(program.end))}
+                    </div>
+                  </div>
+                `)}
+              </div>
+            `)}
+          </div>
+        </div>
+      </div>
     `;
   }
 
@@ -496,61 +449,28 @@ export class EPGView extends ViewBase {
   }
 
   render() {
-    if (!this._isDataReady) {
-      this._debug('Rendere Ladebildschirm');
-      return this._renderLoading();
-    }
-
-    const channels = this._filteredChannels;
-    this._debug('Rendere EPG mit Kanälen:', channels.length);
-
-    const timeSlots = this._generateTimeSlots();
-    const currentTime = new Date();
-
     return html`
-      <div class="gridcontainer">
-        <div class="superbutton" name="superbutton">
-          <ha-button @click=${this._handleRefresh}>Aktualisieren</ha-button>
+      <epg-box
+        .channels=${this.config.channels}
+        .programs=${this._programs}
+        .currentTime=${this._currentTime}
+        .timeWindow=${this.config.time_window}
+        .showChannel=${this.config.show_channel}
+        .showTime=${this.config.show_time}
+        .showDuration=${this.config.show_duration}
+        .showTitle=${this.config.show_title}
+        .showDescription=${this.config.show_description}
+      >
+        <div slot="superbutton">
+          ${this._renderSuperButton()}
         </div>
-        <div class="timeBar" name="timeBar">
-          ${timeSlots.map(slot => html`
-            <div class="timeSlot ${this._isCurrentTimeSlot(slot, currentTime) ? 'current' : ''}">
-              ${this._formatTime(slot)}
-            </div>
-          `)}
+        <div slot="timebar">
+          ${this._renderTimeBar()}
         </div>
-        <div class="scrollBox" name="scrollBox">
-          <div name="epgOutBox">
-            <div name="epgBox">
-              <div name="channelBox">
-                ${channels.map(channel => html`
-                  <div class="channelRow ${this._selectedChannel === channel.id ? 'selected' : ''}"
-                       @click=${() => this._onChannelSelected(channel)}>
-                    ${channel.name}
-                  </div>
-                `)}
-              </div>
-              <div name="programBox">
-                ${channels.map(channel => html`
-                  <div class="programRow">
-                    ${this._getProgramsForChannel(channel, timeSlots).map(program => html`
-                      <div class="programSlot ${this._isCurrentProgram(program) ? 'current' : ''}"
-                           style="width: ${this._calculateProgramWidth(program)}px"
-                           @click=${() => this._onProgramSelected(program)}>
-                        <div class="programTitle">${program.title}</div>
-                        <div class="programTime">
-                          ${this._formatTime(new Date(program.start))} -
-                          ${this._formatTime(new Date(program.end))}
-                        </div>
-                      </div>
-                    `)}
-                  </div>
-                `)}
-              </div>
-            </div>
-          </div>
+        <div slot="content">
+          ${this._renderContent()}
         </div>
-      </div>
+      </epg-box>
     `;
   }
 
