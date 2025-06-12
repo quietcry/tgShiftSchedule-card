@@ -23,6 +23,23 @@ export class EpgBox extends LitElement {
       position: relative;
     }
 
+    :host(.epgBox) {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      grid-template-areas: "channelBox programBox";
+    }
+
+    .channelBox {
+      grid-area: channelBox;
+      min-width: 120px;
+      border-right: 1px solid var(--divider-color);
+    }
+
+    .programBox {
+      grid-area: programBox;
+      overflow-x: auto;
+    }
+
     .timeSlot {
       padding: 4px 8px;
       border-right: 1px solid var(--divider-color);
@@ -82,34 +99,30 @@ export class EpgBox extends LitElement {
     const timeSlots = this._generateTimeSlots();
 
     return html`
-      <div name="epgOutBox">
-        <div name="epgBox">
-          <div name="channelBox">
-            ${this.channels.map(channel => html`
-              <div class="channelRow ${this.selectedChannel === channel.id ? 'selected' : ''}"
-                   @click=${() => this._onChannelSelected(channel)}>
-                ${channel.name}
+      <div class="channelBox">
+        ${this.channels.map(channel => html`
+          <div class="channelRow ${this.selectedChannel === channel.id ? 'selected' : ''}"
+               @click=${() => this._onChannelSelected(channel)}>
+            ${channel.name}
+          </div>
+        `)}
+      </div>
+      <div class="programBox">
+        ${this.channels.map(channel => html`
+          <div class="programRow">
+            ${this._getProgramsForChannel(channel, timeSlots).map(program => html`
+              <div class="programSlot ${this._isCurrentProgram(program) ? 'current' : ''}"
+                   style="width: ${this._calculateProgramWidth(program)}px"
+                   @click=${() => this._onProgramSelected(program)}>
+                <div class="programTitle">${program.title}</div>
+                <div class="programTime">
+                  ${this._formatTime(new Date(program.start))} -
+                  ${this._formatTime(new Date(program.end))}
+                </div>
               </div>
             `)}
           </div>
-          <div name="programBox">
-            ${this.channels.map(channel => html`
-              <div class="programRow">
-                ${this._getProgramsForChannel(channel, timeSlots).map(program => html`
-                  <div class="programSlot ${this._isCurrentProgram(program) ? 'current' : ''}"
-                       style="width: ${this._calculateProgramWidth(program)}px"
-                       @click=${() => this._onProgramSelected(program)}>
-                    <div class="programTitle">${program.title}</div>
-                    <div class="programTime">
-                      ${this._formatTime(new Date(program.start))} -
-                      ${this._formatTime(new Date(program.end))}
-                    </div>
-                  </div>
-                `)}
-              </div>
-            `)}
-          </div>
-        </div>
+        `)}
       </div>
     `;
   }

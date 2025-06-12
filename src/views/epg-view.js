@@ -495,6 +495,7 @@ export class EPGView extends ViewBase {
           ${this._renderTimeBar()}
         </div>
         <epg-box
+          class="epgBox"
           .channels=${this._filteredChannels}
           .programs=${this._programs}
           .currentTime=${this._currentTime}
