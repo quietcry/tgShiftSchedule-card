@@ -1,9 +1,8 @@
-import { LitElement } from 'lit';
+import { SuperBase } from '../base/super-base.js';
 import { DataProvider } from '../data-provider';
-import { CardName, DebugMode } from '../card-config';
 import { css } from 'lit';
 
-export class ViewBase extends LitElement {
+export class ViewBase extends SuperBase {
   static properties = {
     config: { type: Object },
     epgData: { type: Array },
@@ -123,15 +122,5 @@ export class ViewBase extends LitElement {
 
   _renderContent() {
     return html`<div>Keine Daten verfügbar</div>`;
-  }
-
-  _debug(message, ...args) {
-    if (DebugMode) {
-      console.debug(`[${CardName}] [${this.constructor.name}] ${message}`, ...args);
-    }
-  }
-
-  static get styles() {
-    return css``;
   }
 }

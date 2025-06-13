@@ -76,8 +76,8 @@ export class EditorImpl extends EditorBase {
               <div slot="header" class="expander-header">
                 <ha-switch
                   .checked=${this.config.view_mode === 'Liste'}
-                  @change=${(e) => this._handleViewModeChange('Liste', e)}
-                  @click=${(e) => e.stopPropagation()}
+                  @change=${e => this._handleViewModeChange('Liste', e)}
+                  @click=${e => e.stopPropagation()}
                 ></ha-switch>
                 <span>Liste</span>
               </div>
@@ -115,8 +115,8 @@ export class EditorImpl extends EditorBase {
               <div slot="header" class="expander-header">
                 <ha-switch
                   .checked=${this.config.view_mode === 'epg'}
-                  @change=${(e) => this._handleViewModeChange('epg', e)}
-                  @click=${(e) => e.stopPropagation()}
+                  @change=${e => this._handleViewModeChange('epg', e)}
+                  @click=${e => e.stopPropagation()}
                 ></ha-switch>
                 <span>epg</span>
               </div>
@@ -142,8 +142,8 @@ export class EditorImpl extends EditorBase {
               <div slot="header" class="expander-header">
                 <ha-switch
                   .checked=${this.config.view_mode === 'Tabelle'}
-                  @change=${(e) => this._handleViewModeChange('Tabelle', e)}
-                  @click=${(e) => e.stopPropagation()}
+                  @change=${e => this._handleViewModeChange('Tabelle', e)}
+                  @click=${e => e.stopPropagation()}
                 ></ha-switch>
                 <span>Tabelle</span>
               </div>

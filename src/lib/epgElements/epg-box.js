@@ -2,8 +2,7 @@ import { LitElement, html, css } from 'lit';
 
 export class EpgBox extends LitElement {
   static properties = {
-    channels: { type: Array },
-    programs: { type: Array },
+    epgData: { type: Object },
     currentTime: { type: Number },
     timeWindow: { type: Number },
     showChannel: { type: Boolean },
@@ -12,7 +11,29 @@ export class EpgBox extends LitElement {
     showTitle: { type: Boolean },
     showDescription: { type: Boolean },
     selectedChannel: { type: String },
+    channelOrder: { type: Array }, // Array mit Kanaldefinitionen { name: string, style?: string, channels?: Array }
   };
+
+  constructor() {
+    super();
+    this._channels = new Map(); // Speichert die Kanäle mit ihren Programmen
+  }
+
+  updated(changedProperties) {
+    if (changedProperties.has('epgData')) {
+      console.log('epg-box: Neue Daten erhalten:', this.epgData);
+
+      if (this.epgData?.channel) {
+        console.log('epg-box: Neuer Kanal wird hinzugefügt:', this.epgData.channel.name);
+        this._channels.set(this.epgData.channel.id, this.epgData.channel);
+        console.log(
+          'epg-box: Aktuelle Kanäle:',
+          Array.from(this._channels.values()).map(c => c.name)
+        );
+        this.requestUpdate();
+      }
+    }
+  }
 
   static styles = css`
     :host {
@@ -26,7 +47,7 @@ export class EpgBox extends LitElement {
     :host(.epgBox) {
       display: grid;
       grid-template-columns: auto 1fr;
-      grid-template-areas: "channelBox programBox";
+      grid-template-areas: 'channelBox programBox';
     }
 
     .channelBox {
@@ -40,16 +61,11 @@ export class EpgBox extends LitElement {
       overflow-x: auto;
     }
 
-    .timeSlot {
+    .channelGroup {
       padding: 4px 8px;
-      border-right: 1px solid var(--divider-color);
-      min-width: 60px;
-      text-align: center;
-    }
-
-    .timeSlot.current {
-      background-color: var(--accent-color);
+      background-color: var(--primary-color);
       color: var(--text-primary-color);
+      font-weight: bold;
     }
 
     .channelRow {
@@ -88,43 +104,154 @@ export class EpgBox extends LitElement {
   `;
 
   render() {
-    return this._renderContent();
-  }
-
-  _renderContent() {
-    if (!this.channels?.length) {
+    if (!this._channels.size) {
+      console.log('epg-box: Erste Renderung - noch keine Daten');
       return this._renderLoading();
     }
 
-    const timeSlots = this._generateTimeSlots();
+    const { groupedChannels, ungroupedChannels } = this._groupChannels();
+    console.log(
+      'epg-box: Rendere mit',
+      groupedChannels.length,
+      'Gruppen und',
+      ungroupedChannels.length,
+      'ungruppierten Kanälen'
+    );
 
     return html`
       <div class="channelBox">
-        ${this.channels.map(channel => html`
-          <div class="channelRow ${this.selectedChannel === channel.id ? 'selected' : ''}"
-               @click=${() => this._onChannelSelected(channel)}>
-            ${channel.name}
-          </div>
-        `)}
+        ${this._renderGroupedChannels(groupedChannels)}
+        ${this._renderUngroupedChannels(ungroupedChannels)}
       </div>
       <div class="programBox">
-        ${this.channels.map(channel => html`
-          <div class="programRow">
-            ${this._getProgramsForChannel(channel, timeSlots).map(program => html`
-              <div class="programSlot ${this._isCurrentProgram(program) ? 'current' : ''}"
-                   style="width: ${this._calculateProgramWidth(program)}px"
-                   @click=${() => this._onProgramSelected(program)}>
-                <div class="programTitle">${program.title}</div>
-                <div class="programTime">
-                  ${this._formatTime(new Date(program.start))} -
-                  ${this._formatTime(new Date(program.end))}
-                </div>
-              </div>
-            `)}
-          </div>
-        `)}
+        ${[...groupedChannels.flatMap(g => g.channels), ...ungroupedChannels].map(
+          channel => html`
+            <div class="programRow">
+              ${this._getProgramsForChannel(channel, this._generateTimeSlots()).map(
+                program => html`
+                  <div
+                    class="programSlot ${this._isCurrentProgram(program) ? 'current' : ''}"
+                    style="width: ${this._calculateProgramWidth(program)}px"
+                    @click=${() => this._onProgramSelected(program)}
+                  >
+                    <div class="programTitle">${program.title}</div>
+                    <div class="programTime">
+                      ${this._formatTime(new Date(program.start))} -
+                      ${this._formatTime(new Date(program.end))}
+                    </div>
+                  </div>
+                `
+              )}
+            </div>
+          `
+        )}
       </div>
     `;
+  }
+
+  _renderGroupedChannels(groupedChannels) {
+    return groupedChannels.map(
+      group => html`
+        <div class="channelGroup" style="${group.style || ''}">${group.name}</div>
+        ${group.channels.length > 0
+          ? html`
+              ${group.channels.map(
+                channel => html`
+                  <div
+                    class="channelRow ${this.selectedChannel === channel.id ? 'selected' : ''}"
+                    style="${channel.style || ''}"
+                    @click=${() => this._onChannelSelected(channel)}
+                  >
+                    ${channel.name}
+                  </div>
+                `
+              )}
+            `
+          : html` <div class="channelRow empty">Keine Kanäle in dieser Gruppe</div> `}
+      `
+    );
+  }
+
+  _renderUngroupedChannels(ungroupedChannels) {
+    return ungroupedChannels.map(
+      channel => html`
+        <div
+          class="channelRow ${this.selectedChannel === channel.id ? 'selected' : ''}"
+          @click=${() => this._onChannelSelected(channel)}
+        >
+          ${channel.name}
+        </div>
+      `
+    );
+  }
+
+  _groupChannels() {
+    if (!this._channels.size) return { groupedChannels: [], ungroupedChannels: [] };
+
+    const channels = Array.from(this._channels.values());
+    const groupedChannels = [];
+    const ungroupedChannels = [];
+    const groupedChannelsSet = new Set();
+
+    // Gruppiere die Kanäle
+    if (this.channelOrder?.length) {
+      // Erstelle die Gruppen und sortiere einzelne Kanäle
+      this.channelOrder.forEach(item => {
+        if (item.channels) {
+          // Es ist eine Gruppe
+          const groupChannels = [];
+
+          item.channels.forEach(channelConfig => {
+            const regex = new RegExp(channelConfig.name);
+            const matchingChannels = channels.filter(
+              c => regex.test(c.name) && !groupedChannelsSet.has(c.id)
+            );
+
+            matchingChannels.forEach(channel => {
+              groupedChannelsSet.add(channel.id);
+              groupChannels.push({
+                ...channel,
+                style: channelConfig.style,
+              });
+            });
+          });
+
+          if (groupChannels.length > 0) {
+            groupedChannels.push({
+              name: item.name,
+              style: item.style,
+              channels: groupChannels,
+            });
+          }
+        } else {
+          // Es ist ein einzelner Kanal
+          const regex = new RegExp(item.name);
+          const matchingChannels = channels.filter(
+            c => regex.test(c.name) && !groupedChannelsSet.has(c.id)
+          );
+
+          matchingChannels.forEach(channel => {
+            groupedChannelsSet.add(channel.id);
+            ungroupedChannels.push({
+              ...channel,
+              style: item.style,
+            });
+          });
+        }
+      });
+
+      // Füge die nicht zugeordneten Kanäle hinzu
+      channels.forEach(channel => {
+        if (!groupedChannelsSet.has(channel.id)) {
+          ungroupedChannels.push(channel);
+        }
+      });
+    } else {
+      // Wenn keine Konfiguration definiert ist, sind alle Kanäle ungruppiert
+      ungroupedChannels.push(...channels);
+    }
+
+    return { groupedChannels, ungroupedChannels };
   }
 
   _renderLoading() {
@@ -154,7 +281,7 @@ export class EpgBox extends LitElement {
   _formatTime(date) {
     return date.toLocaleTimeString('de-DE', {
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
     });
   }
 
@@ -192,19 +319,23 @@ export class EpgBox extends LitElement {
 
   _onChannelSelected(channel) {
     this.selectedChannel = channel.id;
-    this.dispatchEvent(new CustomEvent('channel-selected', {
-      detail: { channel },
-      bubbles: true,
-      composed: true
-    }));
+    this.dispatchEvent(
+      new CustomEvent('channel-selected', {
+        detail: { channel },
+        bubbles: true,
+        composed: true,
+      })
+    );
   }
 
   _onProgramSelected(program) {
-    this.dispatchEvent(new CustomEvent('program-selected', {
-      detail: { program },
-      bubbles: true,
-      composed: true
-    }));
+    this.dispatchEvent(
+      new CustomEvent('program-selected', {
+        detail: { program },
+        bubbles: true,
+        composed: true,
+      })
+    );
   }
 }
 

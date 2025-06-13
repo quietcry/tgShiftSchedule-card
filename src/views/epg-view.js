@@ -18,6 +18,7 @@ export class EPGView extends ViewBase {
     _filteredChannels: { type: Array },
     _processedChannels: { type: Array },
     _lastUpdate: { type: String },
+    _epgData: { type: Object },
   };
 
   static styles = css`
@@ -32,8 +33,8 @@ export class EPGView extends ViewBase {
       grid-template-columns: auto 1fr;
       grid-template-rows: auto 1fr;
       grid-template-areas:
-        "superbutton timeBar"
-        "scrollBox scrollBox";
+        'superbutton timeBar'
+        'scrollBox scrollBox';
       width: 100%;
       height: 100%;
       overflow: hidden;
@@ -121,6 +122,7 @@ export class EPGView extends ViewBase {
     this._filteredChannels = [];
     this._processedChannels = [];
     this._lastUpdate = null;
+    this._epgData = { channels: [] };
   }
 
   set hass(value) {
@@ -162,6 +164,64 @@ export class EPGView extends ViewBase {
     }
   }
 
+  async _filterChannels(channels) {
+    this._debug('Filtere und sortiere Kanäle:', channels);
+
+    if (!Array.isArray(channels)) {
+      this._debug('Keine Kanäle zum Filtern vorhanden');
+      return [];
+    }
+
+    // Filtere nach black/white Liste
+    let filteredChannels = channels;
+    if (this.config.channel_blacklist && this.config.channel_blacklist.length > 0) {
+      filteredChannels = channels.filter(
+        channel => !this.config.channel_blacklist.includes(channel.name)
+      );
+    }
+    if (this.config.channel_whitelist && this.config.channel_whitelist.length > 0) {
+      filteredChannels = channels.filter(channel =>
+        this.config.channel_whitelist.includes(channel.name)
+      );
+    }
+
+    this._debug('Gefilterte und sortierte Kanäle:', filteredChannels);
+    return filteredChannels;
+  }
+
+  _getPrioritizedChannels(channels) {
+    if (!this.config.group_order?.length) return channels;
+
+    const prioritizedChannels = [];
+    const remainingChannels = new Set(channels.map(c => c.id));
+
+    // Extrahiere Kanäle aus group_order in der angegebenen Reihenfolge
+    this.config.group_order.forEach(group => {
+      if (group.channels) {
+        group.channels.forEach(channelConfig => {
+          const regex = new RegExp(channelConfig.name);
+          const matchingChannels = channels.filter(
+            c => regex.test(c.name) && remainingChannels.has(c.id)
+          );
+
+          matchingChannels.forEach(channel => {
+            prioritizedChannels.push(channel);
+            remainingChannels.delete(channel.id);
+          });
+        });
+      }
+    });
+
+    // Füge die übrigen Kanäle hinzu
+    channels.forEach(channel => {
+      if (remainingChannels.has(channel.id)) {
+        prioritizedChannels.push(channel);
+      }
+    });
+
+    return prioritizedChannels;
+  }
+
   async _fetchViewData() {
     try {
       this._debug('EPGView _fetchViewData wird aufgerufen');
@@ -188,27 +248,31 @@ export class EPGView extends ViewBase {
         throw new Error('Ungültiges Kanal-Liste Format');
       }
 
-      // Filtere und sortiere Kanäle
-      const filteredChannels = await this._filterAndSortChannels(channels);
+      // Filtere Kanäle nach black/white Liste
+      const filteredChannels = await this._filterChannels(channels);
       this._debug('Gefilterte Kanäle:', filteredChannels);
 
-      // Hole EPG-Daten für jeden Kanal parallel
-      const epgPromises = filteredChannels.map(channel =>
-        this._dataProvider.fetchChannelEpg(this.config.entity, channel.id)
-          .then(response => ({
-            ...channel,
-            epg: response.response || []
-          }))
-      );
+      // Generiere eine flache Liste der Kanäle aus group_order für die Priorisierung
+      const prioritizedChannels = this._getPrioritizedChannels(filteredChannels);
+      this._debug('Priorisierte Kanäle:', prioritizedChannels);
 
-      const epgData = await Promise.all(epgPromises);
-      this._debug('EPG-Daten:', epgData);
-
-      // Verarbeite die Daten
-      this._filteredChannels = this._prepareData(epgData);
+      // Setze initiale Daten
+      this._epgData = { channels: [] };
       this._isDataReady = true;
       this.requestUpdate();
 
+      // Hole EPG-Daten für jeden Kanal sequentiell
+      for (const channel of prioritizedChannels) {
+        try {
+          const response = await this._dataProvider.fetchChannelEpg(this.config.entity, channel.id);
+          const processedChannel = this._processChannelData(channel, response.response || []);
+          // Übergebe jeden Kanal einzeln an epg-box
+          this._epgData = { channel: processedChannel };
+          this.requestUpdate();
+        } catch (error) {
+          this._debug(`Fehler beim Laden des EPG für ${channel.name}:`, error);
+        }
+      }
     } catch (error) {
       this._debug('Fehler beim Laden der EPG-Daten:', error);
       this._isDataReady = false;
@@ -216,288 +280,56 @@ export class EPGView extends ViewBase {
     }
   }
 
-  async _filterAndSortChannels(channels) {
-    this._debug('Filtere und sortiere Kanäle:', channels);
-
-    // Extrahiere Listen aus der Konfiguration
-    const blacklist = this._parseRegexList(this.config.blacklist || '');
-    const whitelist = this._parseRegexList(this.config.whitelist || '');
-    const importantlist = this._parseRegexList(this.config.importantlist || '');
-
-    // Filtere Kanäle
-    let filteredChannels = channels.filter(channel => {
-      const channelName = channel.name.toLowerCase();
-
-      // Wenn Whitelist existiert, nur diese Kanäle zulassen
-      if (whitelist.length > 0) {
-        return whitelist.some(regex => regex.test(channelName));
-      }
-
-      // Blacklist prüfen
-      if (blacklist.length > 0) {
-        return !blacklist.some(regex => regex.test(channelName));
-      }
-
-      return true;
+  _processChannelData(channel, epgData) {
+    this._debug('Verarbeite Kanal-Daten:', {
+      channel,
+      epgData,
+      response: epgData?.response,
+      epg_data: epgData?.response?.epg_data,
     });
 
-    // Sortiere Kanäle nach YAML-Konfiguration
-    if (this.config.channel_sorting) {
-      try {
-        const sortingConfig = this._parseYamlSorting(this.config.channel_sorting);
-        filteredChannels = this._sortChannelsByConfig(filteredChannels, sortingConfig);
-      } catch (error) {
-        this._debug('Fehler beim Parsen der YAML-Sortierung:', error);
-      }
-    } else {
-      // Fallback: Sortiere nach Importantlist und alphabetisch
-      filteredChannels.sort((a, b) => {
-        const aName = a.name.toLowerCase();
-        const bName = b.name.toLowerCase();
+    // Extrahiere die EPG-Daten aus der Service-Antwort
+    const epgResponse = epgData?.response || [];
 
-        // Wichtige Kanäle zuerst
-        const aImportant = importantlist.some(regex => regex.test(aName));
-        const bImportant = importantlist.some(regex => regex.test(bName));
-
-        if (aImportant && !bImportant) return -1;
-        if (!aImportant && bImportant) return 1;
-
-        // Alphabetisch sortieren
-        return aName.localeCompare(bName);
+    if (!Array.isArray(epgResponse) || epgResponse.length === 0) {
+      this._debug('Keine EPG-Daten für Kanal:', channel.name, {
+        epgData,
+        response: epgData?.response,
       });
+      return {
+        ...channel,
+        programs: [],
+      };
     }
 
-    this._debug('Gefilterte und sortierte Kanäle:', filteredChannels);
-    return filteredChannels;
-  }
+    // Verarbeite die EPG-Daten
+    const programs = epgResponse.map(program => ({
+      title: program.title || '',
+      description: program.description || '',
+      start: program.start || '',
+      end: program.end || '',
+      duration: program.duration || 0,
+    }));
 
-  _parseRegexList(listString) {
-    if (!listString) return [];
-    return listString
-      .split(',')
-      .map(item => item.trim())
-      .filter(item => item)
-      .map(item => new RegExp(item, 'i'));
-  }
+    this._debug('Verarbeitete Programme für Kanal:', channel.name, {
+      programs,
+      epgResponse,
+    });
 
-  _parseYamlSorting(yamlString) {
-    // Einfache YAML-Parsing-Logik für unsere spezifische Struktur
-    const lines = yamlString.split('\n');
-    const result = [];
-    let currentGroup = null;
-
-    for (const line of lines) {
-      const trimmedLine = line.trim();
-      if (!trimmedLine) continue;
-
-      if (trimmedLine.startsWith('- ')) {
-        const item = trimmedLine.substring(2).trim();
-        if (currentGroup) {
-          currentGroup.items.push(item);
-        } else {
-          result.push({ type: 'channel', name: item });
-        }
-      } else if (trimmedLine.endsWith(':')) {
-        currentGroup = { type: 'group', name: trimmedLine.slice(0, -1).trim(), items: [] };
-        result.push(currentGroup);
-      } else if (trimmedLine.startsWith('  - ')) {
-        if (currentGroup) {
-          currentGroup.items.push(trimmedLine.substring(4).trim());
-        }
-      }
-    }
-
-    return result;
-  }
-
-  _sortChannelsByConfig(channels, sortingConfig) {
-    const result = [];
-    const remainingChannels = new Set(channels.map(c => c.name.toLowerCase()));
-
-    // Verarbeite die Sortierungskonfiguration
-    for (const item of sortingConfig) {
-      if (item.type === 'group') {
-        // Füge Kanäle in der angegebenen Reihenfolge hinzu
-        for (const channelName of item.items) {
-          const channel = channels.find(c =>
-            c.name.toLowerCase() === channelName.toLowerCase()
-          );
-          if (channel) {
-            result.push(channel);
-            remainingChannels.delete(channel.name.toLowerCase());
-          }
-        }
-      } else {
-        // Einzelner Kanal
-        const channel = channels.find(c =>
-          c.name.toLowerCase() === item.name.toLowerCase()
-        );
-        if (channel) {
-          result.push(channel);
-          remainingChannels.delete(channel.name.toLowerCase());
-        }
-      }
-    }
-
-    // Füge übrige Kanäle alphabetisch hinzu
-    const remainingChannelsList = channels.filter(c =>
-      remainingChannels.has(c.name.toLowerCase())
-    ).sort((a, b) => a.name.localeCompare(b.name));
-
-    return [...result, ...remainingChannelsList];
-  }
-
-  _processChannelData(channel, epgData) {
-    if (!epgData || !Array.isArray(epgData)) {
-      this._debug('Keine EPG-Daten für Kanal:', channel.name);
-      return channel;
-    }
-
-    // Sortiere Programme nach Startzeit
-    const programs = epgData
-      .filter(program => program.start && program.end)
-      .sort((a, b) => new Date(a.start) - new Date(b.end));
-
-    this._debug('Verarbeitete Programme für Kanal:', channel.name, programs);
     return {
       ...channel,
-      programs
+      programs,
     };
-  }
-
-  _prepareData(data) {
-    if (!data || !Array.isArray(data)) {
-      this._debug('Keine Daten zum Aufbereiten vorhanden');
-      return [];
-    }
-
-    const processedData = data.map(channel => this._processChannelData(channel, channel.epg));
-    this._debug('Aufbereitete Daten:', processedData);
-    return processedData;
-  }
-
-  _renderSuperButton() {
-    return html`
-      <ha-button @click=${this._handleRefresh}>Aktualisieren</ha-button>
-    `;
-  }
-
-  _renderTimeBar() {
-    if (!this._isDataReady) return '';
-
-    const timeSlots = this._generateTimeSlots();
-    const currentTime = new Date();
-
-    return html`
-      ${timeSlots.map(slot => html`
-        <div class="timeSlot ${this._isCurrentTimeSlot(slot, currentTime) ? 'current' : ''}">
-          ${this._formatTime(slot)}
-        </div>
-      `)}
-    `;
-  }
-
-  _renderContent() {
-    if (!this._isDataReady) {
-      this._debug('Rendere Ladebildschirm');
-      return this._renderLoading();
-    }
-
-    const channels = this._filteredChannels;
-    this._debug('Rendere EPG mit Kanälen:', channels.length);
-
-    const timeSlots = this._generateTimeSlots();
-
-    return html`
-      <div name="epgOutBox">
-        <div name="epgBox">
-          <div name="channelBox">
-            ${channels.map(channel => html`
-              <div class="channelRow ${this._selectedChannel === channel.id ? 'selected' : ''}"
-                   @click=${() => this._onChannelSelected(channel)}>
-                ${channel.name}
-              </div>
-            `)}
-          </div>
-          <div name="programBox">
-            ${channels.map(channel => html`
-              <div class="programRow">
-                ${this._getProgramsForChannel(channel, timeSlots).map(program => html`
-                  <div class="programSlot ${this._isCurrentProgram(program) ? 'current' : ''}"
-                       style="width: ${this._calculateProgramWidth(program)}px"
-                       @click=${() => this._onProgramSelected(program)}>
-                    <div class="programTitle">${program.title}</div>
-                    <div class="programTime">
-                      ${this._formatTime(new Date(program.start))} -
-                      ${this._formatTime(new Date(program.end))}
-                    </div>
-                  </div>
-                `)}
-              </div>
-            `)}
-          </div>
-        </div>
-      </div>
-    `;
-  }
-
-  _getPlaceholderChannels() {
-    // Platzhalter für Kanäle während des Ladens
-    return Array(5)
-      .fill()
-      .map((_, index) => ({
-        id: `placeholder-${index}`,
-        name: 'Lade Kanal...',
-        epg: [],
-      }));
-  }
-
-  _getSelectedChannelPrograms() {
-    if (!this._isDataReady || !this._selectedChannel) return [];
-    const channel = this.epgData.find(c => c.id === this._selectedChannel);
-    return channel?.epg || [];
-  }
-
-  _onChannelSelected(e) {
-    this._selectedChannel = e.detail.channel.id;
-    this.requestUpdate();
-  }
-
-  _onProgramSelected(e) {
-    this._debug('EPGView _onProgramSelected:', e.detail.program);
-  }
-
-  _renderLoading() {
-    return html`
-      <div class="loading">
-        <ha-circular-progress indeterminate></ha-circular-progress>
-        <div>Lade EPG-Daten...</div>
-      </div>
-    `;
-  }
-
-  _renderError() {
-    return html`
-      <div class="epg-error">
-        <div class="error-icon">⚠️</div>
-        <div class="error-text">${this._error}</div>
-      </div>
-    `;
   }
 
   render() {
     return html`
       <div class="gridcontainer">
-        <div class="superbutton">
-          ${this._renderSuperButton()}
-        </div>
-        <div class="timeBar">
-          ${this._renderTimeBar()}
-        </div>
+        <div class="superbutton">${this._renderSuperButton()}</div>
+        <div class="timeBar">${this._renderTimeBar()}</div>
         <epg-box
           class="epgBox"
-          .channels=${this._filteredChannels}
-          .programs=${this._programs}
+          .epgData=${this._epgData}
           .currentTime=${this._currentTime}
           .timeWindow=${this.config.time_window}
           .showChannel=${this.config.show_channel}
@@ -506,10 +338,34 @@ export class EPGView extends ViewBase {
           .showTitle=${this.config.show_title}
           .showDescription=${this.config.show_description}
           .selectedChannel=${this._selectedChannel}
+          .channelOrder=${this.config.group_order || []}
           @channel-selected=${this._onChannelSelected}
           @program-selected=${this._onProgramSelected}
         ></epg-box>
       </div>
+    `;
+  }
+
+  _renderSuperButton() {
+    return html`
+      <button @click=${this._handleRefresh}>
+        <ha-icon icon="mdi:refresh"></ha-icon>
+      </button>
+    `;
+  }
+
+  _renderTimeBar() {
+    const timeSlots = this._generateTimeSlots();
+    return html`
+      ${timeSlots.map(
+        slot => html`
+          <div
+            class="timeSlot ${this._isCurrentTimeSlot(slot, this._currentTime) ? 'current' : ''}"
+          >
+            ${this._formatTime(slot)}
+          </div>
+        `
+      )}
     `;
   }
 
@@ -529,46 +385,24 @@ export class EPGView extends ViewBase {
   }
 
   _formatTime(date) {
-    return date.toLocaleTimeString('de-DE', {
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   }
 
   _isCurrentTimeSlot(slot, currentTime) {
-    return slot.getHours() === currentTime.getHours();
+    const slotTime = slot.getTime() / 1000;
+    return Math.abs(slotTime - currentTime) < 1800; // 30 Minuten
   }
 
-  _isCurrentProgram(program) {
-    const now = new Date();
-    const start = new Date(program.start);
-    const end = new Date(program.end);
-    return now >= start && now <= end;
+  _onChannelSelected(e) {
+    this._selectedChannel = e.detail.channel;
+    this.requestUpdate();
   }
 
-  _calculateProgramWidth(program) {
-    const start = new Date(program.start);
-    const end = new Date(program.end);
-    const duration = (end - start) / (1000 * 60); // Dauer in Minuten
-    return (duration / 60) * 120; // 120px pro Stunde
-  }
-
-  _getProgramsForChannel(channel, timeSlots) {
-    if (!channel.programs) return [];
-
-    const startTime = timeSlots[0];
-    const endTime = new Date(timeSlots[timeSlots.length - 1]);
-    endTime.setHours(23, 59, 59, 999);
-
-    return channel.programs.filter(program => {
-      const programStart = new Date(program.start);
-      const programEnd = new Date(program.end);
-      return programStart >= startTime && programEnd <= endTime;
-    });
+  _onProgramSelected(e) {
+    // Hier können Sie die Logik für die Programmauswahl implementieren
   }
 
   _handleRefresh() {
-    this._debug('Manuelles Update gestartet');
     this._loadData();
   }
 }
