@@ -1,6 +1,6 @@
 import { LitElement } from 'lit';
 import { property } from 'lit/decorators.js';
-import { CardName, Version, DebugMode, showVersion } from './card-config';
+import { CardName, Version, DebugMode, showVersion } from './card-config.js';
 import { css } from 'lit';
 
 export class SuperBase extends LitElement {
@@ -14,11 +14,13 @@ export class SuperBase extends LitElement {
     config: { type: Object },
   };
 
-  static styles = css`
-    :host {
-      display: block;
-    }
-  `;
+  static get styles() {
+    return css`
+      :host {
+        display: block;
+      }
+    `;
+  }
 
   constructor() {
     super();

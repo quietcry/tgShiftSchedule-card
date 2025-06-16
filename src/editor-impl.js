@@ -1,10 +1,7 @@
-import { html, css, LitElement } from 'lit';
+import { html, css } from 'lit';
 import { property } from 'lit/decorators.js';
-import { EditorBase } from './editor-base';
-import { CardName, CardVersion } from './card-config';
-const { DebugMode } = require('./card-config');
-
-if (DebugMode) console.debug(`[${EditorBase.cardName}] EditorImpl-Modul wird geladen`);
+import { EditorBase } from './editor-base.js';
+import { CardName, Version, DebugMode, showVersion } from './card-config.js';
 
 export class EditorImpl extends EditorBase {
   static properties = {
@@ -25,27 +22,26 @@ export class EditorImpl extends EditorBase {
       show_description: true,
       view_mode: 'Liste',
     });
-    if (DebugMode)
-      console.debug(`[${this.constructor.cardName}] EditorImpl-Konstruktor wird aufgerufen`);
+    if (DebugMode) console.debug(`[${CardName}] EditorImpl-Modul wird geladen`);
     this._selectedTab = 0;
   }
 
   async firstUpdated() {
-    if (DebugMode)
+    if (this.constructor.debugMode)
       console.debug(`[${this.constructor.cardName}] EditorImpl firstUpdated wird aufgerufen`);
     await super.firstUpdated();
-    if (DebugMode)
+    if (this.constructor.debugMode)
       console.debug(`[${this.constructor.cardName}] EditorImpl firstUpdated abgeschlossen`);
   }
 
   render() {
     this._debug('EditorImpl render wird aufgerufen');
     if (!this.hass) {
-      if (DebugMode) console.debug(`[${this.constructor.cardName}] EditorImpl render: Kein hass`);
+      if (this.constructor.debugMode) console.debug(`[${this.constructor.cardName}] EditorImpl render: Kein hass`);
       return html`<div>Loading...</div>`;
     }
 
-    if (DebugMode)
+    if (this.constructor.debugMode)
       console.debug(`[${this.constructor.cardName}] EditorImpl render mit config:`, this.config);
     return html`
       <div class="card-config">

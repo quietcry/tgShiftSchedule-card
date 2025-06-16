@@ -1,103 +1,59 @@
-import { SuperBase } from '../base/super-base.js';
-import { DataProvider } from '../data-provider';
+import { SuperBase } from '../super-base.js';
 import { css } from 'lit';
+import { property } from 'lit/decorators.js';
 
 export class ViewBase extends SuperBase {
   static properties = {
     config: { type: Object },
     epgData: { type: Array },
     _loading: { type: Boolean },
-    _error: { type: String },
-    _dataProvider: { type: Object },
+    _error: { type: Object },
   };
 
   constructor() {
     super();
+    this._debug('filterx: ViewBase-Konstruktor: Start');
     this.config = {};
     this.epgData = [];
     this._loading = false;
     this._error = null;
-    this._dataProvider = null;
-  }
-
-  set hass(value) {
-    this._debug(
-      'ViewBase set hass wird aufgerufen:',
-      value ? 'hass vorhanden' : 'hass ist null',
-      value
-    );
-    if (this._hass !== value) {
-      this._hass = value;
-      if (this._dataProvider) {
-        this._debug('ViewBase: Aktualisiere hass im DataProvider:', this._hass);
-        this._dataProvider.hass = value;
-      } else {
-        this._debug('ViewBase: Initialisiere neuen DataProvider mit hass:', this._hass);
-        this._dataProvider = new DataProvider();
-        this._dataProvider.hass = value;
-      }
-      if (this._hass && this.config.entity) {
-        this._debug('ViewBase: Starte _loadData mit hass:', this._hass);
-        this._loadData();
-      } else {
-        this._debug('ViewBase: Kein hass oder entity vorhanden, überspringe _loadData');
-      }
-    }
-  }
-
-  get hass() {
-    return this._hass;
+    this._debug('filterx: ViewBase-Konstruktor: Initialisierung abgeschlossen');
   }
 
   async firstUpdated() {
-    this._debug('ViewBase firstUpdated wird aufgerufen');
-    // Sofort rendern mit Lade-Template
-    this.requestUpdate();
-
-    if (this.config.entity && this._hass) {
-      // Nur laden wenn noch nicht geladen wurde
-      if (!this._dataProvider) {
-        this._debug('ViewBase firstUpdated: Starte _loadData');
-        this._loadData();
-      } else {
-        this._debug('ViewBase firstUpdated: DataProvider bereits initialisiert');
-      }
-    } else {
-      this._debug('ViewBase firstUpdated: Keine Entity oder hass in Config');
-    }
+    this._debug('filterx: ViewBase firstUpdated: Start');
+    await super.firstUpdated();
+    this._debug('filterx: ViewBase firstUpdated: Ende');
   }
 
   async _loadData() {
-    this._debug('ViewBase _loadData wird aufgerufen');
+    this._debug('filterx: ViewBase _loadData wird aufgerufen');
     if (!this._dataProvider || !this.config.entity) {
-      this._debug('ViewBase _loadData: Übersprungen - dataProvider oder entity fehlt', {
+      this._debug('filterx: ViewBase _loadData: Übersprungen - dataProvider oder entity fehlt', {
         dataProvider: !!this._dataProvider,
         entity: this.config.entity,
+        config: this.config
       });
       return;
     }
 
     this._loading = true;
     this._error = null;
-    // Sofort Lade-Status rendern
-    this.requestUpdate();
 
     try {
-      const newData = await this._fetchViewData();
-      this.epgData = newData;
-      this.requestUpdate('epgData');
+      this._debug('filterx: Starte _fetchViewData mit Konfiguration:', this.config);
+      const data = await this._fetchViewData(this.config);
+      this.epgData = data;
+      this._debug('filterx: _fetchViewData erfolgreich:', data);
     } catch (error) {
-      this._error = `Fehler beim Laden der Daten: ${error.message}`;
-      this._debug('ViewBase _loadData: Fehler:', error);
-      this.requestUpdate();
+      this._error = error;
+      this._debug('filterx: Fehler in _fetchViewData:', error);
     } finally {
       this._loading = false;
-      this.requestUpdate();
     }
   }
 
-  // Diese Methode muss von den abgeleiteten Klassen implementiert werden
-  async _fetchViewData() {
+  async _fetchViewData(config) {
     throw new Error('_fetchViewData muss in der abgeleiteten Klasse implementiert werden');
   }
 

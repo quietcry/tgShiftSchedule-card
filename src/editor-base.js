@@ -1,10 +1,7 @@
-import { html, css } from 'lit';
+import { LitElement } from 'lit';
+import { css } from 'lit';
 import { property } from 'lit/decorators.js';
-import { SuperBase } from './super-base';
-import { CardName, CardVersion } from './card-config';
-const { DebugMode } = require('./card-config');
-
-if (DebugMode) console.debug(`[${CardName}] EditorBase-Modul wird geladen`);
+import { SuperBase } from './super-base.js';
 
 export class EditorBase extends SuperBase {
   static properties = {
@@ -23,6 +20,7 @@ export class EditorBase extends SuperBase {
 
   constructor(defaultConfig = {}) {
     super();
+    if (this.constructor.debugMode) console.debug(`[${this.constructor.cardName}] EditorBase-Modul wird geladen`);
     this._debug('[EditorBase] EditorBase-Konstruktor wird aufgerufen');
     this.config = {
       type: 'custom:tgeditor-card',
@@ -48,7 +46,7 @@ export class EditorBase extends SuperBase {
         this._debug('[EditorBase] EditorBase ha-form geladen');
       } catch (error) {
         console.error(
-          `[${CardName}] [EditorBase] Fehler beim Laden von custom-card-helpers:`,
+          `[${this.constructor.cardName}] [EditorBase] Fehler beim Laden von custom-card-helpers:`,
           error
         );
         throw error;

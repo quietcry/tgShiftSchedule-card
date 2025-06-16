@@ -3,9 +3,11 @@
   "version": "1.0.0",
   "description": "Eine Home Assistant Karte mit Editor-Funktionalität",
   "main": "src/tgeditor-card.js",
+  "type": "module",
   "scripts": {
-    "build": "webpack --mode=production",
-    "dev": "webpack --mode=development --watch",
+    "build": "NODE_OPTIONS='--experimental-json-modules' webpack --mode=production",
+    "dev": "NODE_OPTIONS='--experimental-json-modules' webpack serve --mode=development",
+    "watch": "NODE_OPTIONS='--experimental-json-modules' webpack --mode=development --watch",
     "format": "prettier --write \"src/**/*.{js,json}\"",
     "format:check": "prettier --check \"src/**/*.{js,json}\""
   },
@@ -33,7 +35,8 @@
     "prettier": "^3.5.3",
     "style-loader": "^3.3.4",
     "webpack": "^5.90.3",
-    "webpack-cli": "^5.1.4"
+    "webpack-cli": "^5.1.4",
+    "webpack-dev-server": "^5.0.2"
   },
   "dependencies": {
     "custom-card-helpers": "^1.9.0"

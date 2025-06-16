@@ -1,6 +1,6 @@
 import { html, css } from 'lit';
-import { ViewBase } from './view-base';
-import { CardName, DebugMode } from '../card-config';
+import { property } from 'lit/decorators.js';
+import { ViewBase } from './view-base.js';
 
 export class TableView extends ViewBase {
   static properties = {

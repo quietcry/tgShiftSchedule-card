@@ -1,6 +1,7 @@
-import { LitElement, html, css } from 'lit';
+import { html, css } from 'lit';
+import { ViewBase } from '../../views/view-base.js';
 
-export class EpgBox extends LitElement {
+export class EpgBox extends ViewBase {
   static properties = {
     epgData: { type: Object },
     currentTime: { type: Number },

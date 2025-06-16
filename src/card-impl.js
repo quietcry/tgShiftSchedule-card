@@ -1,10 +1,8 @@
 import { html, css } from 'lit';
-import { CardBase } from './card-base';
-import { TableView } from './views/table-view';
-import { EPGView } from './views/epg-view';
-import { CardName, CardVersion, DebugMode, CardRegname } from './card-config';
-
-if (DebugMode) console.debug(`[${CardName}] CardImpl-Modul wird geladen`);
+import { CardBase } from './card-base.js';
+import { TableView } from './views/table-view.js';
+import { EPGView } from './views/epg-view.js';
+import { CardName, CardRegname, DebugMode } from './card-config.js';
 
 export class CardImpl extends CardBase {
   static get properties() {
@@ -46,9 +44,9 @@ export class CardImpl extends CardBase {
 
   constructor() {
     super();
-    this._debug('SuperBase-Konstruktor wird aufgerufen');
+    if (DebugMode) console.debug(`[${CardName}] CardImpl-Modul wird geladen`);
     this.config = this.getDefaultConfig();
-    this._debug('getDefaultConfig wird aufgerufen');
+    this._debug('filterx: CardImpl-Konstruktor: Initialisierung abgeschlossen');
   }
 
   getDefaultConfig() {
@@ -70,7 +68,7 @@ export class CardImpl extends CardBase {
   }
 
   setConfig(config) {
-    this._debug('CardImpl setConfig wird aufgerufen mit:', config);
+    this._debug('filterx: CardImpl setConfig wird aufgerufen mit:', config);
     if (!config) {
       throw new Error('Keine Konfiguration vorhanden');
     }
@@ -79,28 +77,25 @@ export class CardImpl extends CardBase {
       ...this.getDefaultConfig(),
       ...config,
     };
-    this._debug('getDefaultConfig wird aufgerufen');
-    this._debug('config nach setConfig:', this.config);
+    this._debug('filterx: config nach setConfig:', this.config);
 
     // View initialisieren
-    this._debug('CardImpl setConfig: Initialisiere EPG-View');
+    this._debug('filterx: CardImpl setConfig: Initialisiere EPG-View');
     this._viewMode = this.config.view_mode || 'epg';
     this._viewType = 'EPGView';
     this._view = new EPGView();
     this._view.config = this.config;
-    this._debug('CardImpl setConfig: View initialisiert:', {
+    this._debug('filterx: CardImpl setConfig: View initialisiert:', {
       viewMode: this._viewMode,
       viewType: this._viewType,
+      config: this.config
     });
   }
 
-  set hass(value) {
-    this._debug('CardImpl set hass wird aufgerufen');
-    if (this._hass !== value) {
-      this._hass = value;
-      if (this._view) {
-        this._view.hass = value;
-      }
+  set hass(hass) {
+    this._debug('filterx: CardImpl set hass wird aufgerufen');
+    if (this._view) {
+      this._view.hass = hass;
     }
   }
 

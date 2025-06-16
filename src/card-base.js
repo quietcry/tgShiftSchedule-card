@@ -1,9 +1,8 @@
+import { LitElement } from 'lit';
 import { html, css } from 'lit';
 import { property } from 'lit/decorators.js';
-import { SuperBase } from './super-base';
-import { CardName, CardVersion, DebugMode } from './card-config';
-
-if (DebugMode) console.debug(`[${CardName}] CardBase-Modul wird geladen`);
+import { SuperBase } from './super-base.js';
+import { CardName, Version, DebugMode, showVersion } from './card-config.js';
 
 export class CardBase extends SuperBase {
   static properties = {
@@ -14,12 +13,13 @@ export class CardBase extends SuperBase {
   constructor() {
     super();
     this._selectedTab = 0;
+    if (this.constructor.debugMode) console.debug(`[${this.constructor.cardName}] CardBase-Modul wird geladen`);
   }
 
   async firstUpdated() {
-    this._debug('firstUpdated wird aufgerufen');
+    this._debug('filterx: CardBase firstUpdated: Start');
     await super.firstUpdated();
-    this._debug('firstUpdated abgeschlossen');
+    this._debug('filterx: CardBase firstUpdated: Ende');
   }
 
   setConfig(config) {
@@ -63,6 +63,7 @@ export class CardBase extends SuperBase {
       view_mode: 'Liste',
     };
   }
+
   render(content = '') {
     this._debug('render wird aufgerufen');
     return html`

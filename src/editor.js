@@ -1,7 +1,9 @@
+import { LitElement } from 'lit';
 import { html, css } from 'lit';
 import { property } from 'lit/decorators.js';
-import { EditorImpl } from './editor-impl';
-import { CardName, CardRegname } from './card-config.js';
+import { EditorBase } from './editor-base.js';
+import { EditorImpl } from './editor-impl.js';
+import { CardRegname } from './card-config.js';
 
 export class Editor extends EditorImpl {
   static styles = css`
