@@ -177,8 +177,8 @@ export class EPGView extends ViewBase {
     }
     return this._dataProvider.fetchEpgData(
       config.entity,
-      undefined,  // Kein time_window
-      undefined,  // Kein date
+      undefined, // Kein time_window
+      undefined, // Kein date
       config
     );
   }

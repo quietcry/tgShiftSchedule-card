@@ -88,7 +88,7 @@ export class CardImpl extends CardBase {
     this._debug('filterx: CardImpl setConfig: View initialisiert:', {
       viewMode: this._viewMode,
       viewType: this._viewType,
-      config: this.config
+      config: this.config,
     });
   }
 

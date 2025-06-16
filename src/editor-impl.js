@@ -37,7 +37,8 @@ export class EditorImpl extends EditorBase {
   render() {
     this._debug('EditorImpl render wird aufgerufen');
     if (!this.hass) {
-      if (this.constructor.debugMode) console.debug(`[${this.constructor.cardName}] EditorImpl render: Kein hass`);
+      if (this.constructor.debugMode)
+        console.debug(`[${this.constructor.cardName}] EditorImpl render: Kein hass`);
       return html`<div>Loading...</div>`;
     }
 

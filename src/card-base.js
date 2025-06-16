@@ -13,7 +13,8 @@ export class CardBase extends SuperBase {
   constructor() {
     super();
     this._selectedTab = 0;
-    if (this.constructor.debugMode) console.debug(`[${this.constructor.cardName}] CardBase-Modul wird geladen`);
+    if (this.constructor.debugMode)
+      console.debug(`[${this.constructor.cardName}] CardBase-Modul wird geladen`);
   }
 
   async firstUpdated() {

@@ -32,7 +32,7 @@ export class ViewBase extends SuperBase {
       this._debug('filterx: ViewBase _loadData: Übersprungen - dataProvider oder entity fehlt', {
         dataProvider: !!this._dataProvider,
         entity: this.config.entity,
-        config: this.config
+        config: this.config,
       });
       return;
     }

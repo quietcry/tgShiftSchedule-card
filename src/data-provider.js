@@ -4,7 +4,8 @@ export class DataProvider {
 
   constructor() {
     this._hass = null;
-    if (this.constructor.debugMode) console.debug(`[${this.constructor.cardName}] DataProvider-Modul wird geladen`);
+    if (this.constructor.debugMode)
+      console.debug(`[${this.constructor.cardName}] DataProvider-Modul wird geladen`);
     this._debug('DataProvider initialisiert');
   }
 
@@ -40,7 +41,7 @@ export class DataProvider {
       entity,
       params,
       hass: this._hass ? 'vorhanden' : 'nicht vorhanden',
-      connection: this._hass?.connection ? 'vorhanden' : 'nicht vorhanden'
+      connection: this._hass?.connection ? 'vorhanden' : 'nicht vorhanden',
     });
 
     if (!this._hass) {
@@ -71,7 +72,7 @@ export class DataProvider {
 
       const response = await this._hass.connection.sendMessagePromise(message);
       this._debug('Service-Antwort erhalten:', response);
-      
+
       // Extrahiere epg_data aus der Antwort
       if (response && response.response && response.response.epg_data) {
         return response.response.epg_data;
@@ -88,44 +89,40 @@ export class DataProvider {
     const response = await this._callService(entity, {
       channel_id: '?',
     });
-    
+
     // Verarbeite die Kanal-Liste
     if (Array.isArray(response)) {
       this._debug('Kanal-Liste vor Filterung:', response);
-      
+
       // Konvertiere YAML-Boxen in Arrays
       const blacklist = config.blacklist ? config.blacklist.split('\n').filter(Boolean) : [];
       const whitelist = config.whitelist ? config.whitelist.split('\n').filter(Boolean) : [];
-      
+
       this._debug('Filter-Konfiguration:', {
         blacklist,
         whitelist,
         originalBlacklist: config.blacklist,
-        originalWhitelist: config.whitelist
+        originalWhitelist: config.whitelist,
       });
-      
+
       // Filtere die Kanäle
       const filteredChannels = response.filter(channel => {
         const channelName = channel.name?.toLowerCase() || '';
-        
+
         // Wenn eine Whitelist existiert, nur diese Kanäle zulassen
         if (whitelist.length > 0) {
-          return whitelist.some(pattern =>
-            new RegExp(pattern.toLowerCase()).test(channelName)
-          );
+          return whitelist.some(pattern => new RegExp(pattern.toLowerCase()).test(channelName));
         }
-        
+
         // Wenn eine Blacklist existiert, diese Kanäle ausschließen
         if (blacklist.length > 0) {
-          return !blacklist.some(pattern =>
-            new RegExp(pattern.toLowerCase()).test(channelName)
-          );
+          return !blacklist.some(pattern => new RegExp(pattern.toLowerCase()).test(channelName));
         }
-        
+
         // Wenn keine Filter existieren, alle Kanäle zulassen
         return true;
       });
-      
+
       this._debug('Gefilterte Kanal-Liste:', filteredChannels);
       return filteredChannels;
     }
@@ -136,14 +133,14 @@ export class DataProvider {
     this._debug('DataProvider: Hole EPG-Daten für Kanal', channelId);
     const channelIdStr = String(channelId);
     this._debug('DataProvider: Konvertierte channel_id:', channelIdStr);
-    
+
     // Erstelle Service-Parameter ohne time_window und date
     const serviceParams = {
-      channel_id: channelIdStr
+      channel_id: channelIdStr,
     };
-    
+
     const response = await this._callService(entity, serviceParams);
-    
+
     // Verarbeite die EPG-Daten
     if (Array.isArray(response)) {
       this._debug('EPG-Daten:', response);
@@ -163,13 +160,18 @@ export class DataProvider {
         try {
           const programs = await this.fetchChannelEpg(entity, channel.id, timeWindow, date);
           this._debug('filterx: EPG-Daten für Kanal', channel.name, ':', programs);
-          
+
           epgData.push({
             channel: channel,
-            programs: programs
+            programs: programs,
           });
         } catch (error) {
-          this._debug('filterx: Fehler beim Abrufen der EPG-Daten für Kanal', channel.name, ':', error);
+          this._debug(
+            'filterx: Fehler beim Abrufen der EPG-Daten für Kanal',
+            channel.name,
+            ':',
+            error
+          );
         }
       }
 
