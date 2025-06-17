@@ -20,7 +20,6 @@ export class EPGView extends ViewBase {
     _epgData: { type: Object },
     _dataProvider: { type: Object },
     _dataLoaded: { type: Boolean },
-    _pendingConfig: { type: Object },
   };
 
   static get styles() {
@@ -123,7 +122,6 @@ export class EPGView extends ViewBase {
     this._dataProvider = new DataProvider();
     this._debug('filterx: EPGView-Konstruktor: DataProvider initialisiert');
     this._epgData = { channels: [] };
-    this._pendingConfig = null;
     this._debug('filterx: EPGView-Konstruktor: Initialisierung abgeschlossen');
     this._currentTime = Math.floor(Date.now() / 1000);
     this._timeWindow = 'C';
@@ -175,6 +173,21 @@ export class EPGView extends ViewBase {
     return this._hass;
   }
 
+  async _loadData() {
+    this._debug('EPG-View: _loadData wird aufgerufen');
+    if (!this._dataProvider || !this.config.entity) {
+      this._debug('EPG-View: _loadData: Übersprungen - dataProvider oder entity fehlt', {
+        dataProvider: !!this._dataProvider,
+        entity: this.config.entity,
+      });
+      return;
+    }
+
+    // Starte den Datenabruf direkt
+    this._debug('EPG-View: Starte Datenabruf');
+    await this._fetchViewData(this.config);
+  }
+
   async _fetchViewData(config) {
     this._debug('EPG-View: _fetchViewData gestartet', {
       entity: config.entity,
@@ -188,7 +201,7 @@ export class EPGView extends ViewBase {
     // Hole die EPG-Box
     const epgBox = this.shadowRoot?.querySelector('epg-box');
     if (!epgBox) {
-      this._debug('EPG-View: EPG-Box nicht gefunden');
+      this._debug('EPG-View: EPG-Box nicht gefunden, überspringe Datenabruf');
       return [];
     }
 
@@ -222,12 +235,8 @@ export class EPGView extends ViewBase {
   }
 
   _onEpgBoxReady() {
-    this._debug('EPG-View: EPG-Box ist bereit');
-    if (this._pendingConfig) {
-      this._debug('EPG-View: Starte Datenabruf');
-      this._fetchViewData(this._pendingConfig);
-      this._pendingConfig = null;
-    }
+    this._debug('EPG-View: EPG-Box ist bereit, starte Datenabruf');
+    this._fetchViewData(this.config);
   }
 
   firstUpdated() {
@@ -239,14 +248,12 @@ export class EPGView extends ViewBase {
     this._debug('EPG-View: firstUpdated - EPG-Box Status', {
       hasShadowRoot: !!this.shadowRoot,
       hasEpgBox: !!epgBox,
-      pendingConfig: !!this._pendingConfig
     });
 
-    // Wenn die EPG-Box bereits verfügbar ist und wir eine ausstehende Konfiguration haben
-    if (epgBox && this._pendingConfig) {
+    // Wenn die EPG-Box bereits verfügbar ist
+    if (epgBox) {
       this._debug('EPG-View: EPG-Box bereits verfügbar, starte Datenabruf');
-      this._fetchViewData(this._pendingConfig);
-      this._pendingConfig = null;
+      this._fetchViewData(this.config);
     }
   }
 
@@ -408,21 +415,6 @@ export class EPGView extends ViewBase {
 
   _handleRefresh() {
     this._loadData();
-  }
-
-  async _loadData() {
-    this._debug('EPG-View: _loadData wird aufgerufen');
-    if (!this._dataProvider || !this.config.entity) {
-      this._debug('EPG-View: _loadData: Übersprungen - dataProvider oder entity fehlt', {
-        dataProvider: !!this._dataProvider,
-        entity: this.config.entity,
-      });
-      return;
-    }
-
-    // Speichere die Konfiguration für späteren Abruf
-    this._pendingConfig = this.config;
-    this._debug('EPG-View: Konfiguration gespeichert für EPG-Box Bereitschaft');
   }
 }
 
