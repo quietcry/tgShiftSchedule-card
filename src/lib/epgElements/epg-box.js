@@ -36,6 +36,17 @@ export class EpgBox extends ViewBase {
     }
   }
 
+  firstUpdated() {
+    super.firstUpdated();
+    this._debug('EPG-Box: firstUpdated - Sende Bereitschaft-Event');
+
+    // Sende Event, dass die EPG-Box bereit ist
+    this.dispatchEvent(new CustomEvent('epg-box-ready', {
+      bubbles: true,
+      composed: true
+    }));
+  }
+
   static styles = css`
     :host {
       display: block;
@@ -337,6 +348,66 @@ export class EpgBox extends ViewBase {
         composed: true,
       })
     );
+  }
+
+  addEpgData(data) {
+    this._debug('EPG-Box: EPG-Daten empfangen', {
+      kanal: data?.channel?.name,
+      anzahlProgramme: data?.programs?.length
+    });
+
+    if (data?.channel?.id) {
+      const channel = this._channels.get(data.channel.id);
+      if (channel) {
+        this._debug('EPG-Box: Aktualisiere Programme für Kanal', {
+          kanal: channel.name,
+          alteAnzahl: channel.programs.length,
+          neueAnzahl: data.programs.length
+        });
+        channel.programs = data.programs || [];
+        this._channels.set(data.channel.id, channel);
+        this.requestUpdate();
+        this._debug('EPG-Box: Update angefordert');
+      } else {
+        this._debug('EPG-Box: Kanal nicht gefunden', {
+          kanalId: data.channel.id
+        });
+      }
+    } else {
+      this._debug('EPG-Box: Ungültige EPG-Daten', {
+        hatKanal: !!data?.channel,
+        hatKanalId: !!data?.channel?.id
+      });
+    }
+  }
+
+  addTeilEpg(teilEpg) {
+    this._debug('EPG-Box: Teil-EPG empfangen', {
+      kanal: teilEpg?.channel?.name,
+      anzahlProgramme: teilEpg?.programs?.length
+    });
+
+    if (teilEpg?.channel?.id && teilEpg?.programs) {
+      // Speichere das Teil-EPG direkt
+      this._channels.set(teilEpg.channel.id, {
+        ...teilEpg.channel,
+        programs: teilEpg.programs
+      });
+
+      this._debug('EPG-Box: Teil-EPG gespeichert', {
+        kanal: teilEpg.channel.name,
+        anzahlProgramme: teilEpg.programs.length
+      });
+
+      this.requestUpdate();
+      this._debug('EPG-Box: Update angefordert');
+    } else {
+      this._debug('EPG-Box: Ungültiges Teil-EPG', {
+        hatKanal: !!teilEpg?.channel,
+        hatKanalId: !!teilEpg?.channel?.id,
+        hatProgramme: !!teilEpg?.programs
+      });
+    }
   }
 }
 

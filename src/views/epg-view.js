@@ -20,6 +20,7 @@ export class EPGView extends ViewBase {
     _epgData: { type: Object },
     _dataProvider: { type: Object },
     _dataLoaded: { type: Boolean },
+    _pendingConfig: { type: Object },
   };
 
   static get styles() {
@@ -120,16 +121,20 @@ export class EPGView extends ViewBase {
     super();
     this._debug('filterx: EPGView-Konstruktor: Start');
     this._dataProvider = new DataProvider();
-    this._dataLoaded = false;
-    this._lastUpdate = null;
     this._debug('filterx: EPGView-Konstruktor: DataProvider initialisiert');
+    this._epgData = { channels: [] };
+    this._pendingConfig = null;
+    this._debug('filterx: EPGView-Konstruktor: Initialisierung abgeschlossen');
     this._currentTime = Math.floor(Date.now() / 1000);
     this._timeWindow = 'C';
     this._selectedChannel = null;
     this._isDataReady = false;
     this._processedChannels = [];
-    this._epgData = { channels: [] };
-    this._debug('filterx: EPGView-Konstruktor: Initialisierung abgeschlossen');
+    this._lastUpdate = null;
+  }
+
+  disconnectedCallback() {
+    super.disconnectedCallback();
   }
 
   set hass(value) {
@@ -171,16 +176,78 @@ export class EPGView extends ViewBase {
   }
 
   async _fetchViewData(config) {
-    this._debug('EPGView _fetchViewData wird aufgerufen');
+    this._debug('EPG-View: _fetchViewData gestartet', {
+      entity: config.entity,
+      hasDataProvider: !!this._dataProvider
+    });
+
     if (!this._dataProvider) {
       throw new Error('DataProvider nicht initialisiert');
     }
+
+    // Hole die EPG-Box
+    const epgBox = this.shadowRoot?.querySelector('epg-box');
+    if (!epgBox) {
+      this._debug('EPG-View: EPG-Box nicht gefunden');
+      return [];
+    }
+
+    this._debug('EPG-View: Starte EPG-Daten Abruf', {
+      hasEpgBox: !!epgBox
+    });
+
     return this._dataProvider.fetchEpgData(
       config.entity,
       undefined, // Kein time_window
       undefined, // Kein date
-      config
+      config,
+      // Callback für EPG-Daten
+      (data) => {
+        this._debug('EPG-View: Neue EPG-Daten empfangen', {
+          kanal: data.channel.name,
+          anzahlProgramme: data.programs.length
+        });
+
+        // Erstelle ein vollständiges Teil-EPG
+        const teilEpg = {
+          channel: data.channel,
+          programs: data.programs
+        };
+
+        // Übergebe das Teil-EPG an die EPG-Box
+        epgBox.addTeilEpg(teilEpg);
+        this._debug('EPG-View: Teil-EPG an Box übergeben');
+      }
     );
+  }
+
+  _onEpgBoxReady() {
+    this._debug('EPG-View: EPG-Box ist bereit');
+    if (this._pendingConfig) {
+      this._debug('EPG-View: Starte Datenabruf');
+      this._fetchViewData(this._pendingConfig);
+      this._pendingConfig = null;
+    }
+  }
+
+  firstUpdated() {
+    super.firstUpdated();
+    this._debug('EPG-View: firstUpdated - Prüfe auf ausstehende Konfiguration');
+
+    // Prüfe, ob die EPG-Box bereits verfügbar ist
+    const epgBox = this.shadowRoot?.querySelector('epg-box');
+    this._debug('EPG-View: firstUpdated - EPG-Box Status', {
+      hasShadowRoot: !!this.shadowRoot,
+      hasEpgBox: !!epgBox,
+      pendingConfig: !!this._pendingConfig
+    });
+
+    // Wenn die EPG-Box bereits verfügbar ist und wir eine ausstehende Konfiguration haben
+    if (epgBox && this._pendingConfig) {
+      this._debug('EPG-View: EPG-Box bereits verfügbar, starte Datenabruf');
+      this._fetchViewData(this._pendingConfig);
+      this._pendingConfig = null;
+    }
   }
 
   _processChannelData(channel, epgData) {
@@ -277,6 +344,7 @@ export class EPGView extends ViewBase {
           .channelOrder=${this.config.group_order || []}
           @channel-selected=${this._onChannelSelected}
           @program-selected=${this._onProgramSelected}
+          @epg-box-ready=${this._onEpgBoxReady}
         ></epg-box>
       </div>
     `;
@@ -340,6 +408,21 @@ export class EPGView extends ViewBase {
 
   _handleRefresh() {
     this._loadData();
+  }
+
+  async _loadData() {
+    this._debug('EPG-View: _loadData wird aufgerufen');
+    if (!this._dataProvider || !this.config.entity) {
+      this._debug('EPG-View: _loadData: Übersprungen - dataProvider oder entity fehlt', {
+        dataProvider: !!this._dataProvider,
+        entity: this.config.entity,
+      });
+      return;
+    }
+
+    // Speichere die Konfiguration für späteren Abruf
+    this._pendingConfig = this.config;
+    this._debug('EPG-View: Konfiguration gespeichert für EPG-Box Bereitschaft');
   }
 }
 
