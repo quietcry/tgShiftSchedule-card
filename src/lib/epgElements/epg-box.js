@@ -14,6 +14,9 @@ export class EpgBox extends ViewBase {
     selectedChannel: { type: String },
     channelOrder: { type: Array }, // Array mit Kanaldefinitionen { name: string, style?: string, channels?: Array }
     showChannelGroups: { type: Boolean }, // Zeigt Kanalgruppen an
+    epgPastTime: { type: Number }, // Minuten in die Vergangenheit
+    epgFutureTime: { type: Number }, // Minuten in die Zukunft
+    epgShowWidth: { type: Number }, // Minuten sichtbar in der Ansicht
   };
 
   constructor() {
@@ -99,6 +102,24 @@ export class EpgBox extends ViewBase {
         composed: true,
       })
     );
+
+    // Füge Scroll-Event-Listener hinzu für Synchronisation mit Zeitleiste
+    this._setupScrollSync();
+  }
+
+  _setupScrollSync() {
+    const programBox = this.shadowRoot?.querySelector('.programBox');
+    if (programBox) {
+      programBox.addEventListener('scroll', e => {
+        this.dispatchEvent(
+          new CustomEvent('program-box-scroll', {
+            detail: { scrollLeft: e.target.scrollLeft },
+            bubbles: true,
+            composed: true,
+          })
+        );
+      });
+    }
   }
 
   static styles = css`
@@ -127,6 +148,12 @@ export class EpgBox extends ViewBase {
       overflow-x: auto;
     }
 
+    .programRow {
+      display: flex;
+      min-height: 60px;
+      border-bottom: 1px solid var(--divider-color);
+    }
+
     .channelGroup {
       padding: 4px 8px;
       background-color: var(--primary-color);
@@ -151,6 +178,12 @@ export class EpgBox extends ViewBase {
       margin: 4px;
       cursor: pointer;
       min-width: 100px;
+      background-color: var(--primary-background-color);
+      transition: background-color 0.2s ease;
+    }
+
+    .programSlot:hover {
+      background-color: var(--secondary-background-color);
     }
 
     .programSlot.current {
@@ -161,106 +194,140 @@ export class EpgBox extends ViewBase {
     .programTitle {
       font-weight: bold;
       margin-bottom: 4px;
+      font-size: 0.9em;
+      line-height: 1.2;
     }
 
     .programTime {
       font-size: 0.8em;
       color: var(--secondary-text-color);
+      margin-bottom: 2px;
+    }
+
+    .programDuration {
+      font-size: 0.75em;
+      color: var(--secondary-text-color);
+      margin-bottom: 2px;
+    }
+
+    .programDescription {
+      font-size: 0.8em;
+      color: var(--secondary-text-color);
+      line-height: 1.3;
+      margin-top: 4px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+    }
+
+    .noPrograms {
+      padding: 20px;
+      text-align: center;
+      color: var(--secondary-text-color);
+      font-style: italic;
+      border: 1px dashed var(--divider-color);
+      margin: 4px;
+      min-height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .loading {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: var(--secondary-text-color);
     }
   `;
 
   render() {
+    this._debug('EPG-Box: Render wird aufgerufen', {
+      anzahlKanale: this._channels.size,
+    });
+
     if (!this._channels.size) {
       console.log('epg-box: Erste Renderung - noch keine Daten');
       return this._renderLoading();
     }
 
-    // Verwende die neue Sortierungsstruktur
-    if (!this._channelOrderInitialized) {
-      this._debug('sortedChannels: Initialisiere Sortierung in render Methode', {
-        anzahlKanäle: this._channels.size,
-        sortedChannels: this._sortedChannels,
-      });
-      this._initializeChannelOrder();
-      this._updateAllChannelSorting();
-    }
+    // Verwende alle verfügbaren Kanäle direkt
+    const allChannels = Array.from(this._channels.values());
 
-    console.log('epg-box: Rendere mit', this._sortedChannels.length, 'Gruppen');
-
-    // Sammle alle Kanäle aus allen Gruppen
-    const allChannels = this._sortedChannels.flatMap(group =>
-      group.patterns.flatMap(p => p.channels)
+    console.log(
+      'EPG-Box: Alle Kanäle:',
+      allChannels.map(c => ({
+        name: c.name,
+        id: c.id,
+        anzahlProgramme: c.programs?.length || 0,
+        programme: c.programs?.map(p => p.title) || [],
+      }))
     );
 
-    this._debug('sortedChannels: Render-Status', {
-      anzahlGruppen: this._sortedChannels.length,
-      gesamtAnzahlKanäle: allChannels.length,
-      gruppenStatus: this._sortedChannels.map(g => ({
-        name: g.name,
-        patterns: g.patterns.map(p => ({
-          pattern: p.pattern,
-          anzahlKanäle: p.channels.length,
-          kanalNamen: p.channels.map(c => c.name),
-        })),
-      })),
-      sortedChannels: this._sortedChannels,
+    this._debug('EPG-Box: Verwende Kanäle für Rendering', {
+      anzahlKanale: allChannels.length,
+      kanalNamen: allChannels.map(c => c.name),
     });
 
     return html`
-      <div class="channelBox">${this._renderSortedChannels()}</div>
+      <div class="channelBox">
+        ${allChannels.map(channel => html` <div class="channelRow">${channel.name}</div> `)}
+      </div>
       <div class="programBox">
-        ${allChannels.map(
-          channel => html`
+        ${allChannels.map(channel => {
+          const programs = this._getProgramsForChannel(channel, this._generateTimeSlots());
+
+          console.log(
+            `EPG-Box: Programme für ${channel.name}:`,
+            programs.length,
+            programs.map(p => p.title)
+          );
+
+          return html`
             <div class="programRow">
-              ${this._getProgramsForChannel(channel, this._generateTimeSlots()).map(
-                program => html`
-                  <div
-                    class="programSlot ${this._isCurrentProgram(program) ? 'current' : ''}"
-                    style="width: ${this._calculateProgramWidth(program)}px"
-                    @click=${() => this._onProgramSelected(program)}
-                  >
-                    <div class="programTitle">${program.title}</div>
-                    <div class="programTime">
-                      ${this._formatTime(new Date(program.start))} -
-                      ${this._formatTime(new Date(program.end))}
-                    </div>
-                  </div>
-                `
-              )}
+              ${programs.length > 0
+                ? programs.map(
+                    program => html`
+                      <div
+                        class="programSlot ${this._isCurrentProgram(program) ? 'current' : ''}"
+                        style="width: ${this._calculateProgramWidth(program)}px"
+                        @click=${() => this._onProgramSelected(program)}
+                      >
+                        <div class="programTitle">${program.title}</div>
+                        ${this.showTime
+                          ? html`
+                              <div class="programTime">
+                                ${this._formatTime(new Date(program.start * 1000))} -
+                                ${this._formatTime(new Date((program.end || program.stop) * 1000))}
+                              </div>
+                            `
+                          : ''}
+                        ${this.showDuration
+                          ? html`
+                              <div class="programDuration">
+                                ${this._formatDuration(
+                                  program.duration ||
+                                    this._calculateDuration(program.start, program.end)
+                                )}
+                              </div>
+                            `
+                          : ''}
+                        ${this.showDescription && program.description
+                          ? html` <div class="programDescription">${program.description}</div> `
+                          : ''}
+                      </div>
+                    `
+                  )
+                : html`<div class="noPrograms">Keine Programme verfügbar</div>`}
             </div>
-          `
-        )}
+          `;
+        })}
       </div>
     `;
-  }
-
-  // Neue Methode: Rendert die sortierten Kanäle
-  _renderSortedChannels() {
-    return this._sortedChannels.map(group => {
-      // Sammle alle Kanäle aus allen Patterns der Gruppe
-      const groupChannels = group.patterns.flatMap(p => p.channels);
-
-      if (groupChannels.length === 0) {
-        return html``;
-      }
-
-      return html`
-        ${this.showChannelGroups
-          ? html`<div class="channelGroup" style="${group.style || ''}">${group.name}</div>`
-          : ''}
-        ${groupChannels.map(
-          channel => html`
-            <div
-              class="channelRow ${this.selectedChannel === channel.id ? 'selected' : ''}"
-              style="${channel.style || ''}"
-              @click=${() => this._onChannelSelected(channel)}
-            >
-              ${channel.name}
-            </div>
-          `
-        )}
-      `;
-    });
   }
 
   _renderLoading() {
@@ -275,14 +342,41 @@ export class EpgBox extends ViewBase {
   _generateTimeSlots() {
     const slots = [];
     const now = new Date();
-    const startTime = new Date(now);
-    startTime.setHours(0, 0, 0, 0);
 
-    for (let i = 0; i < 24; i++) {
-      const slot = new Date(startTime);
-      slot.setHours(i);
-      slots.push(slot);
+    // Verwende die konfigurierten Zeitparameter oder Standardwerte
+    const pastTime = this.epgPastTime || 30; // Minuten in die Vergangenheit
+    const futureTime = this.epgFutureTime || 120; // Minuten in die Zukunft
+    const showWidth = this.epgShowWidth || 180; // Minuten sichtbar
+
+    // Berechne Start- und Endzeit basierend auf den Parametern
+    const startTime = new Date(now.getTime() - pastTime * 60 * 1000);
+    const endTime = new Date(now.getTime() + futureTime * 60 * 1000);
+
+    // Runde auf volle Stunden für bessere Darstellung
+    startTime.setMinutes(0, 0, 0);
+    endTime.setMinutes(0, 0, 0);
+
+    this._debug('_generateTimeSlots: Zeitparameter', {
+      pastTime,
+      futureTime,
+      showWidth,
+      startTime: startTime.toISOString(),
+      endTime: endTime.toISOString(),
+      now: now.toISOString(),
+    });
+
+    // Generiere Zeitslots in 30-Minuten-Intervallen
+    const currentSlot = new Date(startTime);
+    while (currentSlot <= endTime) {
+      slots.push(new Date(currentSlot));
+      currentSlot.setMinutes(currentSlot.getMinutes() + 30);
     }
+
+    this._debug('_generateTimeSlots: Generierte Slots', {
+      anzahlSlots: slots.length,
+      ersteSlot: slots[0]?.toISOString(),
+      letzteSlot: slots[slots.length - 1]?.toISOString(),
+    });
 
     return slots;
   }
@@ -294,36 +388,141 @@ export class EpgBox extends ViewBase {
     });
   }
 
+  _formatDuration(minutes) {
+    if (!minutes) return '';
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    if (hours > 0) {
+      return `${hours}h ${mins}min`;
+    }
+    return `${mins}min`;
+  }
+
+  _calculateDuration(start, end) {
+    // Konvertiere Unix-Timestamps zu Date-Objekten
+    const startTime = new Date(start * 1000);
+    const endTime = new Date(end * 1000);
+    return Math.round((endTime - startTime) / (1000 * 60)); // Dauer in Minuten
+  }
+
   _isCurrentTimeSlot(slot, currentTime) {
     return slot.getHours() === currentTime.getHours();
   }
 
   _isCurrentProgram(program) {
     const now = new Date();
-    const start = new Date(program.start);
-    const end = new Date(program.end);
+    const start = new Date(program.start * 1000);
+    const end = new Date((program.end || program.stop) * 1000);
     return now >= start && now <= end;
   }
 
   _calculateProgramWidth(program) {
-    const start = new Date(program.start);
-    const end = new Date(program.end);
+    const start = new Date(program.start * 1000);
+    const end = new Date((program.end || program.stop) * 1000);
     const duration = (end - start) / (1000 * 60); // Dauer in Minuten
-    return (duration / 60) * 120; // 120px pro Stunde
+
+    // Verwende die konfigurierte Anzeigebreite oder Standardwert
+    const showWidth = this.epgShowWidth || 180; // Minuten sichtbar
+    const containerWidth = 1200; // Geschätzte Container-Breite in Pixeln
+
+    // Berechne die Breite basierend auf dem Verhältnis von Programmdauer zu Anzeigebreite
+    const widthRatio = duration / showWidth;
+    const programWidth = Math.max(100, widthRatio * containerWidth); // Mindestbreite 100px
+
+    this._debug('_calculateProgramWidth', {
+      title: program.title,
+      duration,
+      showWidth,
+      widthRatio,
+      programWidth,
+    });
+
+    return programWidth;
   }
 
   _getProgramsForChannel(channel, timeSlots) {
-    if (!channel.programs) return [];
+    if (!channel.programs) {
+      this._debug('_getProgramsForChannel: Keine Programme für Kanal', {
+        kanal: channel.name,
+        hatProgramme: !!channel.programs,
+      });
+      return [];
+    }
 
-    const startTime = timeSlots[0];
-    const endTime = new Date(timeSlots[timeSlots.length - 1]);
-    endTime.setHours(23, 59, 59, 999);
+    if (!Array.isArray(channel.programs) || channel.programs.length === 0) {
+      this._debug('_getProgramsForChannel: Leeres Programm-Array für Kanal', {
+        kanal: channel.name,
+        programme: channel.programs,
+      });
+      return [];
+    }
 
-    return channel.programs.filter(program => {
-      const programStart = new Date(program.start);
-      const programEnd = new Date(program.end);
-      return programStart >= startTime && programEnd <= endTime;
+    // Verwende die konfigurierten Zeitparameter für die Filterung
+    const pastTime = this.epgPastTime || 30; // Minuten in die Vergangenheit
+    const futureTime = this.epgFutureTime || 120; // Minuten in die Zukunft
+
+    const now = new Date();
+    const startTime = new Date(now.getTime() - pastTime * 60 * 1000);
+    const endTime = new Date(now.getTime() + futureTime * 60 * 1000);
+
+    this._debug('_getProgramsForChannel: Zeitfilterung', {
+      kanal: channel.name,
+      anzahlProgramme: channel.programs.length,
+      startTime: startTime.toISOString(),
+      endTime: endTime.toISOString(),
+      now: now.toISOString(),
+      programme: channel.programs.map(p => ({
+        title: p.title,
+        start: p.start,
+        stop: p.stop,
+        end: p.end,
+        startDate: new Date(p.start * 1000).toISOString(),
+        endDate: new Date((p.end || p.stop) * 1000).toISOString(),
+      })),
     });
+
+    const filteredPrograms = channel.programs.filter(program => {
+      // Stelle sicher, dass die Programme gültige Zeitstempel haben
+      if (!program.start || !(program.end || program.stop)) {
+        this._debug('_getProgramsForChannel: Programm ohne gültige Zeitstempel', {
+          title: program.title,
+          start: program.start,
+          end: program.end,
+          stop: program.stop,
+        });
+        return false;
+      }
+
+      // Konvertiere Unix-Timestamps zu Date-Objekten
+      const programStart = new Date(program.start * 1000);
+      const programEnd = new Date((program.end || program.stop) * 1000);
+
+      // Zeige Programme an, die sich mit dem Zeitfenster überschneiden
+      const overlaps = programStart < endTime && programEnd > startTime;
+
+      this._debug('_getProgramsForChannel: Programm-Prüfung', {
+        title: program.title,
+        startTimestamp: program.start,
+        stopTimestamp: program.stop,
+        endTimestamp: program.end,
+        programStart: programStart.toISOString(),
+        programEnd: programEnd.toISOString(),
+        overlaps,
+        startTime: startTime.toISOString(),
+        endTime: endTime.toISOString(),
+      });
+
+      return overlaps;
+    });
+
+    this._debug('_getProgramsForChannel: Gefilterte Programme', {
+      kanal: channel.name,
+      anzahlVorher: channel.programs.length,
+      anzahlNachher: filteredPrograms.length,
+      gefilterteProgramme: filteredPrograms.map(p => p.title),
+    });
+
+    return filteredPrograms;
   }
 
   _onChannelSelected(channel) {
@@ -391,21 +590,10 @@ export class EpgBox extends ViewBase {
         programs: teilEpg.programs,
       });
 
-      // Initialisiere die Sortierungsstruktur beim ersten Kanal
-      if (!this._channelOrderInitialized) {
-        this._debug('sortedChannels: Initialisiere Sortierung beim ersten Teil-EPG', {
-          kanalName: teilEpg.channel.name,
-          sortedChannels: this._sortedChannels,
-        });
-        this._initializeChannelOrder();
-      }
-
-      // Sortiere den neuen Kanal in die Struktur ein
-      this._sortChannelIntoStructure(teilEpg.channel);
-
-      this._debug('EPG-Box: Teil-EPG gespeichert', {
+      this._debug('EPG-Box: Kanal gespeichert', {
         kanal: teilEpg.channel.name,
         anzahlProgramme: teilEpg.programs.length,
+        gesamtKanale: this._channels.size,
       });
 
       this.requestUpdate();

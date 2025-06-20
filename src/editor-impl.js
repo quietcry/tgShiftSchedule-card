@@ -1,7 +1,15 @@
 import { html, css } from 'lit';
 import { property } from 'lit/decorators.js';
 import { EditorBase } from './editor-base.js';
-import { CardName, Version, DebugMode, showVersion } from './card-config.js';
+import {
+  CardName,
+  Version,
+  DebugMode,
+  showVersion,
+  DefaultEpgPastTime,
+  DefaultEpgFutureTime,
+  DefaultEpgShowWidth,
+} from './card-config.js';
 import yaml from 'js-yaml';
 
 export class EditorImpl extends EditorBase {
@@ -25,6 +33,9 @@ export class EditorImpl extends EditorBase {
       show_title: true,
       show_description: true,
       view_mode: 'Liste',
+      epgPastTime: DefaultEpgPastTime,
+      epgFutureTime: DefaultEpgFutureTime,
+      epgShowWidth: DefaultEpgShowWidth,
     });
     if (DebugMode) console.debug(`[${CardName}] EditorImpl-Modul wird geladen`);
     this._selectedTab = 0;
@@ -576,6 +587,9 @@ export class EditorImpl extends EditorBase {
       blacklist: '',
       whitelist: '',
       importantlist: '',
+      epgPastTime: DefaultEpgPastTime,
+      epgFutureTime: DefaultEpgFutureTime,
+      epgShowWidth: DefaultEpgShowWidth,
     };
   }
 
@@ -604,6 +618,27 @@ export class EditorImpl extends EditorBase {
         name: 'importantlist',
         label: 'Wichtige Kanäle (RegEx, kommagetrennt)',
         description: 'Kanäle, die zuerst angezeigt werden sollen',
+      },
+      {
+        type: 'number',
+        name: 'epgPastTime',
+        label: 'EPG Vergangenheit (Minuten)',
+        description: 'Anzahl der Minuten in die Vergangenheit',
+        default: DefaultEpgPastTime,
+      },
+      {
+        type: 'number',
+        name: 'epgFutureTime',
+        label: 'EPG Zukunft (Minuten)',
+        description: 'Anzahl der Minuten in die Zukunft',
+        default: DefaultEpgFutureTime,
+      },
+      {
+        type: 'number',
+        name: 'epgShowWidth',
+        label: 'EPG Anzeigebreite (Minuten)',
+        description: 'Anzahl der sichtbaren Minuten in der Ansicht',
+        default: DefaultEpgShowWidth,
       },
     ];
   }
@@ -647,6 +682,39 @@ export class EditorImpl extends EditorBase {
       {
         name: 'show_channel_groups',
         selector: { boolean: {} },
+      },
+      {
+        name: 'epgPastTime',
+        selector: {
+          number: {
+            min: 0,
+            max: 1440,
+            step: 5,
+            unit_of_measurement: 'Minuten',
+          },
+        },
+      },
+      {
+        name: 'epgFutureTime',
+        selector: {
+          number: {
+            min: 0,
+            max: 1440,
+            step: 5,
+            unit_of_measurement: 'Minuten',
+          },
+        },
+      },
+      {
+        name: 'epgShowWidth',
+        selector: {
+          number: {
+            min: 30,
+            max: 1440,
+            step: 5,
+            unit_of_measurement: 'Minuten',
+          },
+        },
       },
     ];
     return schema;

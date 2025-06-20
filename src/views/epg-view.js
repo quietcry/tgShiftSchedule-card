@@ -60,6 +60,12 @@ export class EPGView extends ViewBase {
         padding: 8px;
         background-color: var(--primary-background-color);
         border-bottom: 1px solid var(--divider-color);
+        overflow-x: auto;
+      }
+
+      .timeBarContainer {
+        display: flex;
+        min-width: max-content;
       }
 
       epg-box {
@@ -73,6 +79,7 @@ export class EPGView extends ViewBase {
         border-right: 1px solid var(--divider-color);
         min-width: 60px;
         text-align: center;
+        flex-shrink: 0;
       }
 
       .timeSlot.current {
@@ -350,9 +357,13 @@ export class EPGView extends ViewBase {
           .selectedChannel=${this._selectedChannel}
           .channelOrder=${this.config.group_order || []}
           .showChannelGroups=${this.config.show_channel_groups || false}
+          .epgPastTime=${this.config.epgPastTime || 30}
+          .epgFutureTime=${this.config.epgFutureTime || 120}
+          .epgShowWidth=${this.config.epgShowWidth || 180}
           @channel-selected=${this._onChannelSelected}
           @program-selected=${this._onProgramSelected}
           @epg-box-ready=${this._onEpgBoxReady}
+          @program-box-scroll=${this._onProgramBoxScroll}
         ></epg-box>
       </div>
     `;
@@ -369,29 +380,57 @@ export class EPGView extends ViewBase {
   _renderTimeBar() {
     const timeSlots = this._generateTimeSlots();
     return html`
-      ${timeSlots.map(
-        slot => html`
-          <div
-            class="timeSlot ${this._isCurrentTimeSlot(slot, this._currentTime) ? 'current' : ''}"
-          >
-            ${this._formatTime(slot)}
-          </div>
-        `
-      )}
+      <div class="timeBarContainer">
+        ${timeSlots.map(
+          slot => html`
+            <div
+              class="timeSlot ${this._isCurrentTimeSlot(slot, this._currentTime) ? 'current' : ''}"
+              style="width: 120px; min-width: 120px;"
+            >
+              ${this._formatTime(slot)}
+            </div>
+          `
+        )}
+      </div>
     `;
   }
 
   _generateTimeSlots() {
     const slots = [];
     const now = new Date();
-    const startTime = new Date(now);
-    startTime.setHours(0, 0, 0, 0);
 
-    for (let i = 0; i < 24; i++) {
-      const slot = new Date(startTime);
-      slot.setHours(i);
-      slots.push(slot);
+    // Verwende die konfigurierten Zeitparameter oder Standardwerte
+    const pastTime = this.config.epgPastTime || 30; // Minuten in die Vergangenheit
+    const futureTime = this.config.epgFutureTime || 120; // Minuten in die Zukunft
+
+    // Berechne Start- und Endzeit basierend auf den Parametern
+    const startTime = new Date(now.getTime() - pastTime * 60 * 1000);
+    const endTime = new Date(now.getTime() + futureTime * 60 * 1000);
+
+    // Runde auf volle Stunden für bessere Darstellung
+    startTime.setMinutes(0, 0, 0);
+    endTime.setMinutes(0, 0, 0);
+
+    this._debug('_generateTimeSlots: Zeitparameter', {
+      pastTime,
+      futureTime,
+      startTime: startTime.toISOString(),
+      endTime: endTime.toISOString(),
+      now: now.toISOString(),
+    });
+
+    // Generiere Zeitslots in 30-Minuten-Intervallen
+    const currentSlot = new Date(startTime);
+    while (currentSlot <= endTime) {
+      slots.push(new Date(currentSlot));
+      currentSlot.setMinutes(currentSlot.getMinutes() + 30);
     }
+
+    this._debug('_generateTimeSlots: Generierte Slots', {
+      anzahlSlots: slots.length,
+      ersteSlot: slots[0]?.toISOString(),
+      letzteSlot: slots[slots.length - 1]?.toISOString(),
+    });
 
     return slots;
   }
@@ -412,6 +451,13 @@ export class EPGView extends ViewBase {
 
   _onProgramSelected(e) {
     // Hier können Sie die Logik für die Programmauswahl implementieren
+  }
+
+  _onProgramBoxScroll(e) {
+    const timeBar = this.shadowRoot?.querySelector('.timeBar');
+    if (timeBar) {
+      timeBar.scrollLeft = e.detail.scrollLeft;
+    }
   }
 
   _handleRefresh() {

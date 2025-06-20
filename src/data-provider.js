@@ -73,11 +73,88 @@ export class DataProvider {
       const response = await this._hass.connection.sendMessagePromise(message);
       this._debug('Service-Antwort erhalten:', response);
 
-      // Extrahiere epg_data aus der Antwort
-      if (response && response.response && response.response.epg_data) {
-        return response.response.epg_data;
+      // Debug: Zeige die vollständige Antwort-Struktur
+      this._debug('Service-Antwort Details:', {
+        responseType: typeof response,
+        hasResponse: !!response,
+        responseKeys: response ? Object.keys(response) : [],
+        responseResponseType: typeof response?.response,
+        responseResponseKeys: response?.response ? Object.keys(response.response) : [],
+        responseResponseValue: response?.response,
+      });
+
+      // Extrahiere EPG-Daten aus der Antwort
+      let epgData = [];
+
+      if (response && response.response) {
+        this._debug('Response-Struktur analysieren:', {
+          responseType: typeof response.response,
+          responseKeys: Object.keys(response.response),
+          hasEpgData: !!response.response.epg_data,
+          epgDataType: typeof response.response.epg_data,
+          epgDataKeys: response.response.epg_data ? Object.keys(response.response.epg_data) : [],
+        });
+
+        // Versuche verschiedene mögliche Strukturen
+        if (Array.isArray(response.response)) {
+          // Direktes Array
+          epgData = response.response;
+        } else if (response.response.epg_data) {
+          // Neue Struktur: response.response.epg_data.epg ist ein Objekt mit Zeitstempel-Schlüsseln
+          if (
+            response.response.epg_data.epg &&
+            typeof response.response.epg_data.epg === 'object'
+          ) {
+            // Konvertiere das epg-Objekt in ein Array
+            const epgObject = response.response.epg_data.epg;
+            epgData = Object.values(epgObject).map(program => ({
+              ...program,
+              // Stelle sicher, dass die Zeitstempel als Zahlen vorliegen
+              start: typeof program.start === 'string' ? parseInt(program.start) : program.start,
+              stop: typeof program.stop === 'string' ? parseInt(program.stop) : program.stop,
+              // Füge end-Feld hinzu falls nicht vorhanden
+              end: program.end || program.stop,
+            }));
+
+            this._debug('EPG-Objekt konvertiert:', {
+              anzahlZeitstempel: Object.keys(epgObject).length,
+              zeitstempel: Object.keys(epgObject),
+              anzahlProgramme: epgData.length,
+            });
+          } else if (Array.isArray(response.response.epg_data)) {
+            // Verschachteltes epg_data Array
+            epgData = response.response.epg_data;
+          }
+        } else if (response.response.data && Array.isArray(response.response.data)) {
+          // Verschachteltes data Array
+          epgData = response.response.data;
+        } else if (typeof response.response === 'string') {
+          // String-Antwort - versuche JSON zu parsen
+          try {
+            const parsed = JSON.parse(response.response);
+            epgData = Array.isArray(parsed) ? parsed : [];
+          } catch (e) {
+            this._debug('Fehler beim JSON-Parsing der String-Antwort:', e);
+            epgData = [];
+          }
+        } else {
+          // Fallback: Versuche response.response als Array zu verwenden
+          epgData = Array.isArray(response.response) ? response.response : [];
+        }
       }
-      return [];
+
+      this._debug('Extrahierte EPG-Daten:', {
+        anzahlProgramme: epgData.length,
+        programme: epgData.map(p => ({
+          title: p.title,
+          start: p.start,
+          end: p.end || p.stop,
+          starttime: p.starttime,
+          endtime: p.endtime,
+        })),
+      });
+
+      return epgData;
     } catch (error) {
       this._debug('Fehler beim Service-Aufruf:', error);
       throw error;
@@ -143,9 +220,35 @@ export class DataProvider {
 
     // Verarbeite die EPG-Daten
     if (Array.isArray(response)) {
-      this._debug('EPG-Daten:', response);
-      return response;
+      this._debug('EPG-Daten vor Verarbeitung:', response);
+
+      // Stelle sicher, dass alle Programme die erforderlichen Felder haben
+      const processedPrograms = response.map(program => ({
+        title: program.title || program.name || 'Unbekanntes Programm',
+        description: program.description || program.desc || '',
+        start: program.start || program.start_time || '',
+        end: program.end || program.end_time || '',
+        duration: program.duration || 0,
+        // Zusätzliche Felder falls vorhanden
+        category: program.category || '',
+        rating: program.rating || '',
+        ...program, // Behalte alle anderen Felder bei
+      }));
+
+      this._debug('Verarbeitete EPG-Daten:', {
+        anzahlProgramme: processedPrograms.length,
+        programme: processedPrograms.map(p => ({
+          title: p.title,
+          start: p.start,
+          end: p.end,
+          duration: p.duration,
+        })),
+      });
+
+      return processedPrograms;
     }
+
+    this._debug('Keine EPG-Daten erhalten oder ungültiges Format:', response);
     return [];
   }
 
