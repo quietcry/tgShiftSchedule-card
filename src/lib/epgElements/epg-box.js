@@ -13,20 +13,47 @@ export class EpgBox extends ViewBase {
     showDescription: { type: Boolean },
     selectedChannel: { type: String },
     channelOrder: { type: Array }, // Array mit Kanaldefinitionen { name: string, style?: string, channels?: Array }
+    showChannelGroups: { type: Boolean }, // Zeigt Kanalgruppen an
   };
 
   constructor() {
     super();
     this._channels = new Map(); // Speichert die Kanäle mit ihren Programmen
+    this._sortedChannels = []; // Neue detaillierte Sortierungsstruktur
+    this._channelOrderInitialized = false; // Flag für initialisierte Sortierung
   }
 
   updated(changedProperties) {
+    if (changedProperties.has('channelOrder')) {
+      this._debug('sortedChannels: channelOrder wurde gesetzt', {
+        channelOrder: this.channelOrder,
+        channelOrderType: typeof this.channelOrder,
+        isArray: Array.isArray(this.channelOrder),
+        channelOrderLength: this.channelOrder?.length,
+      });
+    }
+
     if (changedProperties.has('epgData')) {
       console.log('epg-box: Neue Daten erhalten:', this.epgData);
 
       if (this.epgData?.channel) {
         console.log('epg-box: Neuer Kanal wird hinzugefügt:', this.epgData.channel.name);
         this._channels.set(this.epgData.channel.id, this.epgData.channel);
+
+        // Initialisiere die Sortierungsstruktur beim ersten Kanal
+        if (!this._channelOrderInitialized) {
+          this._debug('sortedChannels: Initialisiere Sortierung beim ersten Kanal', {
+            kanalName: this.epgData.channel.name,
+            sortedChannels: this._sortedChannels,
+            channelOrder: this.channelOrder,
+            channelOrderInitialized: this._channelOrderInitialized,
+          });
+          this._initializeChannelOrder();
+        }
+
+        // Sortiere den neuen Kanal in die Struktur ein
+        this._sortChannelIntoStructure(this.epgData.channel);
+
         console.log(
           'epg-box: Aktuelle Kanäle:',
           Array.from(this._channels.values()).map(c => c.name)
@@ -34,17 +61,44 @@ export class EpgBox extends ViewBase {
         this.requestUpdate();
       }
     }
+
+    // Wenn sich die channelOrder ändert, aktualisiere die Sortierung
+    if (changedProperties.has('channelOrder')) {
+      this._debug('sortedChannels: channelOrder hat sich geändert, aktualisiere Sortierung', {
+        neueChannelOrder: this.channelOrder,
+        sortedChannels: this._sortedChannels,
+      });
+      this._channelOrderInitialized = false;
+      this._initializeChannelOrder();
+      this._updateAllChannelSorting();
+      this.requestUpdate();
+    }
   }
 
   firstUpdated() {
     super.firstUpdated();
     this._debug('EPG-Box: firstUpdated - Sende Bereitschaft-Event');
 
+    // Initialisiere die Sortierung für alle vorhandenen Kanäle
+    if (this._channels.size > 0 && !this._channelOrderInitialized) {
+      this._debug(
+        'sortedChannels: Initialisiere Sortierung für vorhandene Kanäle in firstUpdated',
+        {
+          anzahlVorhandeneKanäle: this._channels.size,
+          sortedChannels: this._sortedChannels,
+        }
+      );
+      this._initializeChannelOrder();
+      this._updateAllChannelSorting();
+    }
+
     // Sende Event, dass die EPG-Box bereit ist
-    this.dispatchEvent(new CustomEvent('epg-box-ready', {
-      bubbles: true,
-      composed: true
-    }));
+    this.dispatchEvent(
+      new CustomEvent('epg-box-ready', {
+        bubbles: true,
+        composed: true,
+      })
+    );
   }
 
   static styles = css`
@@ -121,22 +175,41 @@ export class EpgBox extends ViewBase {
       return this._renderLoading();
     }
 
-    const { groupedChannels, ungroupedChannels } = this._groupChannels();
-    console.log(
-      'epg-box: Rendere mit',
-      groupedChannels.length,
-      'Gruppen und',
-      ungroupedChannels.length,
-      'ungruppierten Kanälen'
+    // Verwende die neue Sortierungsstruktur
+    if (!this._channelOrderInitialized) {
+      this._debug('sortedChannels: Initialisiere Sortierung in render Methode', {
+        anzahlKanäle: this._channels.size,
+        sortedChannels: this._sortedChannels,
+      });
+      this._initializeChannelOrder();
+      this._updateAllChannelSorting();
+    }
+
+    console.log('epg-box: Rendere mit', this._sortedChannels.length, 'Gruppen');
+
+    // Sammle alle Kanäle aus allen Gruppen
+    const allChannels = this._sortedChannels.flatMap(group =>
+      group.patterns.flatMap(p => p.channels)
     );
 
+    this._debug('sortedChannels: Render-Status', {
+      anzahlGruppen: this._sortedChannels.length,
+      gesamtAnzahlKanäle: allChannels.length,
+      gruppenStatus: this._sortedChannels.map(g => ({
+        name: g.name,
+        patterns: g.patterns.map(p => ({
+          pattern: p.pattern,
+          anzahlKanäle: p.channels.length,
+          kanalNamen: p.channels.map(c => c.name),
+        })),
+      })),
+      sortedChannels: this._sortedChannels,
+    });
+
     return html`
-      <div class="channelBox">
-        ${this._renderGroupedChannels(groupedChannels)}
-        ${this._renderUngroupedChannels(ungroupedChannels)}
-      </div>
+      <div class="channelBox">${this._renderSortedChannels()}</div>
       <div class="programBox">
-        ${[...groupedChannels.flatMap(g => g.channels), ...ungroupedChannels].map(
+        ${allChannels.map(
           channel => html`
             <div class="programRow">
               ${this._getProgramsForChannel(channel, this._generateTimeSlots()).map(
@@ -161,109 +234,33 @@ export class EpgBox extends ViewBase {
     `;
   }
 
-  _renderGroupedChannels(groupedChannels) {
-    return groupedChannels.map(
-      group => html`
-        <div class="channelGroup" style="${group.style || ''}">${group.name}</div>
-        ${group.channels.length > 0
-          ? html`
-              ${group.channels.map(
-                channel => html`
-                  <div
-                    class="channelRow ${this.selectedChannel === channel.id ? 'selected' : ''}"
-                    style="${channel.style || ''}"
-                    @click=${() => this._onChannelSelected(channel)}
-                  >
-                    ${channel.name}
-                  </div>
-                `
-              )}
-            `
-          : html` <div class="channelRow empty">Keine Kanäle in dieser Gruppe</div> `}
-      `
-    );
-  }
+  // Neue Methode: Rendert die sortierten Kanäle
+  _renderSortedChannels() {
+    return this._sortedChannels.map(group => {
+      // Sammle alle Kanäle aus allen Patterns der Gruppe
+      const groupChannels = group.patterns.flatMap(p => p.channels);
 
-  _renderUngroupedChannels(ungroupedChannels) {
-    return ungroupedChannels.map(
-      channel => html`
-        <div
-          class="channelRow ${this.selectedChannel === channel.id ? 'selected' : ''}"
-          @click=${() => this._onChannelSelected(channel)}
-        >
-          ${channel.name}
-        </div>
-      `
-    );
-  }
+      if (groupChannels.length === 0) {
+        return html``;
+      }
 
-  _groupChannels() {
-    if (!this._channels.size) return { groupedChannels: [], ungroupedChannels: [] };
-
-    const channels = Array.from(this._channels.values());
-    const groupedChannels = [];
-    const ungroupedChannels = [];
-    const groupedChannelsSet = new Set();
-
-    // Gruppiere die Kanäle
-    if (this.channelOrder?.length) {
-      // Erstelle die Gruppen und sortiere einzelne Kanäle
-      this.channelOrder.forEach(item => {
-        if (item.channels) {
-          // Es ist eine Gruppe
-          const groupChannels = [];
-
-          item.channels.forEach(channelConfig => {
-            const regex = new RegExp(channelConfig.name);
-            const matchingChannels = channels.filter(
-              c => regex.test(c.name) && !groupedChannelsSet.has(c.id)
-            );
-
-            matchingChannels.forEach(channel => {
-              groupedChannelsSet.add(channel.id);
-              groupChannels.push({
-                ...channel,
-                style: channelConfig.style,
-              });
-            });
-          });
-
-          if (groupChannels.length > 0) {
-            groupedChannels.push({
-              name: item.name,
-              style: item.style,
-              channels: groupChannels,
-            });
-          }
-        } else {
-          // Es ist ein einzelner Kanal
-          const regex = new RegExp(item.name);
-          const matchingChannels = channels.filter(
-            c => regex.test(c.name) && !groupedChannelsSet.has(c.id)
-          );
-
-          matchingChannels.forEach(channel => {
-            groupedChannelsSet.add(channel.id);
-            ungroupedChannels.push({
-              ...channel,
-              style: item.style,
-            });
-          });
-        }
-      });
-
-      // Füge die nicht zugeordneten Kanäle hinzu
-      channels.forEach(channel => {
-        if (!groupedChannelsSet.has(channel.id)) {
-          ungroupedChannels.push(channel);
-        }
-      });
-    } else {
-      // Wenn keine Konfiguration definiert ist, sind alle Kanäle ungruppiert
-      ungroupedChannels.push(...channels);
-    }
-
-    return { groupedChannels, ungroupedChannels };
+      return html`
+        ${this.showChannelGroups
+          ? html`<div class="channelGroup" style="${group.style || ''}">${group.name}</div>`
+          : ''}
+        ${groupChannels.map(
+          channel => html`
+            <div
+              class="channelRow ${this.selectedChannel === channel.id ? 'selected' : ''}"
+              style="${channel.style || ''}"
+              @click=${() => this._onChannelSelected(channel)}
+            >
+              ${channel.name}
+            </div>
+          `
+        )}
+      `;
+    });
   }
 
   _renderLoading() {
@@ -353,7 +350,7 @@ export class EpgBox extends ViewBase {
   addEpgData(data) {
     this._debug('EPG-Box: EPG-Daten empfangen', {
       kanal: data?.channel?.name,
-      anzahlProgramme: data?.programs?.length
+      anzahlProgramme: data?.programs?.length,
     });
 
     if (data?.channel?.id) {
@@ -362,7 +359,7 @@ export class EpgBox extends ViewBase {
         this._debug('EPG-Box: Aktualisiere Programme für Kanal', {
           kanal: channel.name,
           alteAnzahl: channel.programs.length,
-          neueAnzahl: data.programs.length
+          neueAnzahl: data.programs.length,
         });
         channel.programs = data.programs || [];
         this._channels.set(data.channel.id, channel);
@@ -370,13 +367,13 @@ export class EpgBox extends ViewBase {
         this._debug('EPG-Box: Update angefordert');
       } else {
         this._debug('EPG-Box: Kanal nicht gefunden', {
-          kanalId: data.channel.id
+          kanalId: data.channel.id,
         });
       }
     } else {
       this._debug('EPG-Box: Ungültige EPG-Daten', {
         hatKanal: !!data?.channel,
-        hatKanalId: !!data?.channel?.id
+        hatKanalId: !!data?.channel?.id,
       });
     }
   }
@@ -384,19 +381,31 @@ export class EpgBox extends ViewBase {
   addTeilEpg(teilEpg) {
     this._debug('EPG-Box: Teil-EPG empfangen', {
       kanal: teilEpg?.channel?.name,
-      anzahlProgramme: teilEpg?.programs?.length
+      anzahlProgramme: teilEpg?.programs?.length,
     });
 
     if (teilEpg?.channel?.id && teilEpg?.programs) {
       // Speichere das Teil-EPG direkt
       this._channels.set(teilEpg.channel.id, {
         ...teilEpg.channel,
-        programs: teilEpg.programs
+        programs: teilEpg.programs,
       });
+
+      // Initialisiere die Sortierungsstruktur beim ersten Kanal
+      if (!this._channelOrderInitialized) {
+        this._debug('sortedChannels: Initialisiere Sortierung beim ersten Teil-EPG', {
+          kanalName: teilEpg.channel.name,
+          sortedChannels: this._sortedChannels,
+        });
+        this._initializeChannelOrder();
+      }
+
+      // Sortiere den neuen Kanal in die Struktur ein
+      this._sortChannelIntoStructure(teilEpg.channel);
 
       this._debug('EPG-Box: Teil-EPG gespeichert', {
         kanal: teilEpg.channel.name,
-        anzahlProgramme: teilEpg.programs.length
+        anzahlProgramme: teilEpg.programs.length,
       });
 
       this.requestUpdate();
@@ -405,9 +414,403 @@ export class EpgBox extends ViewBase {
       this._debug('EPG-Box: Ungültiges Teil-EPG', {
         hatKanal: !!teilEpg?.channel,
         hatKanalId: !!teilEpg?.channel?.id,
-        hatProgramme: !!teilEpg?.programs
+        hatProgramme: !!teilEpg?.programs,
       });
     }
+  }
+
+  // Neue Methode: Initialisiert die Sortierungsstruktur basierend auf channelOrder
+  _initializeChannelOrder() {
+    this._debug('EpgBox: Initialisiere Sortierungsstruktur', {
+      channelOrder: this.channelOrder,
+      channelOrderType: typeof this.channelOrder,
+      isArray: Array.isArray(this.channelOrder),
+      channelOrderLength: this.channelOrder?.length,
+    });
+
+    // Parse YAML-String zu Array, falls channelOrder ein String ist
+    let parsedChannelOrder = this.channelOrder;
+    if (typeof this.channelOrder === 'string' && this.channelOrder.trim()) {
+      try {
+        // Einfacher YAML-Parser für unsere spezifische Struktur
+        parsedChannelOrder = this._parseYamlString(this.channelOrder);
+        this._debug('sortedChannels: YAML erfolgreich geparst', {
+          originalString: this.channelOrder,
+          parsedResult: parsedChannelOrder,
+        });
+      } catch (error) {
+        this._debug('sortedChannels: Fehler beim YAML-Parsing', {
+          error: error.message,
+          originalString: this.channelOrder,
+        });
+        parsedChannelOrder = [];
+      }
+    }
+
+    if (
+      !parsedChannelOrder ||
+      !Array.isArray(parsedChannelOrder) ||
+      parsedChannelOrder.length === 0
+    ) {
+      this._debug('EpgBox: Keine gültige channelOrder definiert, verwende Standard-Sortierung');
+      this._sortedChannels = [
+        {
+          name: 'Alle Kanäle',
+          style: '',
+          patterns: [
+            {
+              pattern: '.*',
+              style: '',
+              channels: [],
+            },
+          ],
+        },
+      ];
+      this._channelOrderInitialized = true;
+      this._debug('sortedChannels: Standard-Struktur erstellt', {
+        anzahlGruppen: this._sortedChannels.length,
+        gruppen: this._sortedChannels.map(g => ({
+          name: g.name,
+          patterns: g.patterns.map(p => ({
+            pattern: p.pattern,
+            anzahlKanäle: p.channels.length,
+          })),
+        })),
+        sortedChannels: this._sortedChannels,
+      });
+      return;
+    }
+
+    this._sortedChannels = [];
+
+    parsedChannelOrder.forEach(item => {
+      if (!item) return;
+
+      // Ignoriere "channels:" als ungültigen Kanal-Namen
+      if (item.name === 'channels:') return;
+
+      if (item.channels && Array.isArray(item.channels) && item.channels.length > 0) {
+        // Gruppe mit definierten Kanälen
+        const patterns = item.channels
+          .filter(channelConfig => channelConfig && channelConfig.name)
+          .map(channelConfig => ({
+            pattern: channelConfig.name,
+            style: channelConfig.style || item.style || '',
+            channels: [], // Kanäle werden direkt hier gespeichert
+          }));
+
+        this._sortedChannels.push({
+          name: item.name,
+          style: item.style || '',
+          patterns: patterns,
+        });
+
+        this._debug('sortedChannels: Gruppe mit definierten Kanälen hinzugefügt', {
+          gruppenName: item.name,
+          patterns: patterns.map(p => ({ pattern: p.pattern, style: p.style })),
+          anzahlPatterns: patterns.length,
+          aktuelleAnzahlGruppen: this._sortedChannels.length,
+          sortedChannels: this._sortedChannels,
+        });
+      } else if (item.name) {
+        // Einzelner Kanal oder Gruppe ohne definierte Kanäle
+        this._sortedChannels.push({
+          name: item.name,
+          style: item.style || '',
+          patterns: [
+            {
+              pattern: item.name,
+              style: item.style || '',
+              channels: [], // Kanäle werden direkt hier gespeichert
+            },
+          ],
+        });
+
+        this._debug('sortedChannels: Einzelgruppe hinzugefügt', {
+          gruppenName: item.name,
+          pattern: item.name,
+          aktuelleAnzahlGruppen: this._sortedChannels.length,
+          sortedChannels: this._sortedChannels,
+        });
+      }
+    });
+
+    // Füge eine Gruppe für nicht zugeordnete Kanäle hinzu
+    this._sortedChannels.push({
+      name: 'Sonstige',
+      style: '',
+      patterns: [
+        {
+          pattern: '.*',
+          style: '',
+          channels: [],
+        },
+      ],
+    });
+
+    this._channelOrderInitialized = true;
+    this._debug('sortedChannels: Sortierungsstruktur vollständig initialisiert', {
+      anzahlGruppen: this._sortedChannels.length,
+      gruppen: this._sortedChannels.map(g => ({
+        name: g.name,
+        patterns: g.patterns.map(p => ({
+          pattern: p.pattern,
+          anzahlKanäle: p.channels.length,
+        })),
+      })),
+      sortedChannels: this._sortedChannels,
+    });
+  }
+
+  // Neue Methode: Parst YAML-String zu Array
+  _parseYamlString(yamlString) {
+    this._debug('sortedChannels: Starte YAML-Parsing', {
+      yamlString: yamlString,
+    });
+
+    const lines = yamlString.split('\n');
+    const result = [];
+    let currentGroup = null;
+    let currentIndent = 0;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line || line.startsWith('#')) continue;
+
+      const indent = lines[i].length - lines[i].trimStart().length;
+
+      // Neue Gruppe (beginnt mit -)
+      if (line.startsWith('- ')) {
+        const groupName = line.substring(2).replace(':', '');
+        currentGroup = {
+          name: groupName,
+          style: '',
+          channels: [],
+        };
+        result.push(currentGroup);
+        currentIndent = indent;
+        this._debug('sortedChannels: Neue Gruppe erkannt', {
+          groupName: groupName,
+          indent: indent,
+        });
+      }
+      // channels: Zeile
+      else if (line === 'channels:' && currentGroup) {
+        this._debug('sortedChannels: channels-Sektion erkannt');
+        // Nächste Zeilen sind Kanäle
+        let j = i + 1;
+        while (j < lines.length) {
+          const nextLine = lines[j].trim();
+          const nextIndent = lines[j].length - lines[j].trimStart().length;
+
+          // Wenn Einrückung kleiner wird, sind wir aus der channels-Sektion raus
+          if (nextIndent <= indent) break;
+
+          if (nextLine.startsWith('- name:')) {
+            const channelName = nextLine.substring(7).trim();
+            currentGroup.channels.push({
+              name: channelName,
+              style: '',
+            });
+            this._debug('sortedChannels: Kanal zu Gruppe hinzugefügt', {
+              groupName: currentGroup.name,
+              channelName: channelName,
+            });
+          }
+          j++;
+        }
+        i = j - 1; // Überspringe die verarbeiteten Zeilen
+      }
+    }
+
+    this._debug('sortedChannels: YAML-Parsing abgeschlossen', {
+      result: result,
+    });
+
+    return result;
+  }
+
+  // Neue Methode: Sortiert einen Kanal in die Struktur ein
+  _sortChannelIntoStructure(channel) {
+    this._debug('sortedChannels: Starte Einsortierung von Kanal', {
+      kanalName: channel.name,
+      kanalId: channel.id,
+      aktuelleAnzahlGruppen: this._sortedChannels.length,
+      sortedChannels: this._sortedChannels,
+    });
+
+    // Prüfe, ob der Kanal bereits in einem Pattern ist
+    for (const group of this._sortedChannels) {
+      for (const patternConfig of group.patterns) {
+        if (patternConfig.channels.some(c => c.id === channel.id)) {
+          this._debug('sortedChannels: Kanal bereits in Pattern vorhanden', {
+            kanalName: channel.name,
+            gruppe: group.name,
+            pattern: patternConfig.pattern,
+            sortedChannels: this._sortedChannels,
+          });
+          return;
+        }
+      }
+    }
+
+    // Suche nach passender Gruppe und Pattern
+    for (const group of this._sortedChannels) {
+      for (const patternConfig of group.patterns) {
+        try {
+          const regex = new RegExp(patternConfig.pattern, 'i');
+          if (regex.test(channel.name)) {
+            // Kanal passt zu diesem Pattern
+            const channelWithStyle = {
+              ...channel,
+              style: patternConfig.style,
+            };
+
+            patternConfig.channels.push(channelWithStyle);
+
+            // Sortiere die Kanäle alphanumerisch nach Namen, wenn mehr als ein Kanal vorhanden ist
+            if (patternConfig.channels.length > 1) {
+              patternConfig.channels.sort((a, b) =>
+                a.name.localeCompare(b.name, 'de', { numeric: true })
+              );
+              this._debug('sortedChannels: Kanäle in Pattern alphanumerisch sortiert', {
+                pattern: patternConfig.pattern,
+                gruppe: group.name,
+                anzahlKanäle: patternConfig.channels.length,
+                sortierteKanalNamen: patternConfig.channels.map(c => c.name),
+                sortedChannels: this._sortedChannels,
+              });
+            }
+
+            this._debug('sortedChannels: Kanal erfolgreich zu Pattern hinzugefügt', {
+              kanalName: channel.name,
+              gruppe: group.name,
+              pattern: patternConfig.pattern,
+              style: patternConfig.style,
+              neueAnzahlKanäleInPattern: patternConfig.channels.length,
+              gesamtAnzahlKanäle: this._sortedChannels.flatMap(g =>
+                g.patterns.flatMap(p => p.channels)
+              ).length,
+              sortedChannels: this._sortedChannels,
+            });
+            return;
+          }
+        } catch (error) {
+          this._debug('sortedChannels: Fehler beim Pattern-Matching', {
+            pattern: patternConfig.pattern,
+            kanalName: channel.name,
+            gruppe: group.name,
+            error: error.message,
+            sortedChannels: this._sortedChannels,
+          });
+        }
+      }
+    }
+
+    // Kanal passt zu keiner Gruppe, füge zur "Sonstige"-Gruppe hinzu
+    const sonstigeGroup = this._sortedChannels.find(g => g.name === 'Sonstige');
+    if (sonstigeGroup) {
+      // Erstelle ein Pattern für die Sonstige-Gruppe, falls noch keines existiert
+      if (sonstigeGroup.patterns.length === 0) {
+        sonstigeGroup.patterns.push({
+          pattern: '.*',
+          style: '',
+          channels: [],
+        });
+      }
+
+      sonstigeGroup.patterns[0].channels.push(channel);
+
+      // Sortiere die Kanäle alphanumerisch nach Namen, wenn mehr als ein Kanal vorhanden ist
+      if (sonstigeGroup.patterns[0].channels.length > 1) {
+        sonstigeGroup.patterns[0].channels.sort((a, b) =>
+          a.name.localeCompare(b.name, 'de', { numeric: true })
+        );
+        this._debug('sortedChannels: Kanäle in Sonstige-Gruppe alphanumerisch sortiert', {
+          anzahlKanäle: sonstigeGroup.patterns[0].channels.length,
+          sortierteKanalNamen: sonstigeGroup.patterns[0].channels.map(c => c.name),
+          sortedChannels: this._sortedChannels,
+        });
+      }
+
+      this._debug('sortedChannels: Kanal zur Sonstige-Gruppe hinzugefügt', {
+        kanalName: channel.name,
+        neueAnzahlKanäleInSonstige: sonstigeGroup.patterns[0].channels.length,
+        gesamtAnzahlKanäle: this._sortedChannels.flatMap(g => g.patterns.flatMap(p => p.channels))
+          .length,
+        sortedChannels: this._sortedChannels,
+      });
+    } else {
+      this._debug('sortedChannels: FEHLER - Sonstige-Gruppe nicht gefunden', {
+        kanalName: channel.name,
+        verfügbareGruppen: this._sortedChannels.map(g => g.name),
+        sortedChannels: this._sortedChannels,
+      });
+    }
+  }
+
+  // Neue Methode: Aktualisiert die Sortierung für alle vorhandenen Kanäle
+  _updateAllChannelSorting() {
+    this._debug('sortedChannels: Starte Neusortierung aller Kanäle', {
+      anzahlVorhandeneKanäle: this._channels.size,
+      anzahlGruppen: this._sortedChannels.length,
+      sortedChannels: this._sortedChannels,
+    });
+
+    // Leere alle Pattern-Kanäle
+    this._sortedChannels.forEach(group => {
+      group.patterns.forEach(pattern => {
+        const alteAnzahl = pattern.channels.length;
+        pattern.channels = [];
+        this._debug('sortedChannels: Pattern geleert', {
+          gruppenName: group.name,
+          pattern: pattern.pattern,
+          alteAnzahlKanäle: alteAnzahl,
+          neueAnzahlKanäle: 0,
+          sortedChannels: this._sortedChannels,
+        });
+      });
+    });
+
+    // Sortiere alle Kanäle neu ein
+    Array.from(this._channels.values()).forEach(channel => {
+      this._sortChannelIntoStructure(channel);
+    });
+
+    // Sortiere alle Pattern-Kanäle alphanumerisch
+    this._sortAllPatternChannels();
+
+    this._debug('sortedChannels: Neusortierung aller Kanäle abgeschlossen', {
+      gesamtAnzahlKanäle: this._sortedChannels.flatMap(g => g.patterns.flatMap(p => p.channels))
+        .length,
+      gruppenStatus: this._sortedChannels.map(g => ({
+        name: g.name,
+        patterns: g.patterns.map(p => ({
+          pattern: p.pattern,
+          anzahlKanäle: p.channels.length,
+          kanalNamen: p.channels.map(c => c.name),
+        })),
+      })),
+      sortedChannels: this._sortedChannels,
+    });
+  }
+
+  // Neue Hilfsmethode: Sortiert alle Kanäle in allen Patterns alphanumerisch
+  _sortAllPatternChannels() {
+    this._sortedChannels.forEach(group => {
+      group.patterns.forEach(pattern => {
+        if (pattern.channels.length > 1) {
+          pattern.channels.sort((a, b) => a.name.localeCompare(b.name, 'de', { numeric: true }));
+          this._debug('sortedChannels: Pattern-Kanäle alphanumerisch sortiert', {
+            gruppe: group.name,
+            pattern: pattern.pattern,
+            anzahlKanäle: pattern.channels.length,
+            sortierteKanalNamen: pattern.channels.map(c => c.name),
+            sortedChannels: this._sortedChannels,
+          });
+        }
+      });
+    });
   }
 }
 

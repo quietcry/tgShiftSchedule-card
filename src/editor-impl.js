@@ -2,11 +2,14 @@ import { html, css } from 'lit';
 import { property } from 'lit/decorators.js';
 import { EditorBase } from './editor-base.js';
 import { CardName, Version, DebugMode, showVersion } from './card-config.js';
+import yaml from 'js-yaml';
 
 export class EditorImpl extends EditorBase {
   static properties = {
     ...super.properties,
     _selectedTab: { type: Number },
+    _yamlError: { type: String },
+    _groupOrderError: { type: String },
   };
 
   constructor() {
@@ -16,6 +19,7 @@ export class EditorImpl extends EditorBase {
       date: '',
       max_items: 10,
       show_channel: true,
+      show_channel_groups: true,
       show_time: true,
       show_duration: true,
       show_title: true,
@@ -24,12 +28,23 @@ export class EditorImpl extends EditorBase {
     });
     if (DebugMode) console.debug(`[${CardName}] EditorImpl-Modul wird geladen`);
     this._selectedTab = 0;
+    this._yamlError = '';
+    this._groupOrderError = '';
   }
 
   async firstUpdated() {
     if (this.constructor.debugMode)
       console.debug(`[${this.constructor.cardName}] EditorImpl firstUpdated wird aufgerufen`);
     await super.firstUpdated();
+
+    // Initialisiere group_order als YAML-String, falls es als Array vorliegt
+    if (this.config.group_order && Array.isArray(this.config.group_order)) {
+      const yamlString = this._convertArrayToYaml(this.config.group_order);
+      this.config.group_order = yamlString;
+      this.config.group_order_parsed = this.config.group_order;
+      this._debug('EditorImpl: group_order beim ersten Laden initialisiert:', yamlString);
+    }
+
     if (this.constructor.debugMode)
       console.debug(`[${this.constructor.cardName}] EditorImpl firstUpdated abgeschlossen`);
   }
@@ -49,22 +64,20 @@ export class EditorImpl extends EditorBase {
         <ha-form
           .hass=${this.hass}
           .data=${this.config}
-          .schema=${[
-            {
-              name: 'entity',
-              selector: {
-                entity: {
-                  domain: 'sensor',
-                  filter: {
-                    attribute: 'epg_info',
-                  },
-                },
-              },
-            },
-          ]}
+          .schema=${this._getFormSchema()}
           .computeLabel=${this._computeLabel}
           @value-changed=${this._valueChanged}
+          class=${this._yamlError ? 'yaml-error-input' : ''}
         ></ha-form>
+
+        ${this._yamlError
+          ? html`
+              <div class="yaml-error">
+                <ha-icon icon="mdi:alert-circle"></ha-icon>
+                <span>YAML-Fehler: ${this._yamlError}</span>
+              </div>
+            `
+          : ''}
 
         <ha-expansion-panel>
           <span slot="header">Anzeige</span>
@@ -122,17 +135,31 @@ export class EditorImpl extends EditorBase {
                 .data=${this.config}
                 .schema=${[
                   {
-                    name: 'sortierung',
+                    name: 'group_order',
                     selector: {
-                      template: {
+                      text: {
                         multiline: true,
                       },
                     },
                   },
+                  {
+                    name: 'show_channel_groups',
+                    selector: { boolean: {} },
+                  },
                 ]}
                 .computeLabel=${this._computeLabel}
                 @value-changed=${this._valueChanged}
+                class=${this._groupOrderError ? 'yaml-error-input' : ''}
               ></ha-form>
+
+              ${this._groupOrderError
+                ? html`
+                    <div class="yaml-error">
+                      <ha-icon icon="mdi:alert-circle"></ha-icon>
+                      <span>group_order YAML-Fehler: ${this._groupOrderError}</span>
+                    </div>
+                  `
+                : ''}
             </ha-expansion-panel>
 
             <ha-expansion-panel>
@@ -213,7 +240,7 @@ export class EditorImpl extends EditorBase {
               {
                 name: 'whitelist',
                 selector: {
-                  template: {
+                  text: {
                     multiline: true,
                   },
                 },
@@ -221,7 +248,7 @@ export class EditorImpl extends EditorBase {
               {
                 name: 'blacklist',
                 selector: {
-                  template: {
+                  text: {
                     multiline: true,
                   },
                 },
@@ -233,6 +260,33 @@ export class EditorImpl extends EditorBase {
         </ha-expansion-panel>
       </div>
     `;
+  }
+
+  updated(changedProps) {
+    super.updated?.(changedProps);
+    // Nach dem Rendern: Fehler-Outline setzen
+    if (this._yamlError) {
+      const form = this.renderRoot.querySelector('ha-form');
+      if (form) {
+        // Versuche mwc-textarea oder ha-textfield zu finden
+        const textarea = form.shadowRoot?.querySelector('mwc-textarea, ha-textfield, textarea');
+        if (textarea) {
+          textarea.setAttribute('invalid', 'true');
+          textarea.style.setProperty('border', '2px solid var(--error-color)', 'important');
+          textarea.style.setProperty('outline', '2px solid var(--error-color)', 'important');
+        }
+      }
+    } else {
+      const form = this.renderRoot.querySelector('ha-form');
+      if (form) {
+        const textarea = form.shadowRoot?.querySelector('mwc-textarea, ha-textfield, textarea');
+        if (textarea) {
+          textarea.removeAttribute('invalid');
+          textarea.style.removeProperty('border');
+          textarea.style.removeProperty('outline');
+        }
+      }
+    }
   }
 
   _computeLabel(schema) {
@@ -255,11 +309,13 @@ export class EditorImpl extends EditorBase {
         return 'Titel anzeigen';
       case 'show_description':
         return 'Beschreibung anzeigen';
+      case 'show_channel_groups':
+        return 'Kanalgruppen anzeigen';
       case 'whitelist':
         return 'Whitelist (YAML)';
       case 'blacklist':
         return 'Blacklist (YAML)';
-      case 'sortierung':
+      case 'group_order':
         return 'Sortierung (YAML)';
       default:
         return schema.name;
@@ -268,20 +324,34 @@ export class EditorImpl extends EditorBase {
 
   _valueChanged(ev) {
     this._debug('EditorImpl _valueChanged wird aufgerufen mit:', ev.detail);
+
     const newValue = ev.detail.value;
 
-    // Prüfe, ob ein Unter-Expander geöffnet wurde
-    if (newValue.expanded) {
-      // Schließe alle anderen Unter-Expander
-      const allExpanders = ['Liste', 'epg', 'Tabelle'];
-      allExpanders.forEach(expander => {
-        if (expander !== newValue.name) {
-          this.config[`${expander.toLowerCase()}_expanded`] = false;
+    // YAML-Validierung für group_order
+    if (newValue.group_order !== undefined) {
+      const validationResult = this._validateYaml(newValue.group_order);
+      if (!validationResult.isValid) {
+        this._debug('EditorImpl: group_order YAML-Validierungsfehler:', validationResult.error);
+        console.warn('group_order YAML-Validierungsfehler:', validationResult.error);
+        this._groupOrderError = validationResult.error;
+        this.requestUpdate();
+      } else {
+        this._debug('EditorImpl: group_order YAML ist gültig');
+        if (this._groupOrderError) {
+          this._groupOrderError = '';
+          this.requestUpdate();
         }
-      });
 
-      // Setze den view_mode basierend auf dem geöffneten Expander
-      this.config.view_mode = newValue.name;
+        // Parse den String als YAML für die Verwendung
+        try {
+          const groupOrder = yaml.load(newValue.group_order);
+          this._debug('EditorImpl: group_order YAML geparst:', groupOrder);
+          this.config.group_order_parsed = groupOrder;
+        } catch (error) {
+          this._debug('EditorImpl: Fehler beim Parsen der group_order:', error);
+          this.config.group_order_parsed = [];
+        }
+      }
     }
 
     this.config = {
@@ -296,6 +366,85 @@ export class EditorImpl extends EditorBase {
         composed: true,
       })
     );
+  }
+
+  _parseGroupOrderYaml(yamlString) {
+    if (!yamlString || !yamlString.trim()) {
+      this._debug('EditorImpl: Leere YAML-String, gebe leeres Array zurück');
+      return [];
+    }
+
+    this._debug('EditorImpl: Parse YAML-String:', yamlString);
+
+    const lines = yamlString
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => line);
+    const groups = [];
+    let currentGroup = null;
+
+    for (const line of lines) {
+      this._debug('EditorImpl: Verarbeite Zeile:', line);
+
+      // Prüfe ob es eine Gruppe ist (beginnt mit - und hat keine Unterpunkte)
+      if (line.startsWith('- ') && !line.includes('  - ') && !line.includes('name:')) {
+        const groupName = line.substring(2).trim();
+        if (groupName) {
+          this._debug('EditorImpl: Neue Gruppe gefunden:', groupName);
+          currentGroup = {
+            name: groupName,
+            channels: [],
+          };
+          groups.push(currentGroup);
+        }
+      }
+      // Prüfe ob es ein Kanal ist (hat Einrückung)
+      else if (line.startsWith('  - ') && currentGroup) {
+        const channelName = line.substring(4).trim();
+        if (channelName) {
+          this._debug('EditorImpl: Kanal zu Gruppe hinzugefügt:', channelName);
+          currentGroup.channels.push({
+            name: channelName,
+          });
+        }
+      }
+      // Ignoriere andere Zeilen (tolerant)
+      else {
+        this._debug('EditorImpl: Ignoriere Zeile:', line);
+      }
+    }
+
+    this._debug('EditorImpl: YAML geparst:', { yamlString, result: groups });
+
+    // Sicherheitscheck: Stelle sicher, dass es ein Array ist
+    if (!Array.isArray(groups)) {
+      this._debug('EditorImpl: Fehler - Ergebnis ist kein Array:', groups);
+      return [];
+    }
+
+    return groups;
+  }
+
+  _convertArrayToYaml(groupArray) {
+    if (!Array.isArray(groupArray) || groupArray.length === 0) {
+      return '';
+    }
+
+    let yamlString = '';
+    groupArray.forEach(group => {
+      if (group.name) {
+        yamlString += `- ${group.name}\n`;
+        if (group.channels && Array.isArray(group.channels)) {
+          group.channels.forEach(channel => {
+            if (channel.name) {
+              yamlString += `  - ${channel.name}\n`;
+            }
+          });
+        }
+      }
+    });
+
+    return yamlString.trim();
   }
 
   _handleViewModeChange(mode, event) {
@@ -315,6 +464,24 @@ export class EditorImpl extends EditorBase {
     } else {
       // Wenn der Schalter deaktiviert werden soll, setzen wir ihn wieder auf checked
       event.target.checked = true;
+    }
+  }
+
+  _validateYaml(yamlString) {
+    if (!yamlString || yamlString.trim() === '') {
+      return { isValid: true, error: null };
+    }
+
+    try {
+      // Verwende js-yaml für professionelle YAML-Validierung
+      yaml.load(yamlString);
+      return { isValid: true, error: null };
+    } catch (error) {
+      // js-yaml gibt detaillierte Fehlermeldungen zurück
+      return {
+        isValid: false,
+        error: `Zeile ${error.mark?.line || 'unbekannt'}: ${error.message}`,
+      };
     }
   }
 
@@ -342,6 +509,51 @@ export class EditorImpl extends EditorBase {
     }
     ha-expansion-panel:not([expanded]) {
       --expansion-panel-header-background: var(--primary-background-color);
+    }
+    .yaml-error {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 8px 0;
+      padding: 12px;
+      background-color: var(--error-color);
+      color: white;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+    .yaml-error ha-icon {
+      color: white;
+    }
+    .yaml-error-input,
+    .yaml-error-input ha-textarea,
+    .yaml-error-input ha-textfield,
+    .yaml-error-input mwc-textarea,
+    .yaml-error-input mwc-textfield {
+      --mdc-text-field-outline-color: var(--error-color) !important;
+      --mdc-text-field-focus-outline-color: var(--error-color) !important;
+      --mdc-text-field-hover-outline-color: var(--error-color) !important;
+      --mdc-text-field-label-ink-color: var(--error-color) !important;
+      --mdc-text-field-ink-color: var(--error-color) !important;
+    }
+    .yaml-error-input ha-textarea {
+      --mdc-text-field-outline-color: var(--error-color) !important;
+      --mdc-text-field-focus-outline-color: var(--error-color) !important;
+      --mdc-text-field-hover-outline-color: var(--error-color) !important;
+    }
+    .yaml-error-input ha-textfield {
+      --mdc-text-field-outline-color: var(--error-color) !important;
+      --mdc-text-field-focus-outline-color: var(--error-color) !important;
+      --mdc-text-field-hover-outline-color: var(--error-color) !important;
+    }
+    .yaml-error-input mwc-textarea {
+      --mdc-text-field-outline-color: var(--error-color) !important;
+      --mdc-text-field-focus-outline-color: var(--error-color) !important;
+      --mdc-text-field-hover-outline-color: var(--error-color) !important;
+    }
+    .yaml-error-input mwc-textfield {
+      --mdc-text-field-outline-color: var(--error-color) !important;
+      --mdc-text-field-focus-outline-color: var(--error-color) !important;
+      --mdc-text-field-hover-outline-color: var(--error-color) !important;
     }
   `;
 
@@ -394,5 +606,49 @@ export class EditorImpl extends EditorBase {
         description: 'Kanäle, die zuerst angezeigt werden sollen',
       },
     ];
+  }
+
+  _getFormSchema() {
+    return [
+      {
+        name: 'entity',
+        selector: {
+          entity: {
+            domain: 'sensor',
+            filter: {
+              attribute: 'epg_info',
+            },
+          },
+        },
+      },
+    ];
+  }
+
+  _getEpgSchema() {
+    const schema = [
+      {
+        name: 'group_order',
+        selector: {
+          text: {
+            multiline: true,
+          },
+        },
+      },
+      // Fehlermeldung als Info-Feld direkt nach group_order
+      ...(this._groupOrderError
+        ? [
+            {
+              name: 'group_order_error',
+              type: 'custom:markdown',
+              content: `**<span style=\"color:var(--error-color)\">${this._groupOrderError}</span>**`,
+            },
+          ]
+        : []),
+      {
+        name: 'show_channel_groups',
+        selector: { boolean: {} },
+      },
+    ];
+    return schema;
   }
 }

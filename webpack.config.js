@@ -74,7 +74,7 @@ export default {
     extensions: ['.js', '.mjs'],
     alias: {
       'lit': path.resolve(__dirname, 'node_modules/lit')
-    }
+  }
   },
   experiments: {
     topLevelAwait: true

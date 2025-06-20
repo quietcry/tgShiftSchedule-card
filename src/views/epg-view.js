@@ -191,7 +191,7 @@ export class EPGView extends ViewBase {
   async _fetchViewData(config) {
     this._debug('EPG-View: _fetchViewData gestartet', {
       entity: config.entity,
-      hasDataProvider: !!this._dataProvider
+      hasDataProvider: !!this._dataProvider,
     });
 
     if (!this._dataProvider) {
@@ -206,7 +206,7 @@ export class EPGView extends ViewBase {
     }
 
     this._debug('EPG-View: Starte EPG-Daten Abruf', {
-      hasEpgBox: !!epgBox
+      hasEpgBox: !!epgBox,
     });
 
     return this._dataProvider.fetchEpgData(
@@ -215,16 +215,16 @@ export class EPGView extends ViewBase {
       undefined, // Kein date
       config,
       // Callback für EPG-Daten
-      (data) => {
+      data => {
         this._debug('EPG-View: Neue EPG-Daten empfangen', {
           kanal: data.channel.name,
-          anzahlProgramme: data.programs.length
+          anzahlProgramme: data.programs.length,
         });
 
         // Erstelle ein vollständiges Teil-EPG
         const teilEpg = {
           channel: data.channel,
-          programs: data.programs
+          programs: data.programs,
         };
 
         // Übergebe das Teil-EPG an die EPG-Box
@@ -349,6 +349,7 @@ export class EPGView extends ViewBase {
           .showDescription=${this.config.show_description}
           .selectedChannel=${this._selectedChannel}
           .channelOrder=${this.config.group_order || []}
+          .showChannelGroups=${this.config.show_channel_groups || false}
           @channel-selected=${this._onChannelSelected}
           @program-selected=${this._onProgramSelected}
           @epg-box-ready=${this._onEpgBoxReady}

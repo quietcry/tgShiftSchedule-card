@@ -154,14 +154,14 @@ export class DataProvider {
       entity,
       timeWindow,
       date,
-      hasCallback: typeof onEpgData === 'function'
+      hasCallback: typeof onEpgData === 'function',
     });
 
     try {
       const channelList = await this.fetchChannelList(entity, config);
       this._debug('DataProvider: Kanalliste empfangen', {
         anzahlKanäle: channelList.length,
-        kanäle: channelList.map(c => c.name)
+        kanäle: channelList.map(c => c.name),
       });
 
       const epgData = [];
@@ -169,21 +169,21 @@ export class DataProvider {
         try {
           this._debug('DataProvider: Hole EPG-Daten für Kanal', {
             kanal: channel.name,
-            id: channel.id
+            id: channel.id,
           });
 
           const programs = await this.fetchChannelEpg(entity, channel.id, timeWindow, date);
           this._debug('DataProvider: EPG-Daten empfangen', {
             kanal: channel.name,
             anzahlProgramme: programs.length,
-            programme: programs.map(p => p.title)
+            programme: programs.map(p => p.title),
           });
 
           // Übergebe die EPG-Daten über den Callback
           if (typeof onEpgData === 'function') {
             this._debug('DataProvider: Übergebe EPG-Daten an Callback', {
               kanal: channel.name,
-              anzahlProgramme: programs.length
+              anzahlProgramme: programs.length,
             });
             onEpgData({
               channel: channel,
@@ -197,24 +197,21 @@ export class DataProvider {
             programs: programs,
           });
         } catch (error) {
-          this._debug(
-            'DataProvider: Fehler beim Abrufen der EPG-Daten für Kanal',
-            {
-              kanal: channel.name,
-              fehler: error.message
-            }
-          );
+          this._debug('DataProvider: Fehler beim Abrufen der EPG-Daten für Kanal', {
+            kanal: channel.name,
+            fehler: error.message,
+          });
         }
       }
 
       this._debug('DataProvider: fetchEpgData abgeschlossen', {
         anzahlKanäle: epgData.length,
-        gesamtProgramme: epgData.reduce((sum, c) => sum + c.programs.length, 0)
+        gesamtProgramme: epgData.reduce((sum, c) => sum + c.programs.length, 0),
       });
       return epgData;
     } catch (error) {
       this._debug('DataProvider: Fehler in fetchEpgData', {
-        fehler: error.message
+        fehler: error.message,
       });
       throw error;
     }

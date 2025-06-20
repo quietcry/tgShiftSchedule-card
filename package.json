@@ -39,6 +39,7 @@
     "webpack-dev-server": "^5.0.2"
   },
   "dependencies": {
-    "custom-card-helpers": "^1.9.0"
+    "custom-card-helpers": "^1.9.0",
+    "js-yaml": "^4.1.0"
   }
 }

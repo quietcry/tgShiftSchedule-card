@@ -39,6 +39,8 @@ export class CardImpl extends CardBase {
       show_duration: true,
       show_title: true,
       show_description: true,
+      show_channel_groups: false,
+      test_template: '',
     };
   }
 
@@ -63,7 +65,9 @@ export class CardImpl extends CardBase {
       show_duration: true,
       show_title: true,
       show_description: true,
+      show_channel_groups: false,
       view_mode: 'epg',
+      test_template: '',
     };
   }
 
