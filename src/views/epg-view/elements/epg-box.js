@@ -313,6 +313,8 @@ export class EpgBox extends EpgElementBase {
   render() {
     this._debug('EPG-Box: Render wird aufgerufen', {
       anzahlKanale: this._channels.size,
+      showChannelGroups: this.showChannelGroups,
+      sortedChannels: this._sortedChannels,
     });
 
     if (!this._channels.size) {
@@ -326,12 +328,23 @@ export class EpgBox extends EpgElementBase {
     // Berechne Scale für die Darstellung
     this.scale = this._calculateScale();
 
-    // Verwende alle verfügbaren Kanäle direkt
-    const allChannels = Array.from(this._channels.values());
+    // Verwende gruppierte Kanäle wenn showChannelGroups aktiviert ist
+    let channelsToRender = [];
+    if (this.showChannelGroups && this._sortedChannels.length > 0) {
+      // Verwende die gruppierte Struktur
+      this._sortedChannels.forEach(group => {
+        group.patterns.forEach(pattern => {
+          channelsToRender.push(...pattern.channels);
+        });
+      });
+    } else {
+      // Verwende alle verfügbaren Kanäle direkt
+      channelsToRender = Array.from(this._channels.values());
+    }
 
     console.log(
-      'EPG-Box: Alle Kanäle:',
-      allChannels.map(c => ({
+      'EPG-Box: Kanäle zum Rendern:',
+      channelsToRender.map(c => ({
         name: c.name,
         id: c.id,
         anzahlProgramme: c.programs?.length || 0,
@@ -340,135 +353,23 @@ export class EpgBox extends EpgElementBase {
     );
 
     this._debug('EPG-Box: Verwende Kanäle für Rendering', {
-      anzahlKanale: allChannels.length,
-      kanalNamen: allChannels.map(c => c.name),
+      anzahlKanale: channelsToRender.length,
+      kanalNamen: channelsToRender.map(c => c.name),
       scale: this.scale,
       channelsParameters: this._channelsParameters,
+      showChannelGroups: this.showChannelGroups,
     });
 
     return html`
       <div class="channelBox">
-        ${allChannels.map(channel => {
-          // Berechne Höhenklassen für Channel-Row basierend auf den Anzeigeoptionen
-          const heightClasses = this._calculateHeightClasses(
-            this.showTime,
-            this.showDuration,
-            this.showDescription,
-            true, // Zeit ist verfügbar
-            true, // Dauer ist verfügbar
-            false, // Channel hat keine Beschreibung
-            this.showShortText // ShortText-Option
-          );
-
-          return html`
-            <div class="channelRow epg-row-height ${heightClasses}">
-              <div class="channelRowContent">${channel.name}</div>
-            </div>
-          `;
-        })}
+        ${this.showChannelGroups && this._sortedChannels.length > 0
+          ? this._renderGroupedChannels()
+          : this._renderSimpleChannels(channelsToRender)}
       </div>
       <div class="programBox">
-        ${allChannels.map((channel, rowIndex) => {
-          const programs = this._getProgramsForChannel(channel, this._generateTimeSlots());
-
-          console.log(
-            `EPG-Box: Programme für ${channel.name}:`,
-            programs.length,
-            programs.map(p => p.title)
-          );
-
-          return html`
-            <div
-              class="programRow epg-row-height ${this._calculateHeightClasses(
-                this.showTime,
-                this.showDuration,
-                this.showDescription,
-                true, // Zeit ist verfügbar für Programme
-                true, // Dauer ist verfügbar für Programme
-                false, // Beschreibung wird pro Programm-Item berechnet
-                this.showShortText // ShortText-Option
-              )}"
-            >
-              ${programs.length > 0
-                ? (() => {
-                    // Füge leeres Programm-Item am Anfang hinzu, wenn minTime gesetzt ist
-                    const items = [];
-                    let itemIndex = 0;
-
-                    if (this._channelsParameters.minTime > 0) {
-                      const firstProgram = programs[0];
-                      const gapDuration = this._calculateDuration(
-                        this._channelsParameters.minTime,
-                        firstProgram.start
-                      );
-
-                      // Füge leeres Item immer hinzu, auch wenn gapDuration 0 ist
-                      items.push(html`
-                        <epg-program-item
-                          .start=${this._channelsParameters.minTime}
-                          .stop=${firstProgram.start}
-                          .duration=${gapDuration}
-                          .scale=${this.scale}
-                          .title=${''}
-                          .description=${''}
-                          .shortText=${''}
-                          .isCurrent=${false}
-                          .showTime=${false}
-                          .showDuration=${false}
-                          .showDescription=${false}
-                          .showShortText=${this.showShortText}
-                          .rowIndex=${rowIndex}
-                          .itemIndex=${itemIndex++}
-                        ></epg-program-item>
-                      `);
-                    }
-
-                    // Füge alle echten Programme hinzu
-                    programs.forEach(program => {
-                      const duration = this._calculateDuration(
-                        program.start,
-                        program.end || program.stop
-                      );
-
-                      items.push(html`
-                        <epg-program-item
-                          .start=${program.start}
-                          .stop=${program.end || program.stop}
-                          .duration=${duration}
-                          .scale=${this.scale}
-                          .title=${program.title}
-                          .description=${program.description || ''}
-                          .shortText=${program.shorttext || ''}
-                          .isCurrent=${this._isCurrentProgram(program)}
-                          .showTime=${this.showTime}
-                          .showDuration=${this.showDuration}
-                          .showDescription=${this.showDescription}
-                          .showShortText=${this.showShortText}
-                          .rowIndex=${rowIndex}
-                          .itemIndex=${itemIndex++}
-                          @program-selected=${e => this._onProgramSelected(e.detail)}
-                        ></epg-program-item>
-                      `);
-                    });
-
-                    return items;
-                  })()
-                : html`<div
-                    class="noPrograms epg-row-height ${this._calculateHeightClasses(
-                      this.showTime,
-                      this.showDuration,
-                      this.showDescription,
-                      false, // Keine Zeit
-                      false, // Keine Dauer
-                      false, // Keine Beschreibung
-                      false // Kein ShortText
-                    )}"
-                  >
-                    Keine Programme verfügbar
-                  </div>`}
-            </div>
-          `;
-        })}
+        ${this.showChannelGroups && this._sortedChannels.length > 0
+          ? this._renderGroupedPrograms()
+          : this._renderSimplePrograms(channelsToRender)}
       </div>
     `;
   }
@@ -1153,6 +1054,290 @@ export class EpgBox extends EpgElementBase {
         this.requestUpdate();
       }
     }
+  }
+
+  _renderSimpleChannels(channels) {
+    return channels.map(channel => {
+      // Berechne Höhenklassen für Channel-Row basierend auf den Anzeigeoptionen
+      const heightClasses = this._calculateHeightClasses(
+        this.showTime,
+        this.showDuration,
+        this.showDescription,
+        true, // Zeit ist verfügbar
+        true, // Dauer ist verfügbar
+        false, // Channel hat keine Beschreibung
+        this.showShortText // ShortText-Option
+      );
+
+      return html`
+        <div class="channelRow epg-row-height ${heightClasses}">
+          <div class="channelRowContent">${channel.name}</div>
+        </div>
+      `;
+    });
+  }
+
+  _renderGroupedChannels() {
+    return this._sortedChannels.map(group => {
+      // Sammle alle Kanäle aus allen Patterns der Gruppe
+      const groupChannels = group.patterns.flatMap(pattern => pattern.channels);
+
+      if (groupChannels.length === 0) {
+        return html``; // Leere Gruppe nicht anzeigen
+      }
+
+      return html`
+        <!-- Gruppen-Header -->
+        <div class="channelGroup">${group.name}</div>
+        <!-- Kanäle der Gruppe -->
+        ${groupChannels.map(channel => {
+          // Berechne Höhenklassen für Channel-Row basierend auf den Anzeigeoptionen
+          const heightClasses = this._calculateHeightClasses(
+            this.showTime,
+            this.showDuration,
+            this.showDescription,
+            true, // Zeit ist verfügbar
+            true, // Dauer ist verfügbar
+            false, // Channel hat keine Beschreibung
+            this.showShortText // ShortText-Option
+          );
+
+          return html`
+            <div class="channelRow epg-row-height ${heightClasses}">
+              <div class="channelRowContent">${channel.name}</div>
+            </div>
+          `;
+        })}
+      `;
+    });
+  }
+
+  _renderGroupedPrograms() {
+    let rowIndex = 0;
+    return this._sortedChannels.map(group => {
+      // Sammle alle Kanäle aus allen Patterns der Gruppe
+      const groupChannels = group.patterns.flatMap(pattern => pattern.channels);
+
+      if (groupChannels.length === 0) {
+        return html``; // Leere Gruppe nicht anzeigen
+      }
+
+      return html`
+        <!-- Leere Zeilen für Gruppen-Header -->
+        <div class="programRow epg-row-height">
+          <div class="noPrograms">
+            <!-- Platzhalter für Gruppen-Header -->
+          </div>
+        </div>
+        <!-- Programme der Gruppe -->
+        ${groupChannels.map(channel => {
+          const programs = this._getProgramsForChannel(channel, this._generateTimeSlots());
+          const currentRowIndex = rowIndex++;
+
+          console.log(
+            `EPG-Box: Programme für ${channel.name}:`,
+            programs.length,
+            programs.map(p => p.title)
+          );
+
+          return html`
+            <div
+              class="programRow epg-row-height ${this._calculateHeightClasses(
+                this.showTime,
+                this.showDuration,
+                this.showDescription,
+                true, // Zeit ist verfügbar für Programme
+                true, // Dauer ist verfügbar für Programme
+                false, // Beschreibung wird pro Programm-Item berechnet
+                this.showShortText // ShortText-Option
+              )}"
+            >
+              ${programs.length > 0
+                ? (() => {
+                    // Füge leeres Programm-Item am Anfang hinzu, wenn minTime gesetzt ist
+                    const items = [];
+                    let itemIndex = 0;
+
+                    if (this._channelsParameters.minTime > 0) {
+                      const firstProgram = programs[0];
+                      const gapDuration = this._calculateDuration(
+                        this._channelsParameters.minTime,
+                        firstProgram.start
+                      );
+
+                      // Füge leeres Item immer hinzu, auch wenn gapDuration 0 ist
+                      items.push(html`
+                        <epg-program-item
+                          .start=${this._channelsParameters.minTime}
+                          .stop=${firstProgram.start}
+                          .duration=${gapDuration}
+                          .scale=${this.scale}
+                          .title=${''}
+                          .description=${''}
+                          .shortText=${''}
+                          .isCurrent=${false}
+                          .showTime=${false}
+                          .showDuration=${false}
+                          .showDescription=${false}
+                          .showShortText=${this.showShortText}
+                          .rowIndex=${currentRowIndex}
+                          .itemIndex=${itemIndex++}
+                        ></epg-program-item>
+                      `);
+                    }
+
+                    // Füge alle echten Programme hinzu
+                    programs.forEach(program => {
+                      const duration = this._calculateDuration(
+                        program.start,
+                        program.end || program.stop
+                      );
+
+                      items.push(html`
+                        <epg-program-item
+                          .start=${program.start}
+                          .stop=${program.end || program.stop}
+                          .duration=${duration}
+                          .scale=${this.scale}
+                          .title=${program.title}
+                          .description=${program.description || ''}
+                          .shortText=${program.shorttext || ''}
+                          .isCurrent=${this._isCurrentProgram(program)}
+                          .showTime=${this.showTime}
+                          .showDuration=${this.showDuration}
+                          .showDescription=${this.showDescription}
+                          .showShortText=${this.showShortText}
+                          .rowIndex=${currentRowIndex}
+                          .itemIndex=${itemIndex++}
+                          @program-selected=${e => this._onProgramSelected(e.detail)}
+                        ></epg-program-item>
+                      `);
+                    });
+
+                    return items;
+                  })()
+                : html`<div
+                    class="noPrograms epg-row-height ${this._calculateHeightClasses(
+                      this.showTime,
+                      this.showDuration,
+                      this.showDescription,
+                      false, // Keine Zeit
+                      false, // Keine Dauer
+                      false, // Keine Beschreibung
+                      false // Kein ShortText
+                    )}"
+                  >
+                    Keine Programme verfügbar
+                  </div>`}
+            </div>
+          `;
+        })}
+      `;
+    });
+  }
+
+  _renderSimplePrograms(channels) {
+    return channels.map((channel, rowIndex) => {
+      const programs = this._getProgramsForChannel(channel, this._generateTimeSlots());
+
+      console.log(
+        `EPG-Box: Programme für ${channel.name}:`,
+        programs.length,
+        programs.map(p => p.title)
+      );
+
+      return html`
+        <div
+          class="programRow epg-row-height ${this._calculateHeightClasses(
+            this.showTime,
+            this.showDuration,
+            this.showDescription,
+            true, // Zeit ist verfügbar für Programme
+            true, // Dauer ist verfügbar für Programme
+            false, // Beschreibung wird pro Programm-Item berechnet
+            this.showShortText // ShortText-Option
+          )}"
+        >
+          ${programs.length > 0
+            ? (() => {
+                // Füge leeres Programm-Item am Anfang hinzu, wenn minTime gesetzt ist
+                const items = [];
+                let itemIndex = 0;
+
+                if (this._channelsParameters.minTime > 0) {
+                  const firstProgram = programs[0];
+                  const gapDuration = this._calculateDuration(
+                    this._channelsParameters.minTime,
+                    firstProgram.start
+                  );
+
+                  // Füge leeres Item immer hinzu, auch wenn gapDuration 0 ist
+                  items.push(html`
+                    <epg-program-item
+                      .start=${this._channelsParameters.minTime}
+                      .stop=${firstProgram.start}
+                      .duration=${gapDuration}
+                      .scale=${this.scale}
+                      .title=${''}
+                      .description=${''}
+                      .shortText=${''}
+                      .isCurrent=${false}
+                      .showTime=${false}
+                      .showDuration=${false}
+                      .showDescription=${false}
+                      .showShortText=${this.showShortText}
+                      .rowIndex=${rowIndex}
+                      .itemIndex=${itemIndex++}
+                    ></epg-program-item>
+                  `);
+                }
+
+                // Füge alle echten Programme hinzu
+                programs.forEach(program => {
+                  const duration = this._calculateDuration(
+                    program.start,
+                    program.end || program.stop
+                  );
+
+                  items.push(html`
+                    <epg-program-item
+                      .start=${program.start}
+                      .stop=${program.end || program.stop}
+                      .duration=${duration}
+                      .scale=${this.scale}
+                      .title=${program.title}
+                      .description=${program.description || ''}
+                      .shortText=${program.shorttext || ''}
+                      .isCurrent=${this._isCurrentProgram(program)}
+                      .showTime=${this.showTime}
+                      .showDuration=${this.showDuration}
+                      .showDescription=${this.showDescription}
+                      .showShortText=${this.showShortText}
+                      .rowIndex=${rowIndex}
+                      .itemIndex=${itemIndex++}
+                      @program-selected=${e => this._onProgramSelected(e.detail)}
+                    ></epg-program-item>
+                  `);
+                });
+
+                return items;
+              })()
+            : html`<div
+                class="noPrograms epg-row-height ${this._calculateHeightClasses(
+                  this.showTime,
+                  this.showDuration,
+                  this.showDescription,
+                  false, // Keine Zeit
+                  false, // Keine Dauer
+                  false, // Keine Beschreibung
+                  false // Kein ShortText
+                )}"
+              >
+                Keine Programme verfügbar
+              </div>`}
+        </div>
+      `;
+    });
   }
 }
 
