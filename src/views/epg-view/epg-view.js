@@ -1,12 +1,11 @@
 import { html, css } from 'lit';
-import { property } from 'lit/decorators.js';
-import { ViewBase } from './view-base.js';
-import { EPGViewBase } from '../lib/epgElements/epg-view-base.js';
-import { EPGTimebar } from '../lib/epgElements/epg-timebar.js';
-import { EPGChannelList } from '../lib/epgElements/epg-channel-list.js';
-import { EPGProgramList } from '../lib/epgElements/epg-program-list.js';
-import { EpgBox } from '../lib/epgElements/epg-box.js';
-import { DataProvider } from '../data-provider.js';
+import { ViewBase } from '../view-base.js';
+import { EpgViewBase } from './epg-view-base.js';
+import { EpgTimebar } from './elements/epg-timebar.js';
+import { EpgChannelList } from './elements/epg-channel-list.js';
+import { EpgProgramList } from './elements/epg-program-list.js';
+import { EpgBox } from './elements/epg-box.js';
+import { DataProvider } from '../../tools/data-provider.js';
 
 export class EPGView extends ViewBase {
   static properties = {
@@ -352,8 +351,8 @@ export class EPGView extends ViewBase {
           .showChannel=${this.config.show_channel}
           .showTime=${this.config.show_time}
           .showDuration=${this.config.show_duration}
-          .showTitle=${this.config.show_title}
           .showDescription=${this.config.show_description}
+          .showShortText=${this.config.show_shorttext}
           .selectedChannel=${this._selectedChannel}
           .channelOrder=${this.config.group_order || []}
           .showChannelGroups=${this.config.show_channel_groups || false}

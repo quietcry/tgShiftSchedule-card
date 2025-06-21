@@ -1,9 +1,6 @@
-import { LitElement } from 'lit';
-import { html, css } from 'lit';
-import { property } from 'lit/decorators.js';
-import { EditorBase } from './editor-base.js';
+import { css } from 'lit';
 import { EditorImpl } from './editor-impl.js';
-import { CardRegname } from './card-config.js';
+import { CardRegname } from '../card-config.js';
 
 export class Editor extends EditorImpl {
   static styles = css`

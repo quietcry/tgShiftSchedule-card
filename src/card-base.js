@@ -1,8 +1,5 @@
-import { LitElement } from 'lit';
-import { html, css } from 'lit';
-import { property } from 'lit/decorators.js';
+import { css } from 'lit';
 import { SuperBase } from './super-base.js';
-import { CardName, Version, DebugMode, showVersion } from './card-config.js';
 
 export class CardBase extends SuperBase {
   static properties = {
@@ -59,7 +56,7 @@ export class CardBase extends SuperBase {
       show_channel: true,
       show_time: true,
       show_duration: true,
-      show_title: true,
+      show_shorttext: false,
       show_description: true,
       view_mode: 'Liste',
     };

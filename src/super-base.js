@@ -1,5 +1,4 @@
 import { LitElement } from 'lit';
-import { property } from 'lit/decorators.js';
 import { CardName, Version, DebugMode, showVersion } from './card-config.js';
 import { css } from 'lit';
 

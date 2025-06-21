@@ -1,6 +1,5 @@
 import { html, css } from 'lit';
-import { property } from 'lit/decorators.js';
-import { ViewBase } from './view-base.js';
+import { ViewBase } from '../view-base.js';
 
 export class TableView extends ViewBase {
   static properties = {
@@ -52,7 +51,7 @@ export class TableView extends ViewBase {
               ${this._config.show_channel ? html`<th>Kanal</th>` : ''}
               ${this._config.show_time ? html`<th>Zeit</th>` : ''}
               ${this._config.show_duration ? html`<th>Dauer</th>` : ''}
-              ${this._config.show_title ? html`<th>Titel</th>` : ''}
+              ${this._config.show_shorttext ? html`<th>Titel</th>` : ''}
               ${this._config.show_description ? html`<th>Beschreibung</th>` : ''}
             </tr>
           </thead>
@@ -66,7 +65,7 @@ export class TableView extends ViewBase {
                     ${this._config.show_duration
                       ? html`<td>${this._formatDuration(show.start, show.stop)}</td>`
                       : ''}
-                    ${this._config.show_title ? html`<td>${show.title}</td>` : ''}
+                    ${this._config.show_shorttext ? html`<td>${show.title}</td>` : ''}
                     ${this._config.show_description ? html`<td>${show.shorttext || ''}</td>` : ''}
                   </tr>
                 `

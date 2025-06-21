@@ -1,6 +1,5 @@
 import { SuperBase } from '../super-base.js';
 import { css } from 'lit';
-import { property } from 'lit/decorators.js';
 
 export class ViewBase extends SuperBase {
   static properties = {

@@ -1,7 +1,5 @@
-import { LitElement } from 'lit';
 import { css } from 'lit';
-import { property } from 'lit/decorators.js';
-import { SuperBase } from './super-base.js';
+import { SuperBase } from '../super-base.js';
 
 export class EditorBase extends SuperBase {
   static properties = {

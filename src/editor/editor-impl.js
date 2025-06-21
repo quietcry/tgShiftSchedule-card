@@ -1,15 +1,15 @@
 import { html, css } from 'lit';
-import { property } from 'lit/decorators.js';
 import { EditorBase } from './editor-base.js';
 import {
   CardName,
+  CardRegname,
   Version,
   DebugMode,
   showVersion,
   DefaultEpgPastTime,
   DefaultEpgFutureTime,
   DefaultEpgShowWidth,
-} from './card-config.js';
+} from '../card-config.js';
 import yaml from 'js-yaml';
 
 export class EditorImpl extends EditorBase {
@@ -30,7 +30,7 @@ export class EditorImpl extends EditorBase {
       show_channel_groups: true,
       show_time: true,
       show_duration: true,
-      show_title: true,
+      show_shorttext: false,
       show_description: true,
       view_mode: 'Liste',
       epgPastTime: DefaultEpgPastTime,
@@ -119,7 +119,7 @@ export class EditorImpl extends EditorBase {
                     selector: { boolean: {} },
                   },
                   {
-                    name: 'show_title',
+                    name: 'show_shorttext',
                     selector: { boolean: {} },
                   },
                   {
@@ -144,20 +144,7 @@ export class EditorImpl extends EditorBase {
               <ha-form
                 .hass=${this.hass}
                 .data=${this.config}
-                .schema=${[
-                  {
-                    name: 'group_order',
-                    selector: {
-                      text: {
-                        multiline: true,
-                      },
-                    },
-                  },
-                  {
-                    name: 'show_channel_groups',
-                    selector: { boolean: {} },
-                  },
-                ]}
+                .schema=${this._getEpgSchema()}
                 .computeLabel=${this._computeLabel}
                 @value-changed=${this._valueChanged}
                 class=${this._groupOrderError ? 'yaml-error-input' : ''}
@@ -199,7 +186,7 @@ export class EditorImpl extends EditorBase {
                     selector: { boolean: {} },
                   },
                   {
-                    name: 'show_title',
+                    name: 'show_shorttext',
                     selector: { boolean: {} },
                   },
                   {
@@ -316,8 +303,8 @@ export class EditorImpl extends EditorBase {
         return 'Zeit anzeigen';
       case 'show_duration':
         return 'Dauer anzeigen';
-      case 'show_title':
-        return 'Titel anzeigen';
+      case 'show_shorttext':
+        return 'Kurztext anzeigen';
       case 'show_description':
         return 'Beschreibung anzeigen';
       case 'show_channel_groups':
@@ -328,6 +315,14 @@ export class EditorImpl extends EditorBase {
         return 'Blacklist (YAML)';
       case 'group_order':
         return 'Sortierung (YAML)';
+      case 'epgPastTime':
+        return 'EPG Vergangenheit (Minuten)';
+      case 'epgFutureTime':
+        return 'EPG Zukunft (Minuten)';
+      case 'epgShowWidth':
+        return 'EPG Anzeigebreite (Minuten)';
+      case 'show_shorttext':
+        return 'Kurztext anzeigen';
       default:
         return schema.name;
     }
@@ -582,7 +577,7 @@ export class EditorImpl extends EditorBase {
       show_channel: true,
       show_time: true,
       show_duration: true,
-      show_title: true,
+      show_shorttext: false,
       show_description: true,
       blacklist: '',
       whitelist: '',
@@ -656,6 +651,39 @@ export class EditorImpl extends EditorBase {
           },
         },
       },
+      {
+        name: 'epgPastTime',
+        selector: {
+          number: {
+            min: 0,
+            max: 1440,
+            step: 5,
+            unit_of_measurement: 'Minuten',
+          },
+        },
+      },
+      {
+        name: 'epgFutureTime',
+        selector: {
+          number: {
+            min: 0,
+            max: 1440,
+            step: 5,
+            unit_of_measurement: 'Minuten',
+          },
+        },
+      },
+      {
+        name: 'epgShowWidth',
+        selector: {
+          number: {
+            min: 30,
+            max: 1440,
+            step: 5,
+            unit_of_measurement: 'Minuten',
+          },
+        },
+      },
     ];
   }
 
@@ -681,6 +709,22 @@ export class EditorImpl extends EditorBase {
         : []),
       {
         name: 'show_channel_groups',
+        selector: { boolean: {} },
+      },
+      {
+        name: 'show_time',
+        selector: { boolean: {} },
+      },
+      {
+        name: 'show_duration',
+        selector: { boolean: {} },
+      },
+      {
+        name: 'show_shorttext',
+        selector: { boolean: {} },
+      },
+      {
+        name: 'show_description',
         selector: { boolean: {} },
       },
       {

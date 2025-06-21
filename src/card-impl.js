@@ -1,7 +1,7 @@
 import { html, css } from 'lit';
 import { CardBase } from './card-base.js';
-import { TableView } from './views/table-view.js';
-import { EPGView } from './views/epg-view.js';
+import { TableView } from './views/table-view/table-view.js';
+import { EPGView } from './views/epg-view/epg-view.js';
 import { CardName, CardRegname, DebugMode } from './card-config.js';
 
 export class CardImpl extends CardBase {

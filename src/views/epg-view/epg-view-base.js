@@ -1,9 +1,10 @@
-import { html, css, LitElement } from 'lit';
+import { html, css } from 'lit';
+import { ViewBase } from '../../views/view-base.js';
 
-export class EPGViewBase extends LitElement {
+export class EpgViewBase extends ViewBase {
   static properties = {
-    config: { type: Object },
-    epgData: { type: Array },
+    ...super.properties,
+    viewType: { type: String },
   };
 
   static styles = css`
@@ -66,8 +67,7 @@ export class EPGViewBase extends LitElement {
 
   constructor() {
     super();
-    this.config = {};
-    this.epgData = [];
+    this.viewType = 'epg';
   }
 
   render() {
@@ -90,4 +90,4 @@ export class EPGViewBase extends LitElement {
   }
 }
 
-customElements.define('epg-view-base', EPGViewBase);
+customElements.define('epg-view-base', EpgViewBase);

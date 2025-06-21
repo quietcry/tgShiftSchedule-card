@@ -1,7 +1,7 @@
 import { LitElement, html, css } from 'lit';
 import { property } from 'lit/decorators.js';
 import { CardImpl } from './card-impl.js';
-import './editor.js';
+import './editor/editor.js';
 import { CardRegname, CardName, CardDescription } from './card-config.js';
 
 export class Card extends CardImpl {

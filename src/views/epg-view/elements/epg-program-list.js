@@ -1,65 +1,65 @@
-import { html, css, LitElement } from 'lit';
+import { html, css } from 'lit';
+import { EpgElementBase } from './epg-element-base.js';
+import './epg-program-item.js';
 
-export class EPGProgramList extends LitElement {
+export class EpgProgramList extends EpgElementBase {
   static properties = {
+    ...super.properties,
     programs: { type: Array },
-    currentTime: { type: Number },
-    startTime: { type: Number },
-    endTime: { type: Number },
+    scale: { type: Number },
   };
 
-  static styles = css`
-    :host {
-      display: block;
-      width: 100%;
-      height: 100%;
-    }
-
-    .program-list {
-      display: flex;
-      flex-direction: column;
-      height: 100%;
-    }
-
-    .program-item {
-      padding: 10px;
-      border-bottom: 1px solid var(--epg-border-color);
-      cursor: pointer;
-      transition: background-color 0.2s;
-    }
-
-    .program-item:hover {
-      background-color: var(--epg-hover-bg);
-    }
-
-    .program-item.current {
-      background-color: var(--epg-current-bg);
-    }
-
-    .program-time {
-      font-size: 12px;
-      color: var(--epg-time-color);
-      margin-bottom: 4px;
-    }
-
-    .program-title {
-      font-weight: bold;
-      color: var(--epg-text-color);
-      margin-bottom: 4px;
-    }
-
-    .program-description {
-      font-size: 12px;
-      color: var(--epg-description-color);
-    }
-  `;
+  static styles = [
+    super.styles,
+    css`
+      :host {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+      .program-list {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+      }
+      .program-item {
+        padding: var(--epg-padding);
+        border-bottom: 1px solid var(--epg-border-color);
+        cursor: pointer;
+        transition: background-color 0.2s;
+        height: var(--epg-row-height);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        box-sizing: border-box;
+      }
+      .program-item:hover {
+        background-color: var(--epg-hover-bg);
+      }
+      .program-item.current {
+        background-color: var(--epg-current-bg);
+      }
+      .program-time {
+        font-size: 12px;
+        color: var(--epg-time-color);
+        margin-bottom: 4px;
+      }
+      .program-title {
+        font-weight: bold;
+        color: var(--epg-text-color);
+        margin-bottom: 4px;
+      }
+      .program-description {
+        font-size: 12px;
+        color: var(--epg-description-color);
+      }
+    `,
+  ];
 
   constructor() {
     super();
     this.programs = [];
-    this.currentTime = 0;
-    this.startTime = 0;
-    this.endTime = 0;
+    this.scale = 1;
   }
 
   _formatTime(timestamp) {
@@ -115,4 +115,4 @@ export class EPGProgramList extends LitElement {
   }
 }
 
-customElements.define('epg-program-list', EPGProgramList);
+customElements.define('epg-program-list', EpgProgramList);

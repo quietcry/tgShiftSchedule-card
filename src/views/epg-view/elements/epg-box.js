@@ -1,22 +1,17 @@
 import { html, css } from 'lit';
-import { ViewBase } from '../../views/view-base.js';
+import { EpgElementBase } from './epg-element-base.js';
+import './epg-program-item.js';
 
-export class EpgBox extends ViewBase {
+export class EpgBox extends EpgElementBase {
   static properties = {
-    epgData: { type: Object },
-    currentTime: { type: Number },
+    ...super.properties,
     timeWindow: { type: Number },
     showChannel: { type: Boolean },
-    showTime: { type: Boolean },
-    showDuration: { type: Boolean },
-    showTitle: { type: Boolean },
-    showDescription: { type: Boolean },
     selectedChannel: { type: String },
     channelOrder: { type: Array }, // Array mit Kanaldefinitionen { name: string, style?: string, channels?: Array }
     showChannelGroups: { type: Boolean }, // Zeigt Kanalgruppen an
-    epgPastTime: { type: Number }, // Minuten in die Vergangenheit
-    epgFutureTime: { type: Number }, // Minuten in die Zukunft
-    epgShowWidth: { type: Number }, // Minuten sichtbar in der Ansicht
+    scale: { type: Number },
+    showShortText: { type: Boolean },
   };
 
   constructor() {
@@ -24,6 +19,10 @@ export class EpgBox extends ViewBase {
     this._channels = new Map(); // Speichert die Kanäle mit ihren Programmen
     this._sortedChannels = []; // Neue detaillierte Sortierungsstruktur
     this._channelOrderInitialized = false; // Flag für initialisierte Sortierung
+    this.scale = 1; // Standard-Scale
+    this._channelsParameters = { minTime: 0, maxTime: 0 };
+    this._containerWidth = 1200; // Geschätzte Container-Breite, wird nach erstem Render aktualisiert
+    this._containerWidthMeasured = false; // Flag für gemessene Container-Breite
   }
 
   updated(changedProperties) {
@@ -76,6 +75,16 @@ export class EpgBox extends ViewBase {
       this._updateAllChannelSorting();
       this.requestUpdate();
     }
+
+    // Wenn sich epgShowWidth ändert, aktualisiere den Scale
+    if (changedProperties.has('epgShowWidth')) {
+      this._debug('epgShowWidth hat sich geändert, aktualisiere Scale', {
+        neueEpgShowWidth: this.epgShowWidth,
+        containerWidth: this._containerWidth,
+      });
+      this.scale = this._calculateScale();
+      this.requestUpdate();
+    }
   }
 
   firstUpdated() {
@@ -105,6 +114,11 @@ export class EpgBox extends ViewBase {
 
     // Füge Scroll-Event-Listener hinzu für Synchronisation mit Zeitleiste
     this._setupScrollSync();
+
+    // Messen der Container-Breite nach dem ersten Render
+    setTimeout(() => {
+      this._measureContainerWidth();
+    }, 0);
   }
 
   _setupScrollSync() {
@@ -122,128 +136,179 @@ export class EpgBox extends ViewBase {
     }
   }
 
-  static styles = css`
-    :host {
-      display: block;
-      width: 100%;
-      height: 100%;
-      overflow: auto;
-      position: relative;
-    }
+  static styles = [
+    super.styles,
+    css`
+      :host {
+        display: block;
+        width: 100%;
+        height: auto; /* Automatische Höhe basierend auf Inhalt */
+        overflow: visible; /* Kein Scroll, damit Inhalte sichtbar sind */
+        position: relative;
+      }
 
-    :host(.epgBox) {
-      display: grid;
-      grid-template-columns: auto 1fr;
-      grid-template-areas: 'channelBox programBox';
-    }
+      :host(.epgBox) {
+        display: flex;
+        flex-direction: row;
+        height: auto; /* Automatische Höhe basierend auf Inhalt */
+      }
 
-    .channelBox {
-      grid-area: channelBox;
-      min-width: 120px;
-      border-right: 1px solid var(--divider-color);
-    }
+      .channelBox {
+        border-right: 1px solid var(--epg-border-color);
+        margin: 0; /* Keine äußeren Abstände */
+        padding: 0; /* Keine inneren Abstände */
+        display: flex;
+        flex-direction: column;
+        flex-shrink: 0;
+        flex-basis: auto; /* Automatische Basis-Höhe */
+        align-items: stretch; /* Verhindert Verteilung über Höhe */
+        justify-content: flex-start; /* Startet oben */
+        height: fit-content; /* Höhe passt sich an Inhalt an */
+        max-height: none; /* Keine Höhenbegrenzung */
+      }
 
-    .programBox {
-      grid-area: programBox;
-      overflow-x: auto;
-    }
+      .programBox {
+        flex: 1;
+        overflow-x: auto;
+        margin: 0; /* Keine äußeren Abstände */
+        padding: 0; /* Keine inneren Abstände */
+        display: flex;
+        flex-direction: column;
+        height: auto; /* Automatische Höhe basierend auf Inhalt */
+        max-height: none; /* Keine Höhenbegrenzung */
+      }
 
-    .programRow {
-      display: flex;
-      min-height: 60px;
-      border-bottom: 1px solid var(--divider-color);
-    }
+      .programRow {
+        display: flex;
+        border-bottom: none; /* Kein Border */
+        margin: 0; /* Keine äußeren Abstände */
+        padding: 0; /* Keine inneren Abstände */
+        flex-shrink: 0;
+        /* Höhenklassen werden über epg-row-height angewendet */
+        height: calc(
+          var(--epg-row-height) + var(--has-time) + var(--has-duration) + var(--has-description) +
+            var(--has-shorttext)
+        );
+      }
 
-    .channelGroup {
-      padding: 4px 8px;
-      background-color: var(--primary-color);
-      color: var(--text-primary-color);
-      font-weight: bold;
-    }
+      .channelGroup {
+        padding: 4px var(--epg-padding);
+        background-color: var(--epg-header-bg);
+        color: var(--epg-text-color);
+        font-weight: bold;
+        display: flex;
+        align-items: center;
+        margin: 0; /* Keine äußeren Abstände */
+        flex-shrink: 0; /* Verhindert Schrumpfen */
+      }
 
-    .channelRow {
-      padding: 8px;
-      border-bottom: 1px solid var(--divider-color);
-      cursor: pointer;
-    }
+      .channelRow {
+        padding: 0; /* Kein Padding */
+        border: none; /* Kein Border auf der Row selbst */
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        margin: 0; /* Keine äußeren Abstände */
+        flex-shrink: 0; /* Verhindert Schrumpfen */
+        flex-grow: 0; /* Verhindert Wachsen */
+      }
 
-    .channelRow.selected {
-      background-color: var(--accent-color);
-      color: var(--text-primary-color);
-    }
+      .channelRow:nth-child(odd) .channelRowContent {
+        background-color: var(--epg-odd-channel-bg);
+        color: var(--epg-odd-channel-text);
+      }
 
-    .programSlot {
-      padding: 8px;
-      border: 1px solid var(--divider-color);
-      margin: 4px;
-      cursor: pointer;
-      min-width: 100px;
-      background-color: var(--primary-background-color);
-      transition: background-color 0.2s ease;
-    }
+      .channelRow:nth-child(even) .channelRowContent {
+        background-color: var(--epg-even-channel-bg);
+        color: var(--epg-even-channel-text);
+      }
 
-    .programSlot:hover {
-      background-color: var(--secondary-background-color);
-    }
+      .channelRowContent {
+        padding: var(--epg-padding);
+        border: 1px solid var(--epg-border-color);
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        box-sizing: border-box;
+        border-radius: var(--epg-radius);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        max-height: 100%;
+      }
 
-    .programSlot.current {
-      background-color: var(--accent-color);
-      color: var(--text-primary-color);
-    }
+      /* Selected-Zustand überschreibt die abwechselnden Farben */
+      .channelRow.selected .channelRowContent {
+        background-color: var(--epg-accent);
+        color: var(--epg-text-color);
+      }
 
-    .programTitle {
-      font-weight: bold;
-      margin-bottom: 4px;
-      font-size: 0.9em;
-      line-height: 1.2;
-    }
+      .programSlot {
+        padding: var(--epg-padding);
+        border: 1px solid var(--epg-border-color);
+        margin: 4px;
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+      }
 
-    .programTime {
-      font-size: 0.8em;
-      color: var(--secondary-text-color);
-      margin-bottom: 2px;
-    }
+      .programSlot:hover {
+        background-color: var(--epg-hover-bg);
+      }
 
-    .programDuration {
-      font-size: 0.75em;
-      color: var(--secondary-text-color);
-      margin-bottom: 2px;
-    }
+      .programSlot.current {
+        background-color: var(--epg-accent);
+        color: var(--epg-text-color);
+      }
 
-    .programDescription {
-      font-size: 0.8em;
-      color: var(--secondary-text-color);
-      line-height: 1.3;
-      margin-top: 4px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      display: -webkit-box;
-      -webkit-line-clamp: 2;
-      -webkit-box-orient: vertical;
-    }
+      .programTitle {
+        font-weight: bold;
+        margin-bottom: 4px;
+      }
 
-    .noPrograms {
-      padding: 20px;
-      text-align: center;
-      color: var(--secondary-text-color);
-      font-style: italic;
-      border: 1px dashed var(--divider-color);
-      margin: 4px;
-      min-height: 60px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
+      .programTime {
+        font-size: 0.8em;
+        color: var(--epg-time-color);
+      }
 
-    .loading {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 100%;
-      color: var(--secondary-text-color);
-    }
-  `;
+      .programDescription {
+        font-size: 0.8em;
+        color: var(--epg-description-color);
+        margin-top: 4px;
+      }
+
+      .loading {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 200px;
+        color: var(--epg-text-color);
+      }
+
+      .error {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 200px;
+        color: #f44336;
+      }
+
+      .noPrograms {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: var(--epg-padding);
+        color: var(--epg-text-color);
+        font-style: italic;
+        /* Höhenklassen werden über epg-row-height angewendet */
+        height: calc(
+          var(--epg-row-height) + var(--has-time) + var(--has-duration) + var(--has-description) +
+            var(--has-shorttext)
+        );
+        box-sizing: border-box;
+      }
+    `,
+  ];
 
   render() {
     this._debug('EPG-Box: Render wird aufgerufen', {
@@ -254,6 +319,12 @@ export class EpgBox extends ViewBase {
       console.log('epg-box: Erste Renderung - noch keine Daten');
       return this._renderLoading();
     }
+
+    console.log('=== DEBUG: KANÄLE VORHANDEN ===');
+    console.log('Anzahl Kanäle:', this._channels.size);
+
+    // Berechne Scale für die Darstellung
+    this.scale = this._calculateScale();
 
     // Verwende alle verfügbaren Kanäle direkt
     const allChannels = Array.from(this._channels.values());
@@ -271,14 +342,33 @@ export class EpgBox extends ViewBase {
     this._debug('EPG-Box: Verwende Kanäle für Rendering', {
       anzahlKanale: allChannels.length,
       kanalNamen: allChannels.map(c => c.name),
+      scale: this.scale,
+      channelsParameters: this._channelsParameters,
     });
 
     return html`
       <div class="channelBox">
-        ${allChannels.map(channel => html` <div class="channelRow">${channel.name}</div> `)}
+        ${allChannels.map(channel => {
+          // Berechne Höhenklassen für Channel-Row basierend auf den Anzeigeoptionen
+          const heightClasses = this._calculateHeightClasses(
+            this.showTime,
+            this.showDuration,
+            this.showDescription,
+            true, // Zeit ist verfügbar
+            true, // Dauer ist verfügbar
+            false, // Channel hat keine Beschreibung
+            this.showShortText // ShortText-Option
+          );
+
+          return html`
+            <div class="channelRow epg-row-height ${heightClasses}">
+              <div class="channelRowContent">${channel.name}</div>
+            </div>
+          `;
+        })}
       </div>
       <div class="programBox">
-        ${allChannels.map(channel => {
+        ${allChannels.map((channel, rowIndex) => {
           const programs = this._getProgramsForChannel(channel, this._generateTimeSlots());
 
           console.log(
@@ -288,41 +378,94 @@ export class EpgBox extends ViewBase {
           );
 
           return html`
-            <div class="programRow">
+            <div
+              class="programRow epg-row-height ${this._calculateHeightClasses(
+                this.showTime,
+                this.showDuration,
+                this.showDescription,
+                true, // Zeit ist verfügbar für Programme
+                true, // Dauer ist verfügbar für Programme
+                false, // Beschreibung wird pro Programm-Item berechnet
+                this.showShortText // ShortText-Option
+              )}"
+            >
               ${programs.length > 0
-                ? programs.map(
-                    program => html`
-                      <div
-                        class="programSlot ${this._isCurrentProgram(program) ? 'current' : ''}"
-                        style="width: ${this._calculateProgramWidth(program)}px"
-                        @click=${() => this._onProgramSelected(program)}
-                      >
-                        <div class="programTitle">${program.title}</div>
-                        ${this.showTime
-                          ? html`
-                              <div class="programTime">
-                                ${this._formatTime(new Date(program.start * 1000))} -
-                                ${this._formatTime(new Date((program.end || program.stop) * 1000))}
-                              </div>
-                            `
-                          : ''}
-                        ${this.showDuration
-                          ? html`
-                              <div class="programDuration">
-                                ${this._formatDuration(
-                                  program.duration ||
-                                    this._calculateDuration(program.start, program.end)
-                                )}
-                              </div>
-                            `
-                          : ''}
-                        ${this.showDescription && program.description
-                          ? html` <div class="programDescription">${program.description}</div> `
-                          : ''}
-                      </div>
-                    `
-                  )
-                : html`<div class="noPrograms">Keine Programme verfügbar</div>`}
+                ? (() => {
+                    // Füge leeres Programm-Item am Anfang hinzu, wenn minTime gesetzt ist
+                    const items = [];
+                    let itemIndex = 0;
+
+                    if (this._channelsParameters.minTime > 0) {
+                      const firstProgram = programs[0];
+                      const gapDuration = this._calculateDuration(
+                        this._channelsParameters.minTime,
+                        firstProgram.start
+                      );
+
+                      // Füge leeres Item immer hinzu, auch wenn gapDuration 0 ist
+                      items.push(html`
+                        <epg-program-item
+                          .start=${this._channelsParameters.minTime}
+                          .stop=${firstProgram.start}
+                          .duration=${gapDuration}
+                          .scale=${this.scale}
+                          .title=${''}
+                          .description=${''}
+                          .shortText=${''}
+                          .isCurrent=${false}
+                          .showTime=${false}
+                          .showDuration=${false}
+                          .showDescription=${false}
+                          .showShortText=${this.showShortText}
+                          .rowIndex=${rowIndex}
+                          .itemIndex=${itemIndex++}
+                        ></epg-program-item>
+                      `);
+                    }
+
+                    // Füge alle echten Programme hinzu
+                    programs.forEach(program => {
+                      const duration = this._calculateDuration(
+                        program.start,
+                        program.end || program.stop
+                      );
+
+                      items.push(html`
+                        <epg-program-item
+                          .start=${program.start}
+                          .stop=${program.end || program.stop}
+                          .duration=${duration}
+                          .scale=${this.scale}
+                          .title=${program.title}
+                          .description=${program.description || ''}
+                          .shortText=${program.shorttext || ''}
+                          .isCurrent=${this._isCurrentProgram(program)}
+                          .showTime=${this.showTime}
+                          .showDuration=${this.showDuration}
+                          .showDescription=${this.showDescription}
+                          .showShortText=${this.showShortText}
+                          .rowIndex=${rowIndex}
+                          .itemIndex=${itemIndex++}
+                          @program-selected=${e => this._onProgramSelected(e.detail)}
+                        ></epg-program-item>
+                      `);
+                    });
+
+                    return items;
+                  })()
+                : html`<div
+                    class="noPrograms epg-row-height ${this._calculateHeightClasses(
+                      this.showTime,
+                      this.showDuration,
+                      this.showDescription,
+                      false, // Keine Zeit
+                      false, // Keine Dauer
+                      false, // Keine Beschreibung
+                      false // Kein ShortText
+                    )}"
+                  >
+                    Keine Programme verfügbar
+                  </div>`}
             </div>
           `;
         })}
@@ -381,63 +524,8 @@ export class EpgBox extends ViewBase {
     return slots;
   }
 
-  _formatTime(date) {
-    return date.toLocaleTimeString('de-DE', {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  }
-
-  _formatDuration(minutes) {
-    if (!minutes) return '';
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    if (hours > 0) {
-      return `${hours}h ${mins}min`;
-    }
-    return `${mins}min`;
-  }
-
-  _calculateDuration(start, end) {
-    // Konvertiere Unix-Timestamps zu Date-Objekten
-    const startTime = new Date(start * 1000);
-    const endTime = new Date(end * 1000);
-    return Math.round((endTime - startTime) / (1000 * 60)); // Dauer in Minuten
-  }
-
   _isCurrentTimeSlot(slot, currentTime) {
     return slot.getHours() === currentTime.getHours();
-  }
-
-  _isCurrentProgram(program) {
-    const now = new Date();
-    const start = new Date(program.start * 1000);
-    const end = new Date((program.end || program.stop) * 1000);
-    return now >= start && now <= end;
-  }
-
-  _calculateProgramWidth(program) {
-    const start = new Date(program.start * 1000);
-    const end = new Date((program.end || program.stop) * 1000);
-    const duration = (end - start) / (1000 * 60); // Dauer in Minuten
-
-    // Verwende die konfigurierte Anzeigebreite oder Standardwert
-    const showWidth = this.epgShowWidth || 180; // Minuten sichtbar
-    const containerWidth = 1200; // Geschätzte Container-Breite in Pixeln
-
-    // Berechne die Breite basierend auf dem Verhältnis von Programmdauer zu Anzeigebreite
-    const widthRatio = duration / showWidth;
-    const programWidth = Math.max(100, widthRatio * containerWidth); // Mindestbreite 100px
-
-    this._debug('_calculateProgramWidth', {
-      title: program.title,
-      duration,
-      showWidth,
-      widthRatio,
-      programWidth,
-    });
-
-    return programWidth;
   }
 
   _getProgramsForChannel(channel, timeSlots) {
@@ -514,6 +602,31 @@ export class EpgBox extends ViewBase {
 
       return overlaps;
     });
+
+    // Berechne minTime und maxTime über alle gefilterten Programme
+    if (filteredPrograms.length > 0) {
+      const allStarts = filteredPrograms.map(p => p.start);
+      const allEnds = filteredPrograms.map(p => p.end || p.stop);
+
+      const minStart = Math.min(...allStarts);
+      const maxEnd = Math.max(...allEnds);
+
+      // Aktualisiere _channelsParameters nur wenn neue Werte größer/kleiner sind
+      if (this._channelsParameters.minTime === 0 || minStart < this._channelsParameters.minTime) {
+        this._channelsParameters.minTime = minStart;
+      }
+      if (maxEnd > this._channelsParameters.maxTime) {
+        this._channelsParameters.maxTime = maxEnd;
+      }
+
+      this._debug('_getProgramsForChannel: _channelsParameters aktualisiert', {
+        kanal: channel.name,
+        anzahlGefilterteProgramme: filteredPrograms.length,
+        minStart,
+        maxEnd,
+        channelsParameters: this._channelsParameters,
+      });
+    }
 
     this._debug('_getProgramsForChannel: Gefilterte Programme', {
       kanal: channel.name,
@@ -670,6 +783,7 @@ export class EpgBox extends ViewBase {
     }
 
     this._sortedChannels = [];
+    this._channelsParameters = { minTime: 0, maxTime: 0 };
 
     parsedChannelOrder.forEach(item => {
       if (!item) return;
@@ -999,6 +1113,46 @@ export class EpgBox extends ViewBase {
         }
       });
     });
+  }
+
+  _calculateScale() {
+    // Verwende die gemessene Container-Breite oder geschätzte Breite
+    const containerWidth = this._containerWidth;
+    const showWidth = this.epgShowWidth || 180; // Minuten sichtbar
+
+    // Berechne Scale: Container-Breite / Anzeigebreite in Minuten
+    const scale = containerWidth / showWidth;
+
+    this._debug('_calculateScale', {
+      containerWidth,
+      showWidth,
+      scale,
+      containerWidthMeasured: this._containerWidthMeasured,
+    });
+
+    return scale;
+  }
+
+  // Neue Methode: Misst die tatsächliche Container-Breite
+  _measureContainerWidth() {
+    const programBox = this.shadowRoot?.querySelector('.programBox');
+    if (programBox) {
+      const measuredWidth = programBox.clientWidth;
+      if (measuredWidth > 0) {
+        this._containerWidth = measuredWidth;
+        this._containerWidthMeasured = true;
+
+        this._debug('_measureContainerWidth', {
+          measuredWidth,
+          oldWidth: this._containerWidth,
+          containerWidthMeasured: this._containerWidthMeasured,
+        });
+
+        // Recalculate scale with new container width
+        this.scale = this._calculateScale();
+        this.requestUpdate();
+      }
+    }
   }
 }
 
