@@ -2,6 +2,7 @@ import { html, css } from 'lit';
 import { EpgElementBase } from './epg-element-base.js';
 
 export class EpgProgramItem extends EpgElementBase {
+  static className = 'EpgProgramItem';
   static properties = {
     ...super.properties,
     start: { type: Number },

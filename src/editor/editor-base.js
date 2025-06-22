@@ -18,8 +18,6 @@ export class EditorBase extends SuperBase {
 
   constructor(defaultConfig = {}) {
     super();
-    if (this.constructor.debugMode)
-      console.debug(`[${this.constructor.cardName}] EditorBase-Modul wird geladen`);
     this._debug('[EditorBase] EditorBase-Konstruktor wird aufgerufen');
     this.config = {
       type: 'custom:tgeditor-card',

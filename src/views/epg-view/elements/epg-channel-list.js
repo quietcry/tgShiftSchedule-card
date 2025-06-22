@@ -2,6 +2,7 @@ import { html, css } from 'lit';
 import { EpgElementBase } from './epg-element-base.js';
 
 export class EpgChannelList extends EpgElementBase {
+  static className = 'EpgChannelList';
   static properties = {
     ...super.properties,
     channels: { type: Array },

@@ -3,6 +3,8 @@ import { EpgElementBase } from './epg-element-base.js';
 import './epg-program-item.js';
 
 export class EpgProgramList extends EpgElementBase {
+  static className = 'EpgProgramList';
+
   static properties = {
     ...super.properties,
     programs: { type: Array },

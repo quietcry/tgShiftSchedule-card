@@ -5,6 +5,7 @@ import './editor/editor.js';
 import { CardRegname, CardName, CardDescription } from './card-config.js';
 
 export class Card extends CardImpl {
+  static className = 'Card';
   static get styles() {
     return [
       super.styles,

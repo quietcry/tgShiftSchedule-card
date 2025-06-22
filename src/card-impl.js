@@ -5,10 +5,8 @@ import { EPGView } from './views/epg-view/epg-view.js';
 import { CardName, CardRegname, DebugMode } from './card-config.js';
 
 export class CardImpl extends CardBase {
+  static className = 'CardImpl';
   static get properties() {
-    if (DebugMode) {
-      console.debug(`[${CardName}] [CardImpl] CardImpl static properties wird aufgerufen`);
-    }
     return {
       ...super.properties,
       config: { type: Object },
@@ -20,14 +18,10 @@ export class CardImpl extends CardBase {
   }
 
   static getConfigElement() {
-    if (DebugMode)
-      console.debug(`[${CardName}] [CardImpl] CardImpl static getConfigElement wird aufgerufen`);
     return document.createElement(`${CardRegname}-editor`);
   }
 
   static getStubConfig() {
-    if (DebugMode)
-      console.debug(`[${CardName}] [CardImpl] CardImpl static getStubConfig wird aufgerufen`);
     return {
       entity: 'sensor.vdr_vdr_epg_info',
       time_window: 'C',
@@ -46,15 +40,14 @@ export class CardImpl extends CardBase {
 
   constructor() {
     super();
-    if (DebugMode) console.debug(`[${CardName}] CardImpl-Modul wird geladen`);
+    this._debug(`CardImpl-Modul wird geladen`);
     this.config = this.getDefaultConfig();
-    this._debug('filterx: CardImpl-Konstruktor: Initialisierung abgeschlossen');
+    this._debug('CardImpl-Konstruktor: Initialisierung abgeschlossen');
   }
 
   getDefaultConfig() {
-    if (DebugMode) {
-      console.debug(`[${CardName}] [CardImpl] CardImpl getDefaultConfig wird aufgerufen`);
-    }
+    this._debug(`CardImpl getDefaultConfig wird aufgerufen`);
+
     return {
       entity: '',
       time_window: 'C',
@@ -72,7 +65,7 @@ export class CardImpl extends CardBase {
   }
 
   setConfig(config) {
-    this._debug('filterx: CardImpl setConfig wird aufgerufen mit:', config);
+    this._debug('CardImpl setConfig wird aufgerufen mit:', config);
     if (!config) {
       throw new Error('Keine Konfiguration vorhanden');
     }
@@ -81,15 +74,15 @@ export class CardImpl extends CardBase {
       ...this.getDefaultConfig(),
       ...config,
     };
-    this._debug('filterx: config nach setConfig:', this.config);
+    this._debug('CardImpl config nach setConfig:', this.config);
 
     // View initialisieren
-    this._debug('filterx: CardImpl setConfig: Initialisiere EPG-View');
+    this._debug('CardImpl setConfig: Initialisiere EPG-View');
     this._viewMode = this.config.view_mode || 'epg';
     this._viewType = 'EPGView';
     this._view = new EPGView();
     this._view.config = this.config;
-    this._debug('filterx: CardImpl setConfig: View initialisiert:', {
+    this._debug('CardImpl setConfig: View initialisiert:', {
       viewMode: this._viewMode,
       viewType: this._viewType,
       config: this.config,
@@ -97,7 +90,7 @@ export class CardImpl extends CardBase {
   }
 
   set hass(hass) {
-    this._debug('filterx: CardImpl set hass wird aufgerufen');
+    this._debug('CardImpl set hass wird aufgerufen');
     if (this._view) {
       this._view.hass = hass;
     }
@@ -148,11 +141,5 @@ export class CardImpl extends CardBase {
         }
       `,
     ];
-  }
-
-  _debug(message, ...args) {
-    if (DebugMode) {
-      console.debug(`[${CardName}] [CardImpl] ${message}`, ...args);
-    }
   }
 }

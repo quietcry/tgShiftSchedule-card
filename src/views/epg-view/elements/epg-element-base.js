@@ -2,6 +2,8 @@ import { SuperBase } from '../../../super-base.js';
 import { css } from 'lit';
 
 export class EpgElementBase extends SuperBase {
+  static className = 'EpgElementBase';
+
   static properties = {
     // EPG-spezifische Properties
     epgData: { type: Object },
@@ -202,12 +204,5 @@ export class EpgElementBase extends SuperBase {
 
   _renderContent() {
     return html`<div>EPG-Element Basis - muss überschrieben werden</div>`;
-  }
-
-  // Debug-Methode für EPG-Elemente
-  _debug(message, data = null) {
-    if (this.constructor.debugMode) {
-      console.debug(`[EpgElementBase] ${message}`, data);
-    }
   }
 }

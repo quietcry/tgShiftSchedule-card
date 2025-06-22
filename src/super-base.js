@@ -1,6 +1,6 @@
-import { LitElement } from 'lit';
+import { LitElement, css } from 'lit';
 import { CardName, Version, DebugMode, showVersion } from './card-config.js';
-import { css } from 'lit';
+import { TgCardHelper } from './tools/tg-card-helper.js';
 
 export class SuperBase extends LitElement {
   static cardName = CardName;
@@ -27,25 +27,31 @@ export class SuperBase extends LitElement {
     this.version = this.constructor.version;
     this.debugMode = this.constructor.debugMode;
     this.showVersion = this.constructor.showVersion;
+    this.tgCardHelper = new TgCardHelper(this.constructor.cardName, this.constructor.debugMode);
     this._debug('SuperBase-Konstruktor wird aufgerufen');
   }
 
   _debug(message, data = null) {
-    if (!DebugMode) return;
+    // Versuche verschiedene Methoden, um den echten Klassennamen zu bekommen
+    let className = 'Unknown';
 
-    const className = this.constructor.name;
-    const debugList = DebugMode.split(',').map(item => item.trim().toLowerCase());
-    const shouldDebug =
-      debugList[0] === 'true'
-        ? !debugList.slice(1).includes(className.toLowerCase())
-        : debugList.includes(className.toLowerCase());
-
-    if (shouldDebug) {
-      if (data) {
-        console.debug(`[${this.cardName}] [${className}] ${message}`, data);
-      } else {
-        console.debug(`[${this.cardName}] [${className}] ${message}`);
-      }
+    // Methode 1: Statischer Klassennamen (falls definiert)
+    if (this.constructor.className) {
+      className = this.constructor.className;
     }
+    // Methode 2: Tag-Name des Custom Elements
+    else if (this.tagName) {
+      className = this.tagName.toLowerCase().replace(/[^a-z0-9]/g, '');
+    }
+    // Methode 3: Constructor name (kann minifiziert sein)
+    else if (this.constructor.name && this.constructor.name.length > 2) {
+      className = this.constructor.name;
+    }
+    // Methode 4: Fallback auf cardName
+    else if (this.cardName) {
+      className = this.cardName;
+    }
+
+    this.tgCardHelper._debug(className, message, data);
   }
 }

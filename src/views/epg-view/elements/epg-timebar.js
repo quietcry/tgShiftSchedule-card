@@ -2,6 +2,8 @@ import { html, css } from 'lit';
 import { EpgElementBase } from './epg-element-base.js';
 
 export class EpgTimebar extends EpgElementBase {
+  static className = 'EpgTimebar';
+
   static properties = {
     ...super.properties,
     timeSlots: { type: Array },

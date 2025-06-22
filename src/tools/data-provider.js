@@ -1,11 +1,12 @@
+import { TgCardHelper } from './tg-card-helper.js';
+import { CardName, DebugMode } from '../card-config.js';
+
 export class DataProvider {
-  static cardName = 'TG EPG Card';
-  static debugMode = true;
+  static className = 'DataProvider';
 
   constructor() {
     this._hass = null;
-    if (this.constructor.debugMode)
-      console.debug(`[${this.constructor.cardName}] DataProvider-Modul wird geladen`);
+    this.tgCardHelper = new TgCardHelper(CardName, DebugMode);
     this._debug('DataProvider initialisiert');
   }
 
@@ -30,10 +31,28 @@ export class DataProvider {
     return this._hass;
   }
 
-  _debug(message, ...args) {
-    if (this.constructor.debugMode) {
-      console.debug(`[${this.constructor.cardName}] [DataProvider] ${message}`, ...args);
+  _debug(message, data = null) {
+    // Versuche verschiedene Methoden, um den echten Klassennamen zu bekommen
+    let className = 'Unknown';
+
+    // Methode 1: Statischer Klassennamen (falls definiert)
+    if (this.constructor.className) {
+      className = this.constructor.className;
     }
+    // Methode 2: Tag-Name des Custom Elements
+    else if (this.tagName) {
+      className = this.tagName.toLowerCase().replace(/[^a-z0-9]/g, '');
+    }
+    // Methode 3: Constructor name (kann minifiziert sein)
+    else if (this.constructor.name && this.constructor.name.length > 2) {
+      className = this.constructor.name;
+    }
+    // Methode 4: Fallback auf cardName
+    else if (this.cardName) {
+      className = this.cardName;
+    }
+
+    this.tgCardHelper._debug(className, message, data);
   }
 
   async _callService(entity, params = {}) {
@@ -253,7 +272,7 @@ export class DataProvider {
   }
 
   async fetchEpgData(entity, timeWindow, date, config, onEpgData) {
-    this._debug('DataProvider: fetchEpgData gestartet', {
+    this._debug('fetchEpgData gestartet', {
       entity,
       timeWindow,
       date,
@@ -262,7 +281,7 @@ export class DataProvider {
 
     try {
       const channelList = await this.fetchChannelList(entity, config);
-      this._debug('DataProvider: Kanalliste empfangen', {
+      this._debug('Kanalliste empfangen', {
         anzahlKanäle: channelList.length,
         kanäle: channelList.map(c => c.name),
       });
@@ -270,13 +289,13 @@ export class DataProvider {
       const epgData = [];
       for (const channel of channelList) {
         try {
-          this._debug('DataProvider: Hole EPG-Daten für Kanal', {
+          this._debug('Hole EPG-Daten für Kanal', {
             kanal: channel.name,
             id: channel.id,
           });
 
           const programs = await this.fetchChannelEpg(entity, channel.id, timeWindow, date);
-          this._debug('DataProvider: EPG-Daten empfangen', {
+          this._debug('EPG-Daten empfangen', {
             kanal: channel.name,
             anzahlProgramme: programs.length,
             programme: programs.map(p => p.title),
@@ -284,7 +303,7 @@ export class DataProvider {
 
           // Übergebe die EPG-Daten über den Callback
           if (typeof onEpgData === 'function') {
-            this._debug('DataProvider: Übergebe EPG-Daten an Callback', {
+            this._debug('Übergebe EPG-Daten an Callback', {
               kanal: channel.name,
               anzahlProgramme: programs.length,
             });
@@ -300,20 +319,20 @@ export class DataProvider {
             programs: programs,
           });
         } catch (error) {
-          this._debug('DataProvider: Fehler beim Abrufen der EPG-Daten für Kanal', {
+          this._debug('Fehler beim Abrufen der EPG-Daten für Kanal', {
             kanal: channel.name,
             fehler: error.message,
           });
         }
       }
 
-      this._debug('DataProvider: fetchEpgData abgeschlossen', {
+      this._debug('fetchEpgData abgeschlossen', {
         anzahlKanäle: epgData.length,
         gesamtProgramme: epgData.reduce((sum, c) => sum + c.programs.length, 0),
       });
       return epgData;
     } catch (error) {
-      this._debug('DataProvider: Fehler in fetchEpgData', {
+      this._debug('Fehler in fetchEpgData', {
         fehler: error.message,
       });
       throw error;

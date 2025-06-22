@@ -37,15 +37,14 @@ export class EditorImpl extends EditorBase {
       epgFutureTime: DefaultEpgFutureTime,
       epgShowWidth: DefaultEpgShowWidth,
     });
-    if (DebugMode) console.debug(`[${CardName}] EditorImpl-Modul wird geladen`);
+    this._debug(`EditorImpl-Modul wird geladen`);
     this._selectedTab = 0;
     this._yamlError = '';
     this._groupOrderError = '';
   }
 
   async firstUpdated() {
-    if (this.constructor.debugMode)
-      console.debug(`[${this.constructor.cardName}] EditorImpl firstUpdated wird aufgerufen`);
+    this._debug(`EditorImpl firstUpdated wird aufgerufen`);
     await super.firstUpdated();
 
     // Initialisiere group_order als YAML-String, falls es als Array vorliegt
@@ -55,21 +54,17 @@ export class EditorImpl extends EditorBase {
       this.config.group_order_parsed = this.config.group_order;
       this._debug('EditorImpl: group_order beim ersten Laden initialisiert:', yamlString);
     }
-
-    if (this.constructor.debugMode)
-      console.debug(`[${this.constructor.cardName}] EditorImpl firstUpdated abgeschlossen`);
+    this._debug(`EditorImpl firstUpdated abgeschlossen`);
   }
 
   render() {
     this._debug('EditorImpl render wird aufgerufen');
     if (!this.hass) {
-      if (this.constructor.debugMode)
-        console.debug(`[${this.constructor.cardName}] EditorImpl render: Kein hass`);
+      this._debug(`EditorImpl render: Kein hass`);
       return html`<div>Loading...</div>`;
     }
 
-    if (this.constructor.debugMode)
-      console.debug(`[${this.constructor.cardName}] EditorImpl render mit config:`, this.config);
+    this._debug(`EditorImpl render mit config:`, this.config);
     return html`
       <div class="card-config">
         <ha-form

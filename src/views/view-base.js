@@ -11,24 +11,24 @@ export class ViewBase extends SuperBase {
 
   constructor() {
     super();
-    this._debug('filterx: ViewBase-Konstruktor: Start');
+    this._debug('ViewBase-Konstruktor: Start');
     this.config = {};
     this.epgData = [];
     this._loading = false;
     this._error = null;
-    this._debug('filterx: ViewBase-Konstruktor: Initialisierung abgeschlossen');
+    this._debug('ViewBase-Konstruktor: Initialisierung abgeschlossen');
   }
 
   async firstUpdated() {
-    this._debug('filterx: ViewBase firstUpdated: Start');
+    this._debug('ViewBase firstUpdated: Start');
     await super.firstUpdated();
-    this._debug('filterx: ViewBase firstUpdated: Ende');
+    this._debug('ViewBase firstUpdated: Ende');
   }
 
   async _loadData() {
-    this._debug('filterx: ViewBase _loadData wird aufgerufen');
+    this._debug('ViewBase _loadData wird aufgerufen');
     if (!this._dataProvider || !this.config.entity) {
-      this._debug('filterx: ViewBase _loadData: Übersprungen - dataProvider oder entity fehlt', {
+      this._debug('ViewBase _loadData: Übersprungen - dataProvider oder entity fehlt', {
         dataProvider: !!this._dataProvider,
         entity: this.config.entity,
         config: this.config,
@@ -40,13 +40,13 @@ export class ViewBase extends SuperBase {
     this._error = null;
 
     try {
-      this._debug('filterx: Starte _fetchViewData mit Konfiguration:', this.config);
+      this._debug('Starte _fetchViewData mit Konfiguration:', this.config);
       const data = await this._fetchViewData(this.config);
       this.epgData = data;
-      this._debug('filterx: _fetchViewData erfolgreich:', data);
+      this._debug('_fetchViewData erfolgreich:', data);
     } catch (error) {
       this._error = error;
-      this._debug('filterx: Fehler in _fetchViewData:', error);
+      this._debug('Fehler in _fetchViewData:', error);
     } finally {
       this._loading = false;
     }

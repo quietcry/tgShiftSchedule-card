@@ -19,6 +19,7 @@ export class EPGView extends ViewBase {
     _epgData: { type: Object },
     _dataProvider: { type: Object },
     _dataLoaded: { type: Boolean },
+    _dataFetchStarted: { type: Boolean },
   };
 
   static get styles() {
@@ -124,17 +125,18 @@ export class EPGView extends ViewBase {
 
   constructor() {
     super();
-    this._debug('filterx: EPGView-Konstruktor: Start');
+    this._debug('EPGView-Konstruktor: Start');
     this._dataProvider = new DataProvider();
-    this._debug('filterx: EPGView-Konstruktor: DataProvider initialisiert');
+    this._debug('EPGView-Konstruktor: DataProvider initialisiert');
     this._epgData = { channels: [] };
-    this._debug('filterx: EPGView-Konstruktor: Initialisierung abgeschlossen');
+    this._debug('EPGView-Konstruktor: Initialisierung abgeschlossen');
     this._currentTime = Math.floor(Date.now() / 1000);
     this._timeWindow = 'C';
     this._selectedChannel = null;
     this._isDataReady = false;
     this._processedChannels = [];
     this._lastUpdate = null;
+    this._dataFetchStarted = false;
   }
 
   disconnectedCallback() {
@@ -142,7 +144,7 @@ export class EPGView extends ViewBase {
   }
 
   set hass(value) {
-    this._debug('filterx: EPGView set hass wird aufgerufen');
+    this._debug('EPGView set hass wird aufgerufen');
     if (this._hass !== value) {
       const oldState = this._hass?.states[this.config.entity];
       const newState = value?.states[this.config.entity];
@@ -152,23 +154,24 @@ export class EPGView extends ViewBase {
       this._hass = value;
       if (this._dataProvider) {
         this._dataProvider.hass = value;
-        this._debug('filterx: EPGView set hass: DataProvider hass aktualisiert');
+        this._debug('EPGView set hass: DataProvider hass aktualisiert');
       }
 
       // Nur wenn sich last_update ändert oder hass zum ersten Mal gesetzt wird
       if (newLastUpdate !== this._lastUpdate || !this._hass) {
         if (this._hass && this.config.entity) {
           if (newLastUpdate !== this._lastUpdate) {
-            this._debug('filterx: EPGView: last_update hat sich geändert, starte Update', {
+            this._debug('EPGView: last_update hat sich geändert, starte Update', {
               old: this._lastUpdate,
               new: newLastUpdate,
             });
             this._lastUpdate = newLastUpdate;
+            this._dataFetchStarted = false; // Reset flag für neuen Datenabruf
             this._loadData();
           }
         }
       } else {
-        this._debug('filterx: EPGView: last_update unverändert, überspringe Update und Rendering', {
+        this._debug('EPGView: last_update unverändert, überspringe Update und Rendering', {
           lastUpdate: this._lastUpdate,
         });
       }
@@ -215,7 +218,7 @@ export class EPGView extends ViewBase {
       hasEpgBox: !!epgBox,
     });
 
-    return this._dataProvider.fetchEpgData(
+    const result = await this._dataProvider.fetchEpgData(
       config.entity,
       undefined, // Kein time_window
       undefined, // Kein date
@@ -224,7 +227,14 @@ export class EPGView extends ViewBase {
       data => {
         this._debug('EPG-View: Neue EPG-Daten empfangen', {
           kanal: data.channel.name,
+          kanalId: data.channel.id,
           anzahlProgramme: data.programs.length,
+          programme: data.programs.map(p => ({
+            title: p.title,
+            start: p.start,
+            end: p.end || p.stop,
+            duration: p.duration,
+          })),
         });
 
         // Erstelle ein vollständiges Teil-EPG
@@ -233,16 +243,29 @@ export class EPGView extends ViewBase {
           programs: data.programs,
         };
 
+        this._debug('EPG-View: Übergebe Teil-EPG an Box', {
+          teilEpg: teilEpg,
+          kanal: teilEpg.channel.name,
+          anzahlProgramme: teilEpg.programs.length,
+        });
+
         // Übergebe das Teil-EPG an die EPG-Box
         epgBox.addTeilEpg(teilEpg);
         this._debug('EPG-View: Teil-EPG an Box übergeben');
       }
     );
+
+    return result;
   }
 
   _onEpgBoxReady() {
     this._debug('EPG-View: EPG-Box ist bereit, starte Datenabruf');
-    this._fetchViewData(this.config);
+    if (!this._dataFetchStarted) {
+      this._dataFetchStarted = true;
+      this._fetchViewData(this.config);
+    } else {
+      this._debug('EPG-View: Datenabruf bereits gestartet, überspringe');
+    }
   }
 
   firstUpdated() {
@@ -256,9 +279,10 @@ export class EPGView extends ViewBase {
       hasEpgBox: !!epgBox,
     });
 
-    // Wenn die EPG-Box bereits verfügbar ist
-    if (epgBox) {
+    // Wenn die EPG-Box bereits verfügbar ist, starte Datenabruf nur wenn noch nicht gestartet
+    if (epgBox && !this._dataFetchStarted) {
       this._debug('EPG-View: EPG-Box bereits verfügbar, starte Datenabruf');
+      this._dataFetchStarted = true;
       this._fetchViewData(this.config);
     }
   }

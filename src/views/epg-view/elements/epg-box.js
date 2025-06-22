@@ -3,6 +3,8 @@ import { EpgElementBase } from './epg-element-base.js';
 import './epg-program-item.js';
 
 export class EpgBox extends EpgElementBase {
+  static className = 'EpgBox';
+
   static properties = {
     ...super.properties,
     timeWindow: { type: Number },
@@ -27,61 +29,31 @@ export class EpgBox extends EpgElementBase {
 
   updated(changedProperties) {
     if (changedProperties.has('channelOrder')) {
-      this._debug('sortedChannels: channelOrder wurde gesetzt', {
-        channelOrder: this.channelOrder,
-        channelOrderType: typeof this.channelOrder,
-        isArray: Array.isArray(this.channelOrder),
-        channelOrderLength: this.channelOrder?.length,
-      });
-    }
-
-    if (changedProperties.has('epgData')) {
-      console.log('epg-box: Neue Daten erhalten:', this.epgData);
-
-      if (this.epgData?.channel) {
-        console.log('epg-box: Neuer Kanal wird hinzugefügt:', this.epgData.channel.name);
-        this._channels.set(this.epgData.channel.id, this.epgData.channel);
-
-        // Initialisiere die Sortierungsstruktur beim ersten Kanal
-        if (!this._channelOrderInitialized) {
-          this._debug('sortedChannels: Initialisiere Sortierung beim ersten Kanal', {
-            kanalName: this.epgData.channel.name,
-            sortedChannels: this._sortedChannels,
-            channelOrder: this.channelOrder,
-            channelOrderInitialized: this._channelOrderInitialized,
-          });
-          this._initializeChannelOrder();
-        }
-
-        // Sortiere den neuen Kanal in die Struktur ein
-        this._sortChannelIntoStructure(this.epgData.channel);
-
-        console.log(
-          'epg-box: Aktuelle Kanäle:',
-          Array.from(this._channels.values()).map(c => c.name)
-        );
-        this.requestUpdate();
-      }
-    }
-
-    // Wenn sich die channelOrder ändert, aktualisiere die Sortierung
-    if (changedProperties.has('channelOrder')) {
-      this._debug('sortedChannels: channelOrder hat sich geändert, aktualisiere Sortierung', {
-        neueChannelOrder: this.channelOrder,
-        sortedChannels: this._sortedChannels,
-      });
+      this._debug('channelOrder geändert');
       this._channelOrderInitialized = false;
       this._initializeChannelOrder();
       this._updateAllChannelSorting();
       this.requestUpdate();
     }
 
+    if (changedProperties.has('epgData')) {
+      if (this.epgData?.channel) {
+        this._channels.set(this.epgData.channel.id, this.epgData.channel);
+
+        // Initialisiere die Sortierungsstruktur beim ersten Kanal
+        if (!this._channelOrderInitialized) {
+          this._initializeChannelOrder();
+        }
+
+        // Sortiere den neuen Kanal in die Struktur ein
+        this._sortChannelIntoStructure(this.epgData.channel);
+
+        this.requestUpdate();
+      }
+    }
+
     // Wenn sich epgShowWidth ändert, aktualisiere den Scale
     if (changedProperties.has('epgShowWidth')) {
-      this._debug('epgShowWidth hat sich geändert, aktualisiere Scale', {
-        neueEpgShowWidth: this.epgShowWidth,
-        containerWidth: this._containerWidth,
-      });
       this.scale = this._calculateScale();
       this.requestUpdate();
     }
@@ -89,17 +61,9 @@ export class EpgBox extends EpgElementBase {
 
   firstUpdated() {
     super.firstUpdated();
-    this._debug('EPG-Box: firstUpdated - Sende Bereitschaft-Event');
 
     // Initialisiere die Sortierung für alle vorhandenen Kanäle
     if (this._channels.size > 0 && !this._channelOrderInitialized) {
-      this._debug(
-        'sortedChannels: Initialisiere Sortierung für vorhandene Kanäle in firstUpdated',
-        {
-          anzahlVorhandeneKanäle: this._channels.size,
-          sortedChannels: this._sortedChannels,
-        }
-      );
       this._initializeChannelOrder();
       this._updateAllChannelSorting();
     }
@@ -200,6 +164,8 @@ export class EpgBox extends EpgElementBase {
         align-items: center;
         margin: 0; /* Keine äußeren Abstände */
         flex-shrink: 0; /* Verhindert Schrumpfen */
+        height: var(--epg-row-height);
+        box-sizing: border-box;
       }
 
       .channelRow {
@@ -211,6 +177,12 @@ export class EpgBox extends EpgElementBase {
         margin: 0; /* Keine äußeren Abstände */
         flex-shrink: 0; /* Verhindert Schrumpfen */
         flex-grow: 0; /* Verhindert Wachsen */
+        /* Höhenklassen werden über epg-row-height angewendet */
+        height: calc(
+          var(--epg-row-height) + var(--has-time) + var(--has-duration) + var(--has-description) +
+            var(--has-shorttext)
+        );
+        box-sizing: border-box;
       }
 
       .channelRow:nth-child(odd) .channelRowContent {
@@ -311,19 +283,9 @@ export class EpgBox extends EpgElementBase {
   ];
 
   render() {
-    this._debug('EPG-Box: Render wird aufgerufen', {
-      anzahlKanale: this._channels.size,
-      showChannelGroups: this.showChannelGroups,
-      sortedChannels: this._sortedChannels,
-    });
-
     if (!this._channels.size) {
-      console.log('epg-box: Erste Renderung - noch keine Daten');
       return this._renderLoading();
     }
-
-    console.log('=== DEBUG: KANÄLE VORHANDEN ===');
-    console.log('Anzahl Kanäle:', this._channels.size);
 
     // Berechne Scale für die Darstellung
     this.scale = this._calculateScale();
@@ -341,24 +303,6 @@ export class EpgBox extends EpgElementBase {
       // Verwende alle verfügbaren Kanäle direkt
       channelsToRender = Array.from(this._channels.values());
     }
-
-    console.log(
-      'EPG-Box: Kanäle zum Rendern:',
-      channelsToRender.map(c => ({
-        name: c.name,
-        id: c.id,
-        anzahlProgramme: c.programs?.length || 0,
-        programme: c.programs?.map(p => p.title) || [],
-      }))
-    );
-
-    this._debug('EPG-Box: Verwende Kanäle für Rendering', {
-      anzahlKanale: channelsToRender.length,
-      kanalNamen: channelsToRender.map(c => c.name),
-      scale: this.scale,
-      channelsParameters: this._channelsParameters,
-      showChannelGroups: this.showChannelGroups,
-    });
 
     return html`
       <div class="channelBox">
@@ -400,27 +344,12 @@ export class EpgBox extends EpgElementBase {
     startTime.setMinutes(0, 0, 0);
     endTime.setMinutes(0, 0, 0);
 
-    this._debug('_generateTimeSlots: Zeitparameter', {
-      pastTime,
-      futureTime,
-      showWidth,
-      startTime: startTime.toISOString(),
-      endTime: endTime.toISOString(),
-      now: now.toISOString(),
-    });
-
     // Generiere Zeitslots in 30-Minuten-Intervallen
     const currentSlot = new Date(startTime);
     while (currentSlot <= endTime) {
       slots.push(new Date(currentSlot));
       currentSlot.setMinutes(currentSlot.getMinutes() + 30);
     }
-
-    this._debug('_generateTimeSlots: Generierte Slots', {
-      anzahlSlots: slots.length,
-      ersteSlot: slots[0]?.toISOString(),
-      letzteSlot: slots[slots.length - 1]?.toISOString(),
-    });
 
     return slots;
   }
@@ -430,19 +359,20 @@ export class EpgBox extends EpgElementBase {
   }
 
   _getProgramsForChannel(channel, timeSlots) {
+    this._debug('EpgBox: _getProgramsForChannel gestartet', {
+      kanal: channel.name,
+      anzahlProgrammeVorher: channel.programs?.length || 0,
+      pastTime: this.epgPastTime || 30,
+      futureTime: this.epgFutureTime || 120,
+    });
+
     if (!channel.programs) {
-      this._debug('_getProgramsForChannel: Keine Programme für Kanal', {
-        kanal: channel.name,
-        hatProgramme: !!channel.programs,
-      });
+      this._debug('EpgBox: Keine Programme für Kanal', { kanal: channel.name });
       return [];
     }
 
     if (!Array.isArray(channel.programs) || channel.programs.length === 0) {
-      this._debug('_getProgramsForChannel: Leeres Programm-Array für Kanal', {
-        kanal: channel.name,
-        programme: channel.programs,
-      });
+      this._debug('EpgBox: Leeres Programm-Array für Kanal', { kanal: channel.name });
       return [];
     }
 
@@ -454,30 +384,26 @@ export class EpgBox extends EpgElementBase {
     const startTime = new Date(now.getTime() - pastTime * 60 * 1000);
     const endTime = new Date(now.getTime() + futureTime * 60 * 1000);
 
-    this._debug('_getProgramsForChannel: Zeitfilterung', {
+    this._debug('EpgBox: Zeitfenster für Filterung', {
       kanal: channel.name,
-      anzahlProgramme: channel.programs.length,
+      now: now.toISOString(),
       startTime: startTime.toISOString(),
       endTime: endTime.toISOString(),
-      now: now.toISOString(),
-      programme: channel.programs.map(p => ({
-        title: p.title,
-        start: p.start,
-        stop: p.stop,
-        end: p.end,
-        startDate: new Date(p.start * 1000).toISOString(),
-        endDate: new Date((p.end || p.stop) * 1000).toISOString(),
-      })),
+      pastTime,
+      futureTime,
     });
 
     const filteredPrograms = channel.programs.filter(program => {
       // Stelle sicher, dass die Programme gültige Zeitstempel haben
       if (!program.start || !(program.end || program.stop)) {
-        this._debug('_getProgramsForChannel: Programm ohne gültige Zeitstempel', {
-          title: program.title,
-          start: program.start,
-          end: program.end,
-          stop: program.stop,
+        this._debug('EpgBox: Programm ohne gültige Zeitstempel verworfen', {
+          kanal: channel.name,
+          program: {
+            title: program.title,
+            start: program.start,
+            end: program.end,
+            stop: program.stop,
+          },
         });
         return false;
       }
@@ -489,19 +415,30 @@ export class EpgBox extends EpgElementBase {
       // Zeige Programme an, die sich mit dem Zeitfenster überschneiden
       const overlaps = programStart < endTime && programEnd > startTime;
 
-      this._debug('_getProgramsForChannel: Programm-Prüfung', {
-        title: program.title,
-        startTimestamp: program.start,
-        stopTimestamp: program.stop,
-        endTimestamp: program.end,
-        programStart: programStart.toISOString(),
-        programEnd: programEnd.toISOString(),
-        overlaps,
-        startTime: startTime.toISOString(),
-        endTime: endTime.toISOString(),
-      });
+      if (!overlaps) {
+        this._debug('EpgBox: Programm außerhalb Zeitfenster verworfen', {
+          kanal: channel.name,
+          program: {
+            title: program.title,
+            start: programStart.toISOString(),
+            end: programEnd.toISOString(),
+            overlaps,
+          },
+        });
+      }
 
       return overlaps;
+    });
+
+    this._debug('EpgBox: Filterung abgeschlossen', {
+      kanal: channel.name,
+      anzahlVorher: channel.programs.length,
+      anzahlNachher: filteredPrograms.length,
+      gefilterteProgramme: filteredPrograms.map(p => ({
+        title: p.title,
+        start: new Date(p.start * 1000).toISOString(),
+        end: new Date((p.end || p.stop) * 1000).toISOString(),
+      })),
     });
 
     // Berechne minTime und maxTime über alle gefilterten Programme
@@ -520,21 +457,16 @@ export class EpgBox extends EpgElementBase {
         this._channelsParameters.maxTime = maxEnd;
       }
 
-      this._debug('_getProgramsForChannel: _channelsParameters aktualisiert', {
+      this._debug('EpgBox: Zeitparameter aktualisiert', {
         kanal: channel.name,
-        anzahlGefilterteProgramme: filteredPrograms.length,
-        minStart,
-        maxEnd,
-        channelsParameters: this._channelsParameters,
+        minStart: new Date(minStart * 1000).toISOString(),
+        maxEnd: new Date(maxEnd * 1000).toISOString(),
+        channelsParameters: {
+          minTime: new Date(this._channelsParameters.minTime * 1000).toISOString(),
+          maxTime: new Date(this._channelsParameters.maxTime * 1000).toISOString(),
+        },
       });
     }
-
-    this._debug('_getProgramsForChannel: Gefilterte Programme', {
-      kanal: channel.name,
-      anzahlVorher: channel.programs.length,
-      anzahlNachher: filteredPrograms.length,
-      gefilterteProgramme: filteredPrograms.map(p => p.title),
-    });
 
     return filteredPrograms;
   }
@@ -561,15 +493,22 @@ export class EpgBox extends EpgElementBase {
   }
 
   addEpgData(data) {
-    this._debug('EPG-Box: EPG-Daten empfangen', {
+    this._debug('EPG-Daten empfangen (addEpgData)', {
       kanal: data?.channel?.name,
+      kanalId: data?.channel?.id,
       anzahlProgramme: data?.programs?.length,
+      programme: data?.programs?.map(p => ({
+        title: p.title,
+        start: p.start,
+        end: p.end || p.stop,
+        duration: p.duration,
+      })),
     });
 
     if (data?.channel?.id) {
       const channel = this._channels.get(data.channel.id);
       if (channel) {
-        this._debug('EPG-Box: Aktualisiere Programme für Kanal', {
+        this._debug('EpgBox: Aktualisiere Programme für bestehenden Kanal', {
           kanal: channel.name,
           alteAnzahl: channel.programs.length,
           neueAnzahl: data.programs.length,
@@ -577,24 +516,32 @@ export class EpgBox extends EpgElementBase {
         channel.programs = data.programs || [];
         this._channels.set(data.channel.id, channel);
         this.requestUpdate();
-        this._debug('EPG-Box: Update angefordert');
       } else {
-        this._debug('EPG-Box: Kanal nicht gefunden', {
+        this._debug('EpgBox: Kanal nicht gefunden in addEpgData', {
           kanalId: data.channel.id,
+          verfügbareKanäle: Array.from(this._channels.keys()),
         });
       }
     } else {
-      this._debug('EPG-Box: Ungültige EPG-Daten', {
+      this._debug('EpgBox: Ungültige EPG-Daten in addEpgData', {
         hatKanal: !!data?.channel,
         hatKanalId: !!data?.channel?.id,
+        data: data,
       });
     }
   }
 
   addTeilEpg(teilEpg) {
-    this._debug('EPG-Box: Teil-EPG empfangen', {
+    this._debug('EpgBox: Teil-EPG empfangen', {
       kanal: teilEpg?.channel?.name,
+      kanalId: teilEpg?.channel?.id,
       anzahlProgramme: teilEpg?.programs?.length,
+      programme: teilEpg?.programs?.map(p => ({
+        title: p.title,
+        start: p.start,
+        end: p.end || p.stop,
+        duration: p.duration,
+      })),
     });
 
     if (teilEpg?.channel?.id && teilEpg?.programs) {
@@ -604,47 +551,48 @@ export class EpgBox extends EpgElementBase {
         programs: teilEpg.programs,
       });
 
-      this._debug('EPG-Box: Kanal gespeichert', {
+      // Initialisiere die Sortierungsstruktur beim ersten Kanal
+      if (!this._channelOrderInitialized) {
+        this._initializeChannelOrder();
+      }
+
+      // Sortiere den neuen Kanal in die Struktur ein
+      this._sortChannelIntoStructure(teilEpg.channel);
+
+      this._debug('EpgBox: Kanal erfolgreich gespeichert', {
         kanal: teilEpg.channel.name,
         anzahlProgramme: teilEpg.programs.length,
         gesamtKanale: this._channels.size,
+        sortedChannels: this._sortedChannels.map(g => ({
+          name: g.name,
+          patterns: g.patterns.map(p => ({
+            pattern: p.pattern,
+            anzahlKanäle: p.channels.length,
+            kanalNamen: p.channels.map(c => c.name),
+          })),
+        })),
       });
 
       this.requestUpdate();
-      this._debug('EPG-Box: Update angefordert');
     } else {
-      this._debug('EPG-Box: Ungültiges Teil-EPG', {
+      this._debug('EpgBox: Ungültiges Teil-EPG - Daten werden verworfen', {
         hatKanal: !!teilEpg?.channel,
         hatKanalId: !!teilEpg?.channel?.id,
         hatProgramme: !!teilEpg?.programs,
+        teilEpg: teilEpg,
       });
     }
   }
 
   // Neue Methode: Initialisiert die Sortierungsstruktur basierend auf channelOrder
   _initializeChannelOrder() {
-    this._debug('EpgBox: Initialisiere Sortierungsstruktur', {
-      channelOrder: this.channelOrder,
-      channelOrderType: typeof this.channelOrder,
-      isArray: Array.isArray(this.channelOrder),
-      channelOrderLength: this.channelOrder?.length,
-    });
-
     // Parse YAML-String zu Array, falls channelOrder ein String ist
     let parsedChannelOrder = this.channelOrder;
     if (typeof this.channelOrder === 'string' && this.channelOrder.trim()) {
       try {
         // Einfacher YAML-Parser für unsere spezifische Struktur
         parsedChannelOrder = this._parseYamlString(this.channelOrder);
-        this._debug('sortedChannels: YAML erfolgreich geparst', {
-          originalString: this.channelOrder,
-          parsedResult: parsedChannelOrder,
-        });
       } catch (error) {
-        this._debug('sortedChannels: Fehler beim YAML-Parsing', {
-          error: error.message,
-          originalString: this.channelOrder,
-        });
         parsedChannelOrder = [];
       }
     }
@@ -654,7 +602,6 @@ export class EpgBox extends EpgElementBase {
       !Array.isArray(parsedChannelOrder) ||
       parsedChannelOrder.length === 0
     ) {
-      this._debug('EpgBox: Keine gültige channelOrder definiert, verwende Standard-Sortierung');
       this._sortedChannels = [
         {
           name: 'Alle Kanäle',
@@ -669,17 +616,6 @@ export class EpgBox extends EpgElementBase {
         },
       ];
       this._channelOrderInitialized = true;
-      this._debug('sortedChannels: Standard-Struktur erstellt', {
-        anzahlGruppen: this._sortedChannels.length,
-        gruppen: this._sortedChannels.map(g => ({
-          name: g.name,
-          patterns: g.patterns.map(p => ({
-            pattern: p.pattern,
-            anzahlKanäle: p.channels.length,
-          })),
-        })),
-        sortedChannels: this._sortedChannels,
-      });
       return;
     }
 
@@ -707,14 +643,6 @@ export class EpgBox extends EpgElementBase {
           style: item.style || '',
           patterns: patterns,
         });
-
-        this._debug('sortedChannels: Gruppe mit definierten Kanälen hinzugefügt', {
-          gruppenName: item.name,
-          patterns: patterns.map(p => ({ pattern: p.pattern, style: p.style })),
-          anzahlPatterns: patterns.length,
-          aktuelleAnzahlGruppen: this._sortedChannels.length,
-          sortedChannels: this._sortedChannels,
-        });
       } else if (item.name) {
         // Einzelner Kanal oder Gruppe ohne definierte Kanäle
         this._sortedChannels.push({
@@ -727,13 +655,6 @@ export class EpgBox extends EpgElementBase {
               channels: [], // Kanäle werden direkt hier gespeichert
             },
           ],
-        });
-
-        this._debug('sortedChannels: Einzelgruppe hinzugefügt', {
-          gruppenName: item.name,
-          pattern: item.name,
-          aktuelleAnzahlGruppen: this._sortedChannels.length,
-          sortedChannels: this._sortedChannels,
         });
       }
     });
@@ -752,25 +673,10 @@ export class EpgBox extends EpgElementBase {
     });
 
     this._channelOrderInitialized = true;
-    this._debug('sortedChannels: Sortierungsstruktur vollständig initialisiert', {
-      anzahlGruppen: this._sortedChannels.length,
-      gruppen: this._sortedChannels.map(g => ({
-        name: g.name,
-        patterns: g.patterns.map(p => ({
-          pattern: p.pattern,
-          anzahlKanäle: p.channels.length,
-        })),
-      })),
-      sortedChannels: this._sortedChannels,
-    });
   }
 
   // Neue Methode: Parst YAML-String zu Array
   _parseYamlString(yamlString) {
-    this._debug('sortedChannels: Starte YAML-Parsing', {
-      yamlString: yamlString,
-    });
-
     const lines = yamlString.split('\n');
     const result = [];
     let currentGroup = null;
@@ -792,14 +698,9 @@ export class EpgBox extends EpgElementBase {
         };
         result.push(currentGroup);
         currentIndent = indent;
-        this._debug('sortedChannels: Neue Gruppe erkannt', {
-          groupName: groupName,
-          indent: indent,
-        });
       }
       // channels: Zeile
       else if (line === 'channels:' && currentGroup) {
-        this._debug('sortedChannels: channels-Sektion erkannt');
         // Nächste Zeilen sind Kanäle
         let j = i + 1;
         while (j < lines.length) {
@@ -815,10 +716,6 @@ export class EpgBox extends EpgElementBase {
               name: channelName,
               style: '',
             });
-            this._debug('sortedChannels: Kanal zu Gruppe hinzugefügt', {
-              groupName: currentGroup.name,
-              channelName: channelName,
-            });
           }
           j++;
         }
@@ -826,32 +723,15 @@ export class EpgBox extends EpgElementBase {
       }
     }
 
-    this._debug('sortedChannels: YAML-Parsing abgeschlossen', {
-      result: result,
-    });
-
     return result;
   }
 
   // Neue Methode: Sortiert einen Kanal in die Struktur ein
   _sortChannelIntoStructure(channel) {
-    this._debug('sortedChannels: Starte Einsortierung von Kanal', {
-      kanalName: channel.name,
-      kanalId: channel.id,
-      aktuelleAnzahlGruppen: this._sortedChannels.length,
-      sortedChannels: this._sortedChannels,
-    });
-
     // Prüfe, ob der Kanal bereits in einem Pattern ist
     for (const group of this._sortedChannels) {
       for (const patternConfig of group.patterns) {
         if (patternConfig.channels.some(c => c.id === channel.id)) {
-          this._debug('sortedChannels: Kanal bereits in Pattern vorhanden', {
-            kanalName: channel.name,
-            gruppe: group.name,
-            pattern: patternConfig.pattern,
-            sortedChannels: this._sortedChannels,
-          });
           return;
         }
       }
@@ -862,7 +742,8 @@ export class EpgBox extends EpgElementBase {
       for (const patternConfig of group.patterns) {
         try {
           const regex = new RegExp(patternConfig.pattern, 'i');
-          if (regex.test(channel.name)) {
+          const match = regex.test(channel.name);
+          if (match) {
             // Kanal passt zu diesem Pattern
             const channelWithStyle = {
               ...channel,
@@ -876,36 +757,12 @@ export class EpgBox extends EpgElementBase {
               patternConfig.channels.sort((a, b) =>
                 a.name.localeCompare(b.name, 'de', { numeric: true })
               );
-              this._debug('sortedChannels: Kanäle in Pattern alphanumerisch sortiert', {
-                pattern: patternConfig.pattern,
-                gruppe: group.name,
-                anzahlKanäle: patternConfig.channels.length,
-                sortierteKanalNamen: patternConfig.channels.map(c => c.name),
-                sortedChannels: this._sortedChannels,
-              });
             }
 
-            this._debug('sortedChannels: Kanal erfolgreich zu Pattern hinzugefügt', {
-              kanalName: channel.name,
-              gruppe: group.name,
-              pattern: patternConfig.pattern,
-              style: patternConfig.style,
-              neueAnzahlKanäleInPattern: patternConfig.channels.length,
-              gesamtAnzahlKanäle: this._sortedChannels.flatMap(g =>
-                g.patterns.flatMap(p => p.channels)
-              ).length,
-              sortedChannels: this._sortedChannels,
-            });
             return;
           }
         } catch (error) {
-          this._debug('sortedChannels: Fehler beim Pattern-Matching', {
-            pattern: patternConfig.pattern,
-            kanalName: channel.name,
-            gruppe: group.name,
-            error: error.message,
-            sortedChannels: this._sortedChannels,
-          });
+          // Ignoriere ungültige Regex-Patterns
         }
       }
     }
@@ -929,49 +786,16 @@ export class EpgBox extends EpgElementBase {
         sonstigeGroup.patterns[0].channels.sort((a, b) =>
           a.name.localeCompare(b.name, 'de', { numeric: true })
         );
-        this._debug('sortedChannels: Kanäle in Sonstige-Gruppe alphanumerisch sortiert', {
-          anzahlKanäle: sonstigeGroup.patterns[0].channels.length,
-          sortierteKanalNamen: sonstigeGroup.patterns[0].channels.map(c => c.name),
-          sortedChannels: this._sortedChannels,
-        });
       }
-
-      this._debug('sortedChannels: Kanal zur Sonstige-Gruppe hinzugefügt', {
-        kanalName: channel.name,
-        neueAnzahlKanäleInSonstige: sonstigeGroup.patterns[0].channels.length,
-        gesamtAnzahlKanäle: this._sortedChannels.flatMap(g => g.patterns.flatMap(p => p.channels))
-          .length,
-        sortedChannels: this._sortedChannels,
-      });
-    } else {
-      this._debug('sortedChannels: FEHLER - Sonstige-Gruppe nicht gefunden', {
-        kanalName: channel.name,
-        verfügbareGruppen: this._sortedChannels.map(g => g.name),
-        sortedChannels: this._sortedChannels,
-      });
     }
   }
 
   // Neue Methode: Aktualisiert die Sortierung für alle vorhandenen Kanäle
   _updateAllChannelSorting() {
-    this._debug('sortedChannels: Starte Neusortierung aller Kanäle', {
-      anzahlVorhandeneKanäle: this._channels.size,
-      anzahlGruppen: this._sortedChannels.length,
-      sortedChannels: this._sortedChannels,
-    });
-
     // Leere alle Pattern-Kanäle
     this._sortedChannels.forEach(group => {
       group.patterns.forEach(pattern => {
-        const alteAnzahl = pattern.channels.length;
         pattern.channels = [];
-        this._debug('sortedChannels: Pattern geleert', {
-          gruppenName: group.name,
-          pattern: pattern.pattern,
-          alteAnzahlKanäle: alteAnzahl,
-          neueAnzahlKanäle: 0,
-          sortedChannels: this._sortedChannels,
-        });
       });
     });
 
@@ -982,20 +806,6 @@ export class EpgBox extends EpgElementBase {
 
     // Sortiere alle Pattern-Kanäle alphanumerisch
     this._sortAllPatternChannels();
-
-    this._debug('sortedChannels: Neusortierung aller Kanäle abgeschlossen', {
-      gesamtAnzahlKanäle: this._sortedChannels.flatMap(g => g.patterns.flatMap(p => p.channels))
-        .length,
-      gruppenStatus: this._sortedChannels.map(g => ({
-        name: g.name,
-        patterns: g.patterns.map(p => ({
-          pattern: p.pattern,
-          anzahlKanäle: p.channels.length,
-          kanalNamen: p.channels.map(c => c.name),
-        })),
-      })),
-      sortedChannels: this._sortedChannels,
-    });
   }
 
   // Neue Hilfsmethode: Sortiert alle Kanäle in allen Patterns alphanumerisch
@@ -1004,13 +814,6 @@ export class EpgBox extends EpgElementBase {
       group.patterns.forEach(pattern => {
         if (pattern.channels.length > 1) {
           pattern.channels.sort((a, b) => a.name.localeCompare(b.name, 'de', { numeric: true }));
-          this._debug('sortedChannels: Pattern-Kanäle alphanumerisch sortiert', {
-            gruppe: group.name,
-            pattern: pattern.pattern,
-            anzahlKanäle: pattern.channels.length,
-            sortierteKanalNamen: pattern.channels.map(c => c.name),
-            sortedChannels: this._sortedChannels,
-          });
         }
       });
     });
@@ -1024,13 +827,6 @@ export class EpgBox extends EpgElementBase {
     // Berechne Scale: Container-Breite / Anzeigebreite in Minuten
     const scale = containerWidth / showWidth;
 
-    this._debug('_calculateScale', {
-      containerWidth,
-      showWidth,
-      scale,
-      containerWidthMeasured: this._containerWidthMeasured,
-    });
-
     return scale;
   }
 
@@ -1042,12 +838,6 @@ export class EpgBox extends EpgElementBase {
       if (measuredWidth > 0) {
         this._containerWidth = measuredWidth;
         this._containerWidthMeasured = true;
-
-        this._debug('_measureContainerWidth', {
-          measuredWidth,
-          oldWidth: this._containerWidth,
-          containerWidthMeasured: this._containerWidthMeasured,
-        });
 
         // Recalculate scale with new container width
         this.scale = this._calculateScale();
@@ -1113,6 +903,14 @@ export class EpgBox extends EpgElementBase {
   }
 
   _renderGroupedPrograms() {
+    this._debug('EpgBox: _renderGroupedPrograms gestartet', {
+      anzahlGruppen: this._sortedChannels.length,
+      gruppen: this._sortedChannels.map(g => ({
+        name: g.name,
+        anzahlKanäle: g.patterns.flatMap(p => p.channels).length,
+      })),
+    });
+
     let rowIndex = 0;
     return this._sortedChannels.map(group => {
       // Sammle alle Kanäle aus allen Patterns der Gruppe
@@ -1121,6 +919,12 @@ export class EpgBox extends EpgElementBase {
       if (groupChannels.length === 0) {
         return html``; // Leere Gruppe nicht anzeigen
       }
+
+      this._debug('EpgBox: Rendere gruppierte Programme für Gruppe', {
+        gruppenName: group.name,
+        anzahlKanäle: groupChannels.length,
+        kanalNamen: groupChannels.map(c => c.name),
+      });
 
       return html`
         <!-- Leere Zeilen für Gruppen-Header -->
@@ -1131,14 +935,26 @@ export class EpgBox extends EpgElementBase {
         </div>
         <!-- Programme der Gruppe -->
         ${groupChannels.map(channel => {
-          const programs = this._getProgramsForChannel(channel, this._generateTimeSlots());
+          // Hole den vollständigen Kanal mit Programmen aus der _channels Map
+          const fullChannel = this._channels.get(channel.id);
+          const programs = fullChannel
+            ? this._getProgramsForChannel(fullChannel, this._generateTimeSlots())
+            : [];
           const currentRowIndex = rowIndex++;
 
-          console.log(
-            `EPG-Box: Programme für ${channel.name}:`,
-            programs.length,
-            programs.map(p => p.title)
-          );
+          this._debug('EpgBox: Rendere gruppierte Programme für Kanal', {
+            gruppenName: group.name,
+            kanal: channel.name,
+            kanalId: channel.id,
+            hatVollständigenKanal: !!fullChannel,
+            rowIndex: currentRowIndex,
+            anzahlProgramme: programs.length,
+            programme: programs.map(p => ({
+              title: p.title,
+              start: new Date(p.start * 1000).toISOString(),
+              end: new Date((p.end || p.stop) * 1000).toISOString(),
+            })),
+          });
 
           return html`
             <div
@@ -1237,14 +1053,30 @@ export class EpgBox extends EpgElementBase {
   }
 
   _renderSimplePrograms(channels) {
-    return channels.map((channel, rowIndex) => {
-      const programs = this._getProgramsForChannel(channel, this._generateTimeSlots());
+    this._debug('EpgBox: _renderSimplePrograms gestartet', {
+      anzahlKanäle: channels.length,
+      kanalNamen: channels.map(c => c.name),
+    });
 
-      console.log(
-        `EPG-Box: Programme für ${channel.name}:`,
-        programs.length,
-        programs.map(p => p.title)
-      );
+    return channels.map((channel, rowIndex) => {
+      // Hole den vollständigen Kanal mit Programmen aus der _channels Map
+      const fullChannel = this._channels.get(channel.id);
+      const programs = fullChannel
+        ? this._getProgramsForChannel(fullChannel, this._generateTimeSlots())
+        : [];
+
+      this._debug('EpgBox: Rendere einfache Programme für Kanal', {
+        kanal: channel.name,
+        kanalId: channel.id,
+        hatVollständigenKanal: !!fullChannel,
+        rowIndex,
+        anzahlProgramme: programs.length,
+        programme: programs.map(p => ({
+          title: p.title,
+          start: new Date(p.start * 1000).toISOString(),
+          end: new Date((p.end || p.stop) * 1000).toISOString(),
+        })),
+      });
 
       return html`
         <div

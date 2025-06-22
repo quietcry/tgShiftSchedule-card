@@ -2,6 +2,8 @@ import { css } from 'lit';
 import { SuperBase } from './super-base.js';
 
 export class CardBase extends SuperBase {
+  static className = 'CardBase';
+
   static properties = {
     ...super.properties,
     _selectedTab: { type: Number },
@@ -10,14 +12,13 @@ export class CardBase extends SuperBase {
   constructor() {
     super();
     this._selectedTab = 0;
-    if (this.constructor.debugMode)
-      console.debug(`[${this.constructor.cardName}] CardBase-Modul wird geladen`);
+    this._debug(`CardBase-Modul wird geladen`);
   }
 
   async firstUpdated() {
-    this._debug('filterx: CardBase firstUpdated: Start');
+    this._debug('CardBase firstUpdated: Start');
     await super.firstUpdated();
-    this._debug('filterx: CardBase firstUpdated: Ende');
+    this._debug('CardBase firstUpdated: Ende');
   }
 
   setConfig(config) {
