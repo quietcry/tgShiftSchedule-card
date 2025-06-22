@@ -107,7 +107,9 @@ export class EpgScrollManager {
     const programBox = this.epgBox.shadowRoot?.querySelector('.programBox');
 
     if (!channelBox || !programBox) {
-      this.epgBox._debug('EpgScrollManager: ChannelBox oder ProgramBox nicht gefunden für Scroll-Sync');
+      this.epgBox._debug(
+        'EpgScrollManager: ChannelBox oder ProgramBox nicht gefunden für Scroll-Sync'
+      );
       return;
     }
 

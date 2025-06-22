@@ -139,7 +139,10 @@ export class EpgRenderManager {
 
                 // Füge alle Programme hinzu
                 programs.forEach((program, index) => {
-                  const duration = this.epgBox._calculateDuration(program.start, program.end || program.stop);
+                  const duration = this.epgBox._calculateDuration(
+                    program.start,
+                    program.end || program.stop
+                  );
                   const width = duration * this.epgBox.scale;
 
                   // Füge Lücke zwischen Programmen hinzu
@@ -151,7 +154,10 @@ export class EpgRenderManager {
                     );
                     if (gapDuration > 0) {
                       items.push(html`
-                        <div class="noPrograms" style="width: ${gapDuration * this.epgBox.scale}px;">
+                        <div
+                          class="noPrograms"
+                          style="width: ${gapDuration * this.epgBox.scale}px;"
+                        >
                           <!-- Leerer Bereich zwischen Programmen -->
                         </div>
                       `);
@@ -168,7 +174,7 @@ export class EpgRenderManager {
                       .showDescription=${this.epgBox.showDescription}
                       .showShortText=${this.epgBox.showShortText}
                       style="width: ${width}px;"
-                      @program-selected=${(e) => this.epgBox._onProgramSelected(e.detail)}
+                      @program-selected=${e => this.epgBox._onProgramSelected(e.detail)}
                     ></epg-program-item>
                   `);
                   itemIndex++;
@@ -176,11 +182,7 @@ export class EpgRenderManager {
 
                 return items;
               })()
-            : html`
-                <div class="noPrograms">
-                  Keine Programme verfügbar
-                </div>
-              `}
+            : html` <div class="noPrograms">Keine Programme verfügbar</div> `}
         </div>
       `;
     });
@@ -225,7 +227,10 @@ export class EpgRenderManager {
           // Hole den vollständigen Kanal mit Programmen aus der _channels Map
           const fullChannel = this.epgBox._channels.get(channel.id);
           const programs = fullChannel
-            ? this.epgBox.dataManager.getProgramsForChannel(fullChannel, this.epgBox.dataManager.generateTimeSlots())
+            ? this.epgBox.dataManager.getProgramsForChannel(
+                fullChannel,
+                this.epgBox.dataManager.generateTimeSlots()
+              )
             : [];
           const currentRowIndex = rowIndex++;
 
@@ -269,7 +274,10 @@ export class EpgRenderManager {
                       );
                       if (gapDuration > 0) {
                         items.push(html`
-                          <div class="noPrograms" style="width: ${gapDuration * this.epgBox.scale}px;">
+                          <div
+                            class="noPrograms"
+                            style="width: ${gapDuration * this.epgBox.scale}px;"
+                          >
                             <!-- Leerer Bereich vor dem ersten Programm -->
                           </div>
                         `);
@@ -279,7 +287,10 @@ export class EpgRenderManager {
 
                     // Füge alle Programme hinzu
                     programs.forEach((program, index) => {
-                      const duration = this.epgBox._calculateDuration(program.start, program.end || program.stop);
+                      const duration = this.epgBox._calculateDuration(
+                        program.start,
+                        program.end || program.stop
+                      );
                       const width = duration * this.epgBox.scale;
 
                       // Füge Lücke zwischen Programmen hinzu
@@ -291,7 +302,10 @@ export class EpgRenderManager {
                         );
                         if (gapDuration > 0) {
                           items.push(html`
-                            <div class="noPrograms" style="width: ${gapDuration * this.epgBox.scale}px;">
+                            <div
+                              class="noPrograms"
+                              style="width: ${gapDuration * this.epgBox.scale}px;"
+                            >
                               <!-- Leerer Bereich zwischen Programmen -->
                             </div>
                           `);
@@ -308,7 +322,7 @@ export class EpgRenderManager {
                           .showDescription=${this.epgBox.showDescription}
                           .showShortText=${this.epgBox.showShortText}
                           style="width: ${width}px;"
-                          @program-selected=${(e) => this.epgBox._onProgramSelected(e.detail)}
+                          @program-selected=${e => this.epgBox._onProgramSelected(e.detail)}
                         ></epg-program-item>
                       `);
                       itemIndex++;
@@ -316,11 +330,7 @@ export class EpgRenderManager {
 
                     return items;
                   })()
-                : html`
-                    <div class="noPrograms">
-                      Keine Programme verfügbar
-                    </div>
-                  `}
+                : html` <div class="noPrograms">Keine Programme verfügbar</div> `}
             </div>
           `;
         })}

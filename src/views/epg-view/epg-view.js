@@ -254,7 +254,7 @@ export class EPGView extends ViewBase {
         this._debug('EPG-View: Teil-EPG an Box übergeben');
       },
       // Callback für Abschluss (wird aufgerufen, wenn alle Daten abgeschlossen sind)
-      (completeData) => {
+      completeData => {
         this._debug('EPG-View: Alle EPG-Daten abgeschlossen', {
           anzahlKanäle: completeData.length,
           gesamtProgramme: completeData.reduce((sum, c) => sum + c.programs.length, 0),

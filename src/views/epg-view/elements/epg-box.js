@@ -65,7 +65,11 @@ export class EpgBox extends EpgElementBase {
     }
 
     // Prüfe epgBackview Validierung
-    if (changedProperties.has('epgBackview') || changedProperties.has('epgPastTime') || changedProperties.has('epgShowWidth')) {
+    if (
+      changedProperties.has('epgBackview') ||
+      changedProperties.has('epgPastTime') ||
+      changedProperties.has('epgShowWidth')
+    ) {
       this.scaleManager.validateEpgBackview();
     }
 
@@ -348,7 +352,10 @@ export class EpgBox extends EpgElementBase {
     return html`
       <div class="epgBox">
         <!-- Channel-Box -->
-        <div class="channelBox" style="flex-basis: ${this.channelWidth}px; width: ${this.channelWidth}px;">
+        <div
+          class="channelBox"
+          style="flex-basis: ${this.channelWidth}px; width: ${this.channelWidth}px;"
+        >
           ${this.showChannelGroups && this._sortedChannels.length > 0
             ? this.renderManager.renderGroupedChannels()
             : this.renderManager.renderSimpleChannels(channelsToRender)}
