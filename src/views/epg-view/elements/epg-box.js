@@ -75,28 +75,6 @@ export class EpgBox extends EpgElementBase {
 
       // Rufe testIsFirstLoadCompleteUpdated auf, wenn ein Teil-EPG fertig angezeigt wird
       this.testIsFirstLoadCompleteUpdated();
-
-      // Wenn alle Updates abgeschlossen sind und es der erste Load war
-      if (this.isChannelUpdate === 0 && this.isFirstLoad === 1) {
-        this.isFirstLoad = 2;
-        this._debug('EpgBox: Erster Load abgeschlossen', {
-          isFirstLoad: this.isFirstLoad,
-          isChannelUpdate: this.isChannelUpdate,
-        });
-
-        // Sende Event, dass der erste Load abgeschlossen ist
-        this.dispatchEvent(
-          new CustomEvent('epg-first-load-complete', {
-            detail: {
-              isFirstLoad: this.isFirstLoad,
-              isChannelUpdate: this.isChannelUpdate,
-              channelCount: this._channels.size,
-            },
-            bubbles: true,
-            composed: true,
-          })
-        );
-      }
     }
   }
 
