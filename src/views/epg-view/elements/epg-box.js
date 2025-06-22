@@ -105,6 +105,72 @@ export class EpgBox extends EpgElementBase {
         })
       );
     }
+
+    // Scroll ProgramBox wenn isFirstLoad < 2
+    if (this.isFirstLoad < 2) {
+      this._scrollToBackviewPosition();
+    }
+  }
+
+  _scrollToBackviewPosition() {
+    const programBox = this.shadowRoot?.querySelector('.programBox');
+    if (!programBox) {
+      this._debug('EpgBox: ProgramBox nicht gefunden für Scroll');
+      return;
+    }
+
+    const now = new Date();
+    const backviewMinutes = this.epgBackview || 0;
+    const targetTime = new Date(now.getTime() - backviewMinutes * 60 * 1000);
+
+    this._debug('EpgBox: Scroll zu Backview-Position', {
+      jetzt: now.toISOString(),
+      backviewMinutes,
+      targetTime: targetTime.toISOString(),
+      isFirstLoad: this.isFirstLoad,
+    });
+
+    // Berechne Scroll-Position basierend auf der Zeit
+    const scrollPosition = this._calculateScrollPositionForTime(targetTime);
+
+    if (scrollPosition !== null) {
+      programBox.scrollLeft = scrollPosition;
+      this._debug('EpgBox: ProgramBox gescrollt', {
+        scrollPosition,
+        targetTime: targetTime.toISOString(),
+      });
+    }
+  }
+
+  _calculateScrollPositionForTime(targetTime) {
+    // Berechne die Scroll-Position basierend auf der Ziel-Zeit
+    const now = new Date();
+    const pastTime = this.epgPastTime || 30;
+    const showWidth = this.epgShowWidth || 180;
+
+    // Berechne die Gesamtbreite des sichtbaren Bereichs in Pixeln
+    const totalWidth = this._containerWidth || 1200;
+
+    // Berechne die Zeitdifferenz in Minuten
+    const timeDiffMinutes = (now.getTime() - targetTime.getTime()) / (1000 * 60);
+
+    // Berechne die Position als Prozentsatz der Gesamtzeit
+    const totalTimeMinutes = pastTime + showWidth;
+    const positionPercent = Math.max(0, Math.min(1, timeDiffMinutes / totalTimeMinutes));
+
+    // Berechne die Scroll-Position in Pixeln
+    const scrollPosition = positionPercent * totalWidth;
+
+    this._debug('EpgBox: Scroll-Position berechnet', {
+      targetTime: targetTime.toISOString(),
+      timeDiffMinutes,
+      totalTimeMinutes,
+      positionPercent,
+      scrollPosition,
+      totalWidth,
+    });
+
+    return scrollPosition;
   }
 
   _validateEpgBackview() {
