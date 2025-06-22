@@ -19,6 +19,7 @@ export class EpgBox extends EpgElementBase {
     showChannelGroups: { type: Boolean }, // Zeigt Kanalgruppen an
     scale: { type: Number },
     showShortText: { type: Boolean },
+    channelWidth: { type: Number }, // Breite der Kanalspalte in px
   };
 
   constructor() {
@@ -32,6 +33,7 @@ export class EpgBox extends EpgElementBase {
     this._containerWidthMeasured = false; // Flag für gemessene Container-Breite
     this.isFirstLoad = 0; // Indikator für ersten Datenabruf (0=initial, 1=loading, 2=complete)
     this.isChannelUpdate = 0; // Counter für aktive Kanal-Updates
+    this.channelWidth = 180; // Standardbreite der Kanalspalte
 
     // Initialisiere Manager
     this.scrollManager = new EpgScrollManager(this);
@@ -153,7 +155,7 @@ export class EpgBox extends EpgElementBase {
         display: flex;
         flex-direction: column;
         flex-shrink: 0;
-        flex-basis: auto; /* Automatische Basis-Höhe */
+        /* Die Breite wird dynamisch über einen Inline-Style gesetzt */
         align-items: stretch; /* Verhindert Verteilung über Höhe */
         justify-content: flex-start; /* Startet oben */
         height: fit-content; /* Höhe passt sich an Inhalt an */
@@ -346,7 +348,7 @@ export class EpgBox extends EpgElementBase {
     return html`
       <div class="epgBox">
         <!-- Channel-Box -->
-        <div class="channelBox">
+        <div class="channelBox" style="flex-basis: ${this.channelWidth}px; width: ${this.channelWidth}px;">
           ${this.showChannelGroups && this._sortedChannels.length > 0
             ? this.renderManager.renderGroupedChannels()
             : this.renderManager.renderSimpleChannels(channelsToRender)}

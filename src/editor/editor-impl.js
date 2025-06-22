@@ -38,6 +38,7 @@ export class EditorImpl extends EditorBase {
       epgFutureTime: DefaultEpgFutureTime,
       epgShowWidth: DefaultEpgShowWidth,
       epgBackview: DefaultEpgBackview,
+      channelWidth: 180,
     });
     this._debug(`EditorImpl-Modul wird geladen`);
     this._selectedTab = 0;
@@ -744,13 +745,26 @@ export class EditorImpl extends EditorBase {
         selector: { boolean: {} },
       },
       {
+        name: 'channelWidth',
+        selector: {
+          number: {
+            min: 50,
+            max: 500,
+            step: 10,
+            mode: 'slider',
+            unit_of_measurement: 'px',
+          },
+        },
+      },
+      {
         name: 'epgPastTime',
         selector: {
           number: {
             min: 0,
             max: 1440,
-            step: 5,
-            unit_of_measurement: 'Minuten',
+            step: 10,
+            mode: 'slider',
+            unit_of_measurement: 'min',
           },
         },
       },
@@ -760,8 +774,9 @@ export class EditorImpl extends EditorBase {
           number: {
             min: 0,
             max: 1440,
-            step: 5,
-            unit_of_measurement: 'Minuten',
+            step: 10,
+            mode: 'slider',
+            unit_of_measurement: 'min',
           },
         },
       },
@@ -771,8 +786,9 @@ export class EditorImpl extends EditorBase {
           number: {
             min: 30,
             max: 1440,
-            step: 5,
-            unit_of_measurement: 'Minuten',
+            step: 10,
+            mode: 'slider',
+            unit_of_measurement: 'min',
           },
         },
       },
@@ -782,8 +798,21 @@ export class EditorImpl extends EditorBase {
           number: {
             min: 0,
             max: 180,
-            step: 5,
-            unit_of_measurement: 'Minuten',
+            step: 10,
+            mode: 'slider',
+            unit_of_measurement: 'min',
+          },
+        },
+      },
+      {
+        name: 'channelWidth',
+        selector: {
+          number: {
+            min: 50,
+            max: 500,
+            step: 10,
+            mode: 'slider',
+            unit_of_measurement: 'px',
           },
         },
       },
