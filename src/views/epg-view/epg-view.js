@@ -223,7 +223,7 @@ export class EPGView extends ViewBase {
       undefined, // Kein time_window
       undefined, // Kein date
       config,
-      // Callback für EPG-Daten
+      // Callback für EPG-Daten (wird für jeden Kanal aufgerufen)
       data => {
         this._debug('EPG-View: Neue EPG-Daten empfangen', {
           kanal: data.channel.name,
@@ -252,6 +252,17 @@ export class EPGView extends ViewBase {
         // Übergebe das Teil-EPG an die EPG-Box
         epgBox.addTeilEpg(teilEpg);
         this._debug('EPG-View: Teil-EPG an Box übergeben');
+      },
+      // Callback für Abschluss (wird aufgerufen, wenn alle Daten abgeschlossen sind)
+      (completeData) => {
+        this._debug('EPG-View: Alle EPG-Daten abgeschlossen', {
+          anzahlKanäle: completeData.length,
+          gesamtProgramme: completeData.reduce((sum, c) => sum + c.programs.length, 0),
+          kanäle: completeData.map(c => c.channel.name),
+        });
+
+        // Hier kannst du Aktionen ausführen, die nach Abschluss aller Daten erfolgen sollen
+        // z.B. Loading-Status beenden, UI-Updates, etc.
       }
     );
 
@@ -387,6 +398,7 @@ export class EPGView extends ViewBase {
           @channel-selected=${this._onChannelSelected}
           @program-selected=${this._onProgramSelected}
           @epg-box-ready=${this._onEpgBoxReady}
+          @epg-first-load-complete=${this._onEpgFirstLoadComplete}
           @program-box-scroll=${this._onProgramBoxScroll}
         ></epg-box>
       </div>
@@ -486,6 +498,17 @@ export class EPGView extends ViewBase {
 
   _handleRefresh() {
     this._loadData();
+  }
+
+  _onEpgFirstLoadComplete(e) {
+    this._debug('EPG-View: Erster Load abgeschlossen', {
+      isFirstLoad: e.detail.isFirstLoad,
+      isChannelUpdate: e.detail.isChannelUpdate,
+      channelCount: e.detail.channelCount,
+    });
+
+    // Hier können Aktionen ausgeführt werden, die nach dem ersten Load erfolgen sollen
+    // z.B. Loading-Status beenden, UI-Updates, etc.
   }
 }
 

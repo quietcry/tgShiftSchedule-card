@@ -25,6 +25,8 @@ export class EpgBox extends EpgElementBase {
     this._channelsParameters = { minTime: 0, maxTime: 0 };
     this._containerWidth = 1200; // Geschätzte Container-Breite, wird nach erstem Render aktualisiert
     this._containerWidthMeasured = false; // Flag für gemessene Container-Breite
+    this.isFirstLoad = true; // Indikator für ersten Datenabruf (Initialisierung)
+    this.isChannelUpdate = 0; // Counter für aktive Kanal-Updates
   }
 
   updated(changedProperties) {
@@ -61,6 +63,37 @@ export class EpgBox extends EpgElementBase {
     // Prüfe epgBackview Validierung
     if (changedProperties.has('epgBackview') || changedProperties.has('epgPastTime') || changedProperties.has('epgShowWidth')) {
       this._validateEpgBackview();
+    }
+
+    // Verringere isChannelUpdate nach erfolgreichem Update
+    if (this.isChannelUpdate > 0) {
+      this.isChannelUpdate--;
+      this._debug('EpgBox: Update abgeschlossen, isChannelUpdate verringert', {
+        neuerWert: this.isChannelUpdate,
+        isFirstLoad: this.isFirstLoad,
+      });
+
+      // Wenn alle Updates abgeschlossen sind und es der erste Load war
+      if (this.isChannelUpdate === 0 && this.isFirstLoad) {
+        this.isFirstLoad = false;
+        this._debug('EpgBox: Erster Load abgeschlossen', {
+          isFirstLoad: this.isFirstLoad,
+          isChannelUpdate: this.isChannelUpdate,
+        });
+
+        // Sende Event, dass der erste Load abgeschlossen ist
+        this.dispatchEvent(
+          new CustomEvent('epg-first-load-complete', {
+            detail: {
+              isFirstLoad: this.isFirstLoad,
+              isChannelUpdate: this.isChannelUpdate,
+              channelCount: this._channels.size,
+            },
+            bubbles: true,
+            composed: true,
+          })
+        );
+      }
     }
   }
 
@@ -369,8 +402,8 @@ export class EpgBox extends EpgElementBase {
     const endTime = new Date(now.getTime() + futureTime * 60 * 1000);
 
     // Runde auf volle Stunden für bessere Darstellung
-    startTime.setMinutes(0, 0, 0);
-    endTime.setMinutes(0, 0, 0);
+    // startTime.setMinutes(0, 0, 0);
+    // endTime.setMinutes(0, 0, 0);
 
     // Generiere Zeitslots in 30-Minuten-Intervallen
     const currentSlot = new Date(startTime);
@@ -564,6 +597,8 @@ export class EpgBox extends EpgElementBase {
       kanal: teilEpg?.channel?.name,
       kanalId: teilEpg?.channel?.id,
       anzahlProgramme: teilEpg?.programs?.length,
+      isFirstLoad: this.isFirstLoad,
+      isChannelUpdate: this.isChannelUpdate,
       programme: teilEpg?.programs?.map(p => ({
         title: p.title,
         start: p.start,
@@ -573,6 +608,13 @@ export class EpgBox extends EpgElementBase {
     });
 
     if (teilEpg?.channel?.id && teilEpg?.programs) {
+      // Erhöhe isChannelUpdate Counter für eingehendes Teil-EPG
+      this.isChannelUpdate++;
+      this._debug('EpgBox: isChannelUpdate erhöht', {
+        neuerWert: this.isChannelUpdate,
+        kanal: teilEpg.channel.name,
+      });
+
       // Speichere das Teil-EPG direkt
       this._channels.set(teilEpg.channel.id, {
         ...teilEpg.channel,
@@ -591,6 +633,7 @@ export class EpgBox extends EpgElementBase {
         kanal: teilEpg.channel.name,
         anzahlProgramme: teilEpg.programs.length,
         gesamtKanale: this._channels.size,
+        isChannelUpdate: this.isChannelUpdate,
         sortedChannels: this._sortedChannels.map(g => ({
           name: g.name,
           patterns: g.patterns.map(p => ({

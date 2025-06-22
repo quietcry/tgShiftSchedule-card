@@ -271,12 +271,13 @@ export class DataProvider {
     return [];
   }
 
-  async fetchEpgData(entity, timeWindow, date, config, onEpgData) {
+  async fetchEpgData(entity, timeWindow, date, config, onEpgData, onComplete) {
     this._debug('fetchEpgData gestartet', {
       entity,
       timeWindow,
       date,
       hasCallback: typeof onEpgData === 'function',
+      hasCompleteCallback: typeof onComplete === 'function',
     });
 
     try {
@@ -330,6 +331,16 @@ export class DataProvider {
         anzahlKanäle: epgData.length,
         gesamtProgramme: epgData.reduce((sum, c) => sum + c.programs.length, 0),
       });
+
+      // Rufe onComplete Callback auf, wenn alle Daten abgeschlossen sind
+      if (typeof onComplete === 'function') {
+        this._debug('Rufe onComplete Callback auf', {
+          anzahlKanäle: epgData.length,
+          gesamtProgramme: epgData.reduce((sum, c) => sum + c.programs.length, 0),
+        });
+        onComplete(epgData);
+      }
+
       return epgData;
     } catch (error) {
       this._debug('Fehler in fetchEpgData', {
