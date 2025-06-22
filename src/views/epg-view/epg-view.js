@@ -507,6 +507,24 @@ export class EPGView extends ViewBase {
       channelCount: e.detail.channelCount,
     });
 
+    // Wenn isFirstLoad < 2 dann isFirstLoad = 1
+    if (e.detail.isFirstLoad < 2) {
+      this._debug('EPG-View: isFirstLoad auf 1 gesetzt', {
+        alterWert: e.detail.isFirstLoad,
+        neuerWert: 1,
+      });
+
+      // Hier könntest du isFirstLoad in der EPG-View setzen, falls benötigt
+      // this.isFirstLoad = 1;
+    }
+
+    // Rufe testIsFirstLoadCompleteUpdated auf
+    const epgBox = this.shadowRoot?.querySelector('epg-box');
+    if (epgBox && typeof epgBox.testIsFirstLoadCompleteUpdated === 'function') {
+      this._debug('EPG-View: Rufe testIsFirstLoadCompleteUpdated auf');
+      epgBox.testIsFirstLoadCompleteUpdated();
+    }
+
     // Hier können Aktionen ausgeführt werden, die nach dem ersten Load erfolgen sollen
     // z.B. Loading-Status beenden, UI-Updates, etc.
   }

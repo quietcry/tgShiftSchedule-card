@@ -25,7 +25,7 @@ export class EpgBox extends EpgElementBase {
     this._channelsParameters = { minTime: 0, maxTime: 0 };
     this._containerWidth = 1200; // Geschätzte Container-Breite, wird nach erstem Render aktualisiert
     this._containerWidthMeasured = false; // Flag für gemessene Container-Breite
-    this.isFirstLoad = true; // Indikator für ersten Datenabruf (Initialisierung)
+    this.isFirstLoad = 0; // Indikator für ersten Datenabruf (0=initial, 1=loading, 2=complete)
     this.isChannelUpdate = 0; // Counter für aktive Kanal-Updates
   }
 
@@ -73,9 +73,12 @@ export class EpgBox extends EpgElementBase {
         isFirstLoad: this.isFirstLoad,
       });
 
+      // Rufe testIsFirstLoadCompleteUpdated auf, wenn ein Teil-EPG fertig angezeigt wird
+      this.testIsFirstLoadCompleteUpdated();
+
       // Wenn alle Updates abgeschlossen sind und es der erste Load war
-      if (this.isChannelUpdate === 0 && this.isFirstLoad) {
-        this.isFirstLoad = false;
+      if (this.isChannelUpdate === 0 && this.isFirstLoad === 1) {
+        this.isFirstLoad = 2;
         this._debug('EpgBox: Erster Load abgeschlossen', {
           isFirstLoad: this.isFirstLoad,
           isChannelUpdate: this.isChannelUpdate,
@@ -94,6 +97,35 @@ export class EpgBox extends EpgElementBase {
           })
         );
       }
+    }
+  }
+
+  testIsFirstLoadCompleteUpdated() {
+    this._debug('EpgBox: testIsFirstLoadCompleteUpdated aufgerufen', {
+      isFirstLoad: this.isFirstLoad,
+      isChannelUpdate: this.isChannelUpdate,
+    });
+
+    // Wenn isFirstLoad == 1 && isChannelUpdate == 0 dann isFirstLoad = 2
+    if (this.isFirstLoad === 1 && this.isChannelUpdate === 0) {
+      this.isFirstLoad = 2;
+      this._debug('EpgBox: testIsFirstLoadCompleteUpdated - isFirstLoad auf 2 gesetzt', {
+        isFirstLoad: this.isFirstLoad,
+        isChannelUpdate: this.isChannelUpdate,
+      });
+
+      // Sende Event, dass der erste Load abgeschlossen ist
+      this.dispatchEvent(
+        new CustomEvent('epg-first-load-complete', {
+          detail: {
+            isFirstLoad: this.isFirstLoad,
+            isChannelUpdate: this.isChannelUpdate,
+            channelCount: this._channels.size,
+          },
+          bubbles: true,
+          composed: true,
+        })
+      );
     }
   }
 
@@ -614,6 +646,16 @@ export class EpgBox extends EpgElementBase {
         neuerWert: this.isChannelUpdate,
         kanal: teilEpg.channel.name,
       });
+
+      // Wenn isFirstLoad < 2 dann isFirstLoad = 1 (erster Teil-EPG)
+      if (this.isFirstLoad < 2) {
+        this.isFirstLoad = 1;
+        this._debug('EpgBox: isFirstLoad auf 1 gesetzt (erster Teil-EPG)', {
+          alterWert: 0,
+          neuerWert: this.isFirstLoad,
+          kanal: teilEpg.channel.name,
+        });
+      }
 
       // Speichere das Teil-EPG direkt
       this._channels.set(teilEpg.channel.id, {
