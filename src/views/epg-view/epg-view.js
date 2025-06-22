@@ -383,6 +383,7 @@ export class EPGView extends ViewBase {
           .epgPastTime=${this.config.epgPastTime || 30}
           .epgFutureTime=${this.config.epgFutureTime || 120}
           .epgShowWidth=${this.config.epgShowWidth || 180}
+          .epgBackview=${this.config.epgBackview || 0}
           @channel-selected=${this._onChannelSelected}
           @program-selected=${this._onProgramSelected}
           @epg-box-ready=${this._onEpgBoxReady}

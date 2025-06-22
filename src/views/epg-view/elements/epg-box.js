@@ -57,6 +57,34 @@ export class EpgBox extends EpgElementBase {
       this.scale = this._calculateScale();
       this.requestUpdate();
     }
+
+    // Prüfe epgBackview Validierung
+    if (changedProperties.has('epgBackview') || changedProperties.has('epgPastTime') || changedProperties.has('epgShowWidth')) {
+      this._validateEpgBackview();
+    }
+  }
+
+  _validateEpgBackview() {
+    const epgPastTime = this.epgPastTime || 30;
+    const epgShowWidth = this.epgShowWidth || 180;
+    const epgBackview = this.epgBackview || 0;
+
+    this._debug('EpgBox: Validiere epgBackview', {
+      epgBackview,
+      epgPastTime,
+      epgShowWidth,
+      isValid: epgBackview <= epgPastTime && epgBackview <= epgShowWidth,
+    });
+
+    // Prüfe ob epgBackview <= epgPastTime && epgBackview <= epgShowWidth
+    if (!(epgBackview <= epgPastTime && epgBackview <= epgShowWidth)) {
+      this._debug('EpgBox: epgBackview ungültig, setze auf 0', {
+        epgBackview,
+        epgPastTime,
+        epgShowWidth,
+      });
+      this.epgBackview = 0;
+    }
   }
 
   firstUpdated() {

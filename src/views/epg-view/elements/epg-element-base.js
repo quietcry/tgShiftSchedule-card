@@ -15,6 +15,7 @@ export class EpgElementBase extends SuperBase {
     epgPastTime: { type: Number },
     epgFutureTime: { type: Number },
     epgShowWidth: { type: Number },
+    epgBackview: { type: Number },
     scale: { type: Number },
   };
 
@@ -112,6 +113,7 @@ export class EpgElementBase extends SuperBase {
     this.epgPastTime = 30; // Minuten in die Vergangenheit
     this.epgFutureTime = 120; // Minuten in die Zukunft
     this.epgShowWidth = 180; // Minuten sichtbar
+    this.epgBackview = 0; // Default value
     this.scale = 1; // Darstellungsmaßstab
 
     this._debug('EpgElementBase-Konstruktor: Initialisierung abgeschlossen');

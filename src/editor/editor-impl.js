@@ -9,6 +9,7 @@ import {
   DefaultEpgPastTime,
   DefaultEpgFutureTime,
   DefaultEpgShowWidth,
+  DefaultEpgBackview,
 } from '../card-config.js';
 import yaml from 'js-yaml';
 
@@ -36,6 +37,7 @@ export class EditorImpl extends EditorBase {
       epgPastTime: DefaultEpgPastTime,
       epgFutureTime: DefaultEpgFutureTime,
       epgShowWidth: DefaultEpgShowWidth,
+      epgBackview: DefaultEpgBackview,
     });
     this._debug(`EditorImpl-Modul wird geladen`);
     this._selectedTab = 0;
@@ -580,6 +582,7 @@ export class EditorImpl extends EditorBase {
       epgPastTime: DefaultEpgPastTime,
       epgFutureTime: DefaultEpgFutureTime,
       epgShowWidth: DefaultEpgShowWidth,
+      epgBackview: DefaultEpgBackview,
     };
   }
 
@@ -630,6 +633,13 @@ export class EditorImpl extends EditorBase {
         description: 'Anzahl der sichtbaren Minuten in der Ansicht',
         default: DefaultEpgShowWidth,
       },
+      {
+        type: 'number',
+        name: 'epgBackview',
+        label: 'EPG Rückblick (Minuten)',
+        description: 'Anzahl der Minuten für Rückblick (0-180)',
+        default: DefaultEpgBackview,
+      },
     ];
   }
 
@@ -674,6 +684,17 @@ export class EditorImpl extends EditorBase {
           number: {
             min: 30,
             max: 1440,
+            step: 5,
+            unit_of_measurement: 'Minuten',
+          },
+        },
+      },
+      {
+        name: 'epgBackview',
+        selector: {
+          number: {
+            min: 0,
+            max: 180,
             step: 5,
             unit_of_measurement: 'Minuten',
           },
@@ -750,6 +771,17 @@ export class EditorImpl extends EditorBase {
           number: {
             min: 30,
             max: 1440,
+            step: 5,
+            unit_of_measurement: 'Minuten',
+          },
+        },
+      },
+      {
+        name: 'epgBackview',
+        selector: {
+          number: {
+            min: 0,
+            max: 180,
             step: 5,
             unit_of_measurement: 'Minuten',
           },
