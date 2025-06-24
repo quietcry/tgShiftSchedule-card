@@ -9,21 +9,28 @@ export class EpgDataManager {
 
   /**
    * Fügt EPG-Daten hinzu
+   * Kann wahrscheinlich entfallen
    */
   addEpgData(data) {
-    if (!data || !data.channel) {
+    if (!data || !data.channeldata) {
       this.epgBox._debug('EpgDataManager: Ungültige EPG-Daten erhalten', { data });
       return;
     }
 
+    const channel = data.channeldata;
+    const programs = data.epg && typeof data.epg === 'object' ? Object.values(data.epg) : [];
+
     this.epgBox._debug('EpgDataManager: Füge EPG-Daten hinzu', {
-      kanal: data.channel.name,
-      kanalId: data.channel.id,
-      anzahlProgramme: data.programs?.length || 0,
+      kanal: channel.name,
+      kanalId: channel.id,
+      anzahlProgramme: programs.length,
     });
 
     // Speichere den Kanal mit seinen Programmen
-    this.epgBox._channels.set(data.channel.id, data.channel);
+    this.epgBox._channels.set(channel.id, {
+      ...channel,
+      programs: programs,
+    });
 
     // Initialisiere die Sortierungsstruktur beim ersten Kanal
     if (!this.epgBox._channelOrderInitialized) {
@@ -31,7 +38,7 @@ export class EpgDataManager {
     }
 
     // Sortiere den neuen Kanal in die Struktur ein
-    this.epgBox.channelManager.sortChannelIntoStructure(data.channel);
+    this.epgBox.channelManager.sortChannelIntoStructure(channel);
 
     this.epgBox.requestUpdate();
   }
@@ -40,15 +47,22 @@ export class EpgDataManager {
    * Fügt Teil-EPG-Daten hinzu
    */
   addTeilEpg(teilEpg) {
-    if (!teilEpg || !teilEpg.channel) {
+    this.epgBox._debug('EpgDataManager: Teil-EPG-Daten erhalten', { teilEpg });
+
+    if (!teilEpg || !teilEpg.channeldata) {
       this.epgBox._debug('EpgDataManager: Ungültige Teil-EPG-Daten erhalten', { teilEpg });
       return;
     }
 
+    const channel = teilEpg.channeldata;
+    const programs =
+      teilEpg.epg && typeof teilEpg.epg === 'object' ? Object.values(teilEpg.epg) : [];
+
     this.epgBox._debug('EpgDataManager: Füge Teil-EPG hinzu', {
-      kanal: teilEpg.channel.name,
-      kanalId: teilEpg.channel.id,
-      anzahlProgramme: teilEpg.programs?.length || 0,
+      epg: teilEpg,
+      kanal: channel.name,
+      kanalId: channel.id,
+      anzahlProgramme: programs.length,
       isFirstLoad: this.epgBox.isFirstLoad,
     });
 
@@ -56,19 +70,19 @@ export class EpgDataManager {
     this.epgBox.isChannelUpdate++;
 
     // Hole den bestehenden Kanal oder erstelle einen neuen
-    let existingChannel = this.epgBox._channels.get(teilEpg.channel.id);
+    let existingChannel = this.epgBox._channels.get(channel.id);
     if (!existingChannel) {
       existingChannel = {
-        id: teilEpg.channel.id,
-        name: teilEpg.channel.name,
+        id: channel.id,
+        name: channel.name,
         programs: [],
       };
-      this.epgBox._channels.set(teilEpg.channel.id, existingChannel);
+      this.epgBox._channels.set(channel.id, existingChannel);
     }
 
     // Füge die Programme hinzu oder aktualisiere sie
-    if (teilEpg.programs && Array.isArray(teilEpg.programs)) {
-      teilEpg.programs.forEach(newProgram => {
+    if (programs && Array.isArray(programs)) {
+      programs.forEach(newProgram => {
         // Suche nach bestehendem Programm mit gleicher Startzeit
         const existingProgramIndex = existingChannel.programs.findIndex(
           p => p.start === newProgram.start
@@ -166,12 +180,12 @@ export class EpgDataManager {
       // Prüfe Überlappung mit dem sichtbaren Zeitfenster
       const overlaps = programStart < maxTime && programEnd > minTime;
 
-      this.epgBox._debug('EpgDataManager: Programm-Prüfung', {
-        title: program.title,
-        start: new Date(programStart * 1000).toISOString(),
-        end: new Date(programEnd * 1000).toISOString(),
-        overlaps,
-      });
+      // this.epgBox._debug('EpgDataManager: Programm-Prüfung', {
+      //   title: program.title,
+      //   start: new Date(programStart * 1000).toISOString(),
+      //   end: new Date(programEnd * 1000).toISOString(),
+      //   overlaps,
+      // });
 
       return overlaps;
     });

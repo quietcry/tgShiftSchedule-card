@@ -198,7 +198,7 @@ export class EPGView extends ViewBase {
   }
 
   async _fetchViewData(config) {
-    this._debug('EPG-View: _fetchViewData gestartet', {
+    this._debug('_fetchViewData(): _fetchViewData gestartet', {
       entity: config.entity,
       hasDataProvider: !!this._dataProvider,
     });
@@ -210,11 +210,11 @@ export class EPGView extends ViewBase {
     // Hole die EPG-Box
     const epgBox = this.shadowRoot?.querySelector('epg-box');
     if (!epgBox) {
-      this._debug('EPG-View: EPG-Box nicht gefunden, überspringe Datenabruf');
+      this._debug('_fetchViewData(): EPG-Box nicht gefunden, überspringe Datenabruf');
       return [];
     }
 
-    this._debug('EPG-View: Starte EPG-Daten Abruf', {
+    this._debug('_fetchViewData(): Starte EPG-Daten Abruf', {
       hasEpgBox: !!epgBox,
     });
 
@@ -222,43 +222,52 @@ export class EPGView extends ViewBase {
       config.entity,
       undefined, // Kein time_window
       undefined, // Kein date
-      config,
+      {
+        blacklist: config.blacklist || '',
+        whitelist: config.whitelist || '',
+      }, // Blacklist/Whitelist-Konfiguration übergeben
       // Callback für EPG-Daten (wird für jeden Kanal aufgerufen)
       data => {
-        this._debug('EPG-View: Neue EPG-Daten empfangen', {
-          kanal: data.channel.name,
-          kanalId: data.channel.id,
-          anzahlProgramme: data.programs.length,
-          programme: data.programs.map(p => ({
-            title: p.title,
-            start: p.start,
-            end: p.end || p.stop,
-            duration: p.duration,
-          })),
+        this._debug('_fetchViewData(): Neue EPG-Daten empfangen', {
+          epg: data,
+          kanal: data.channeldata.name,
+          kanalId: data.channeldata.id,
+          anzahlProgramme:
+            data.epg && typeof data.epg === 'object' ? Object.keys(data.epg).length : 0,
+          programme:
+            data.epg && typeof data.epg === 'object'
+              ? Object.values(data.epg).map(p => ({
+                  title: p.title,
+                  start: p.start,
+                  end: p.end || p.stop,
+                  duration: p.duration,
+                }))
+              : [],
         });
 
         // Erstelle ein vollständiges Teil-EPG
-        const teilEpg = {
-          channel: data.channel,
-          programs: data.programs,
-        };
+        const teilEpg = data;
 
-        this._debug('EPG-View: Übergebe Teil-EPG an Box', {
+        this._debug('_fetchViewData(): Übergebe Teil-EPG an Box', {
           teilEpg: teilEpg,
-          kanal: teilEpg.channel.name,
-          anzahlProgramme: teilEpg.programs.length,
+          kanal: teilEpg.channeldata.name,
+          anzahlProgramme:
+            teilEpg.epg && typeof teilEpg.epg === 'object' ? Object.keys(teilEpg.epg).length : 0,
         });
 
         // Übergebe das Teil-EPG an die EPG-Box
         epgBox.addTeilEpg(teilEpg);
-        this._debug('EPG-View: Teil-EPG an Box übergeben');
+        this._debug('_fetchViewData(): Teil-EPG an Box übergeben');
       },
       // Callback für Abschluss (wird aufgerufen, wenn alle Daten abgeschlossen sind)
       completeData => {
-        this._debug('EPG-View: Alle EPG-Daten abgeschlossen', {
+        this._debug('_fetchViewData(): Alle EPG-Daten abgeschlossen', {
           anzahlKanäle: completeData.length,
-          gesamtProgramme: completeData.reduce((sum, c) => sum + c.programs.length, 0),
-          kanäle: completeData.map(c => c.channel.name),
+          gesamtProgramme: completeData.reduce(
+            (sum, c) => sum + (c.epg && typeof c.epg === 'object' ? Object.keys(c.epg).length : 0),
+            0
+          ),
+          kanäle: completeData.map(c => c.channeldata.name),
         });
 
         // Hier kannst du Aktionen ausführen, die nach Abschluss aller Daten erfolgen sollen
@@ -379,27 +388,18 @@ export class EPGView extends ViewBase {
         <div class="superbutton">${this._renderSuperButton()}</div>
         <div class="timeBar">${this._renderTimeBar()}</div>
         <epg-box
-          class="epgBox"
-          .epgData=${this._epgData}
-          .currentTime=${this._currentTime}
-          .timeWindow=${this.config.time_window}
-          .showChannel=${this.config.show_channel}
+          .epgPastTime=${this.config.epgPastTime}
+          .epgShowWidth=${this.config.epgShowWidth}
+          .epgBackview=${this.config.epgBackview}
+          .channelWidth=${this.config.channelWidth}
+          .showChannelGroups=${this.config.show_channel_groups}
           .showTime=${this.config.show_time}
           .showDuration=${this.config.show_duration}
           .showDescription=${this.config.show_description}
           .showShortText=${this.config.show_shorttext}
-          .selectedChannel=${this._selectedChannel}
-          .channelOrder=${this.config.group_order || []}
-          .showChannelGroups=${this.config.show_channel_groups || false}
-          .epgPastTime=${this.config.epgPastTime || 30}
-          .epgFutureTime=${this.config.epgFutureTime || 120}
-          .epgShowWidth=${this.config.epgShowWidth || 180}
-          .epgBackview=${this.config.epgBackview || 0}
-          @channel-selected=${this._onChannelSelected}
-          @program-selected=${this._onProgramSelected}
+          .channelOrder=${this.config.group_order}
           @epg-box-ready=${this._onEpgBoxReady}
           @epg-first-load-complete=${this._onEpgFirstLoadComplete}
-          @program-box-scroll=${this._onProgramBoxScroll}
         ></epg-box>
       </div>
     `;

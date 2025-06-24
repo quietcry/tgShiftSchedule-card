@@ -15,16 +15,19 @@ export class EpgChannelManager {
       return;
     }
 
+    // Direkt auf die Property der epgBox zugreifen, um Timing-Probleme zu umgehen
+    const channelOrder = this.epgBox.channelOrder;
+
     this.epgBox._debug('EpgChannelManager: Initialisiere Kanal-Reihenfolge', {
-      channelOrder: this.epgBox.channelOrder,
+      channelOrder: channelOrder,
     });
 
     // Leere die Sortierungsstruktur
     this.epgBox._sortedChannels = [];
 
-    if (this.epgBox.channelOrder && Array.isArray(this.epgBox.channelOrder)) {
+    if (channelOrder && Array.isArray(channelOrder)) {
       // Verarbeite jede Kanaldefinition
-      this.epgBox.channelOrder.forEach(channelDef => {
+      channelOrder.forEach(channelDef => {
         if (typeof channelDef === 'string') {
           // Einfache String-Definition
           this.epgBox._sortedChannels.push({

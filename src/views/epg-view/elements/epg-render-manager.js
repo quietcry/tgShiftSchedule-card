@@ -47,8 +47,8 @@ export class EpgRenderManager {
   /**
    * Rendert gruppierte Kanäle
    */
-  renderGroupedChannels() {
-    return this.epgBox._sortedChannels.map(group => {
+  renderGroupedChannels(sortedChannels) {
+    return sortedChannels.map(group => {
       // Sammle alle Kanäle aus allen Patterns der Gruppe
       const groupChannels = group.patterns.flatMap(pattern => pattern.channels);
 
@@ -191,17 +191,17 @@ export class EpgRenderManager {
   /**
    * Rendert gruppierte Programme
    */
-  renderGroupedPrograms() {
+  renderGroupedPrograms(sortedChannels) {
     this.epgBox._debug('EpgRenderManager: _renderGroupedPrograms gestartet', {
-      anzahlGruppen: this.epgBox._sortedChannels.length,
-      gruppen: this.epgBox._sortedChannels.map(g => ({
+      anzahlGruppen: sortedChannels.length,
+      gruppen: sortedChannels.map(g => ({
         name: g.name,
         anzahlKanäle: g.patterns.flatMap(p => p.channels).length,
       })),
     });
 
     let rowIndex = 0;
-    return this.epgBox._sortedChannels.map(group => {
+    return sortedChannels.map(group => {
       // Sammle alle Kanäle aus allen Patterns der Gruppe
       const groupChannels = group.patterns.flatMap(pattern => pattern.channels);
 
@@ -216,9 +216,9 @@ export class EpgRenderManager {
       });
 
       return html`
-        <!-- Leere Zeilen für Gruppen-Header -->
-        <div class="programRow epg-row-height">
-          <div class="noPrograms">
+        <!-- Leere Zeile für Gruppen-Header, um die Höhe abzugleichen -->
+        <div class="programRow" style="height: var(--epg-row-height);">
+          <div class="noPrograms" style="width: 100%; height: 100%;">
             <!-- Platzhalter für Gruppen-Header -->
           </div>
         </div>

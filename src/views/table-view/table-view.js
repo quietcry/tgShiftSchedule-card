@@ -17,7 +17,11 @@ export class TableView extends ViewBase {
     const data = await this._dataProvider.fetchEpgData(
       this.config.entity,
       'C', // Immer aktuelle Zeit für die Tabelle
-      ''
+      '',
+      {
+        blacklist: this.config.blacklist || '',
+        whitelist: this.config.whitelist || '',
+      }
     );
 
     // Begrenze die Anzahl der Einträge

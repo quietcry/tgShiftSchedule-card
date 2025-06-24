@@ -139,17 +139,12 @@ export class EpgBox extends EpgElementBase {
     super.styles,
     css`
       :host {
-        display: block;
+        display: flex;
+        flex-direction: row;
         width: 100%;
         height: auto; /* Automatische Höhe basierend auf Inhalt */
         overflow: visible; /* Kein Scroll, damit Inhalte sichtbar sind */
         position: relative;
-      }
-
-      :host(.epgBox) {
-        display: flex;
-        flex-direction: row;
-        height: auto; /* Automatische Höhe basierend auf Inhalt */
       }
 
       .channelBox {
@@ -326,47 +321,32 @@ export class EpgBox extends EpgElementBase {
       return this.renderManager.renderLoading();
     }
 
-    // Berechne Scale für die Darstellung
-    this.scale = this.scaleManager.calculateScale();
-
-    // Verwende gruppierte Kanäle wenn showChannelGroups aktiviert ist
-    let channelsToRender = [];
-    if (this.showChannelGroups && this._sortedChannels.length > 0) {
-      // Verwende die gruppierte Struktur
-      this._sortedChannels.forEach(group => {
-        group.patterns.forEach(pattern => {
-          channelsToRender.push(...pattern.channels);
-        });
-      });
-    } else {
-      // Verwende alle verfügbaren Kanäle direkt
-      channelsToRender = Array.from(this._channels.values());
-    }
+    // Die Logik zur Auswahl des Render-Pfades (gruppiert vs. einfach)
+    // ist jetzt direkt im Template. Wir bereiten hier keine flache Liste mehr vor.
+    const channelsToRenderForSimpleMode = Array.from(this._channels.values());
 
     this._debug('EpgBox: Render gestartet', {
-      anzahlKanäle: channelsToRender.length,
+      anzahlKanäle: this._channels.size,
       showChannelGroups: this.showChannelGroups,
-      sortedChannels: this._sortedChannels.length,
+      sortedChannelsCount: this._sortedChannels.length,
     });
 
     return html`
-      <div class="epgBox">
-        <!-- Channel-Box -->
-        <div
-          class="channelBox"
-          style="flex-basis: ${this.channelWidth}px; width: ${this.channelWidth}px;"
-        >
-          ${this.showChannelGroups && this._sortedChannels.length > 0
-            ? this.renderManager.renderGroupedChannels()
-            : this.renderManager.renderSimpleChannels(channelsToRender)}
-        </div>
+      <!-- Channel-Box -->
+      <div
+        class="channelBox"
+        style="flex-basis: ${this.channelWidth}px; width: ${this.channelWidth}px;"
+      >
+        ${this.showChannelGroups && this._sortedChannels.length > 0
+          ? this.renderManager.renderGroupedChannels(this._sortedChannels)
+          : this.renderManager.renderSimpleChannels(channelsToRenderForSimpleMode)}
+      </div>
 
-        <!-- Program-Box -->
-        <div class="programBox">
-          ${this.showChannelGroups && this._sortedChannels.length > 0
-            ? this.renderManager.renderGroupedPrograms()
-            : this.renderManager.renderSimplePrograms(channelsToRender)}
-        </div>
+      <!-- Program-Box -->
+      <div class="programBox">
+        ${this.showChannelGroups && this._sortedChannels.length > 0
+          ? this.renderManager.renderGroupedPrograms(this._sortedChannels)
+          : this.renderManager.renderSimplePrograms(channelsToRenderForSimpleMode)}
       </div>
     `;
   }

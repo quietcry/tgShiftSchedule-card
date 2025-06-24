@@ -61,6 +61,9 @@ export class CardImpl extends CardBase {
       show_channel_groups: false,
       view_mode: 'epg',
       test_template: '',
+      blacklist: '',
+      whitelist: '',
+      importantlist: '',
     };
   }
 

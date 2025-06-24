@@ -1,12 +1,14 @@
-import { TgCardHelper } from './tg-card-helper.js';
 import { CardName, DebugMode } from '../card-config.js';
+import { TgCardHelper } from './tg-card-helper.js';
 
 export class DataProvider {
   static className = 'DataProvider';
-
   constructor() {
     this._hass = null;
     this.tgCardHelper = new TgCardHelper(CardName, DebugMode);
+
+    if (this.constructor.debugMode)
+      console.debug(`[${this.constructor.cardName}] DataProvider-Modul wird geladen`);
     this._debug('DataProvider initialisiert');
   }
 
@@ -56,7 +58,7 @@ export class DataProvider {
   }
 
   async _callService(entity, params = {}) {
-    this._debug('_callService wird aufgerufen mit:', {
+    this._debug('_callService(): _callService wird aufgerufen mit:', {
       entity,
       params,
       hass: this._hass ? 'vorhanden' : 'nicht vorhanden',
@@ -78,7 +80,7 @@ export class DataProvider {
         entity_id: entity,
         ...params,
       };
-      this._debug('Service-Daten:', serviceData);
+      this._debug('_callService(): Service-Daten:', serviceData);
 
       const message = {
         type: 'call_service',
@@ -87,93 +89,16 @@ export class DataProvider {
         service_data: serviceData,
         return_response: true,
       };
-      this._debug('Service-Nachricht:', message);
+      this._debug('_callService(): Service-Nachricht:', message);
 
       const response = await this._hass.connection.sendMessagePromise(message);
-      this._debug('Service-Antwort erhalten:', response);
+      this._debug('_callService(): Service-Antwort erhalten:', response);
 
-      // Debug: Zeige die vollständige Antwort-Struktur
-      this._debug('Service-Antwort Details:', {
-        responseType: typeof response,
-        hasResponse: !!response,
-        responseKeys: response ? Object.keys(response) : [],
-        responseResponseType: typeof response?.response,
-        responseResponseKeys: response?.response ? Object.keys(response.response) : [],
-        responseResponseValue: response?.response,
-      });
-
-      // Extrahiere EPG-Daten aus der Antwort
-      let epgData = [];
-
-      if (response && response.response) {
-        this._debug('Response-Struktur analysieren:', {
-          responseType: typeof response.response,
-          responseKeys: Object.keys(response.response),
-          hasEpgData: !!response.response.epg_data,
-          epgDataType: typeof response.response.epg_data,
-          epgDataKeys: response.response.epg_data ? Object.keys(response.response.epg_data) : [],
-        });
-
-        // Versuche verschiedene mögliche Strukturen
-        if (Array.isArray(response.response)) {
-          // Direktes Array
-          epgData = response.response;
-        } else if (response.response.epg_data) {
-          // Neue Struktur: response.response.epg_data.epg ist ein Objekt mit Zeitstempel-Schlüsseln
-          if (
-            response.response.epg_data.epg &&
-            typeof response.response.epg_data.epg === 'object'
-          ) {
-            // Konvertiere das epg-Objekt in ein Array
-            const epgObject = response.response.epg_data.epg;
-            epgData = Object.values(epgObject).map(program => ({
-              ...program,
-              // Stelle sicher, dass die Zeitstempel als Zahlen vorliegen
-              start: typeof program.start === 'string' ? parseInt(program.start) : program.start,
-              stop: typeof program.stop === 'string' ? parseInt(program.stop) : program.stop,
-              // Füge end-Feld hinzu falls nicht vorhanden
-              end: program.end || program.stop,
-            }));
-
-            this._debug('EPG-Objekt konvertiert:', {
-              anzahlZeitstempel: Object.keys(epgObject).length,
-              zeitstempel: Object.keys(epgObject),
-              anzahlProgramme: epgData.length,
-            });
-          } else if (Array.isArray(response.response.epg_data)) {
-            // Verschachteltes epg_data Array
-            epgData = response.response.epg_data;
-          }
-        } else if (response.response.data && Array.isArray(response.response.data)) {
-          // Verschachteltes data Array
-          epgData = response.response.data;
-        } else if (typeof response.response === 'string') {
-          // String-Antwort - versuche JSON zu parsen
-          try {
-            const parsed = JSON.parse(response.response);
-            epgData = Array.isArray(parsed) ? parsed : [];
-          } catch (e) {
-            this._debug('Fehler beim JSON-Parsing der String-Antwort:', e);
-            epgData = [];
-          }
-        } else {
-          // Fallback: Versuche response.response als Array zu verwenden
-          epgData = Array.isArray(response.response) ? response.response : [];
-        }
+      // Extrahiere epg_data aus der Antwort
+      if (response && response.response && response.response.epg_data) {
+        return response.response.epg_data;
       }
-
-      this._debug('Extrahierte EPG-Daten:', {
-        anzahlProgramme: epgData.length,
-        programme: epgData.map(p => ({
-          title: p.title,
-          start: p.start,
-          end: p.end || p.stop,
-          starttime: p.starttime,
-          endtime: p.endtime,
-        })),
-      });
-
-      return epgData;
+      return [];
     } catch (error) {
       this._debug('Fehler beim Service-Aufruf:', error);
       throw error;
@@ -226,9 +151,9 @@ export class DataProvider {
   }
 
   async fetchChannelEpg(entity, channelId, timeWindow, date) {
-    this._debug('DataProvider: Hole EPG-Daten für Kanal', channelId);
+    this._debug('fetchChannelEpg(): Hole EPG-Daten für Kanal', channelId);
     const channelIdStr = String(channelId);
-    this._debug('DataProvider: Konvertierte channel_id:', channelIdStr);
+    this._debug('fetchChannelEpg(): Konvertierte channel_id:', channelIdStr);
 
     // Erstelle Service-Parameter ohne time_window und date
     const serviceParams = {
@@ -236,53 +161,32 @@ export class DataProvider {
     };
 
     const response = await this._callService(entity, serviceParams);
+    this._debug('fetchChannelEpg(): response erhalten', {
+      response: response,
+      isArray: Array.isArray(response),
+    });
 
     // Verarbeite die EPG-Daten
-    if (Array.isArray(response)) {
-      this._debug('EPG-Daten vor Verarbeitung:', response);
-
-      // Stelle sicher, dass alle Programme die erforderlichen Felder haben
-      const processedPrograms = response.map(program => ({
-        title: program.title || program.name || 'Unbekanntes Programm',
-        description: program.description || program.desc || '',
-        start: program.start || program.start_time || '',
-        end: program.end || program.end_time || '',
-        duration: program.duration || 0,
-        // Zusätzliche Felder falls vorhanden
-        category: program.category || '',
-        rating: program.rating || '',
-        ...program, // Behalte alle anderen Felder bei
-      }));
-
-      this._debug('Verarbeitete EPG-Daten:', {
-        anzahlProgramme: processedPrograms.length,
-        programme: processedPrograms.map(p => ({
-          title: p.title,
-          start: p.start,
-          end: p.end,
-          duration: p.duration,
-        })),
-      });
-
-      return processedPrograms;
+    if (response && typeof response === 'object' && response.epg) {
+      this._debug('EPG-Daten gefunden:', response);
+      return response;
     }
 
-    this._debug('Keine EPG-Daten erhalten oder ungültiges Format:', response);
-    return [];
+    this._debug('Keine EPG-Daten gefunden oder ungültiges Format');
+    return null;
   }
 
-  async fetchEpgData(entity, timeWindow, date, config, onEpgData, onComplete) {
-    this._debug('fetchEpgData gestartet', {
+  async fetchEpgData(entity, timeWindow, date, config, onEpgData) {
+    this._debug('fetchEpgData(): fetchEpgData gestartet', {
       entity,
       timeWindow,
       date,
       hasCallback: typeof onEpgData === 'function',
-      hasCompleteCallback: typeof onComplete === 'function',
     });
 
     try {
       const channelList = await this.fetchChannelList(entity, config);
-      this._debug('Kanalliste empfangen', {
+      this._debug('fetchEpgData(): Kanalliste empfangen', {
         anzahlKanäle: channelList.length,
         kanäle: channelList.map(c => c.name),
       });
@@ -290,60 +194,67 @@ export class DataProvider {
       const epgData = [];
       for (const channel of channelList) {
         try {
-          this._debug('Hole EPG-Daten für Kanal', {
+          this._debug('fetchEpgData(): Hole EPG-Daten für Kanal', {
             kanal: channel.name,
             id: channel.id,
           });
 
-          const programs = await this.fetchChannelEpg(entity, channel.id, timeWindow, date);
-          this._debug('EPG-Daten empfangen', {
-            kanal: channel.name,
-            anzahlProgramme: programs.length,
-            programme: programs.map(p => p.title),
+          const response = await this.fetchChannelEpg(entity, channel.id, timeWindow, date);
+          if (!response) {
+            this._debug('fetchEpgData(): für Kanal', channel.name, 'Keine EPG-Daten gefunden');
+            continue;
+          }
+
+          this._debug('fetchEpgData(): EPG-Daten empfangen', {
+            kanal: response.channeldata.name,
+            anzahlProgramme:
+              response.epg && typeof response.epg === 'object'
+                ? Object.keys(response.epg).length
+                : 0,
+            programme:
+              response.epg && typeof response.epg === 'object'
+                ? Object.values(response.epg).map(p => p.title || 'Unbekannt')
+                : [],
           });
 
           // Übergebe die EPG-Daten über den Callback
           if (typeof onEpgData === 'function') {
-            this._debug('Übergebe EPG-Daten an Callback', {
-              kanal: channel.name,
-              anzahlProgramme: programs.length,
+            this._debug('fetchEpgData(): Übergebe EPG-Daten an Callback', {
+              kanal: response.channeldata.name,
+              anzahlProgramme:
+                response.epg && typeof response.epg === 'object'
+                  ? Object.keys(response.epg).length
+                  : 0,
             });
-            onEpgData({
-              channel: channel,
-              programs: programs,
-            });
+            onEpgData(response);
           }
 
           // Sammle die Daten auch für die Rückgabe
           epgData.push({
-            channel: channel,
-            programs: programs,
+            response,
           });
         } catch (error) {
-          this._debug('Fehler beim Abrufen der EPG-Daten für Kanal', {
+          this._debug('fetchEpgData(): Fehler beim Abrufen der EPG-Daten für Kanal', {
             kanal: channel.name,
             fehler: error.message,
           });
         }
       }
 
-      this._debug('fetchEpgData abgeschlossen', {
+      this._debug('fetchEpgData(): fetchEpgData abgeschlossen', {
         anzahlKanäle: epgData.length,
-        gesamtProgramme: epgData.reduce((sum, c) => sum + c.programs.length, 0),
+        gesamtProgramme: epgData.reduce(
+          (sum, c) =>
+            sum +
+            (c.response.epg && typeof c.response.epg === 'object'
+              ? Object.keys(c.response.epg).length
+              : 0),
+          0
+        ),
       });
-
-      // Rufe onComplete Callback auf, wenn alle Daten abgeschlossen sind
-      if (typeof onComplete === 'function') {
-        this._debug('Rufe onComplete Callback auf', {
-          anzahlKanäle: epgData.length,
-          gesamtProgramme: epgData.reduce((sum, c) => sum + c.programs.length, 0),
-        });
-        onComplete(epgData);
-      }
-
       return epgData;
     } catch (error) {
-      this._debug('Fehler in fetchEpgData', {
+      this._debug('fetchEpgData(): Fehler in fetchEpgData', {
         fehler: error.message,
       });
       throw error;
