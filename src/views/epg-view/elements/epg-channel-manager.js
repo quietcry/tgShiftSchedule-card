@@ -84,6 +84,26 @@ export class EpgChannelManager {
     this.epgBox._debug('EpgChannelManager: Kanal-Reihenfolge initialisiert', {
       sortedChannels: this.epgBox._sortedChannels,
     });
+
+    // Detailliertes Debug-Log der Struktur
+    this.epgBox._debug('EpgChannelManager: Detaillierte _sortedChannels Struktur nach Initialisierung', {
+      anzahlGruppen: this.epgBox._sortedChannels.length,
+      gruppen: this.epgBox._sortedChannels.map((group, groupIndex) => ({
+        gruppenIndex: groupIndex,
+        gruppenName: group.name,
+        anzahlPatterns: group.patterns.length,
+        patterns: group.patterns.map((pattern, patternIndex) => ({
+          patternIndex: patternIndex,
+          pattern: pattern.pattern,
+          anzahlKanäle: pattern.channels.length,
+          kanäle: pattern.channels.map(channel => ({
+            id: channel.id,
+            name: channel.name,
+            anzahlProgramme: channel.programs ? channel.programs.length : 0,
+          })),
+        })),
+      })),
+    });
   }
 
   /**
@@ -222,6 +242,34 @@ export class EpgChannelManager {
           pattern.channels.sort((a, b) => a.name.localeCompare(b.name, 'de', { numeric: true }));
         }
       });
+    });
+
+    // Detailliertes Debug-Log der finalen Struktur nach dem Einsortieren
+    this.epgBox._debug('EpgChannelManager: Finale _sortedChannels Struktur nach Einsortierung', {
+      anzahlGruppen: this.epgBox._sortedChannels.length,
+      gesamtKanäle: this.epgBox._sortedChannels.reduce((total, group) =>
+        total + group.patterns.reduce((groupTotal, pattern) => groupTotal + pattern.channels.length, 0), 0
+      ),
+      gruppen: this.epgBox._sortedChannels.map((group, groupIndex) => ({
+        gruppenIndex: groupIndex,
+        gruppenName: group.name,
+        anzahlPatterns: group.patterns.length,
+        patterns: group.patterns.map((pattern, patternIndex) => ({
+          patternIndex: patternIndex,
+          pattern: pattern.pattern,
+          anzahlKanäle: pattern.channels.length,
+          kanäle: pattern.channels.map(channel => ({
+            id: channel.id,
+            name: channel.name,
+            anzahlProgramme: channel.programs ? channel.programs.length : 0,
+            programme: channel.programs ? channel.programs.slice(0, 3).map(p => ({
+              title: p.title,
+              start: new Date(p.start * 1000).toISOString(),
+              end: new Date((p.end || p.stop || p.start + 3600) * 1000).toISOString(),
+            })) : [],
+          })),
+        })),
+      })),
     });
   }
 }
