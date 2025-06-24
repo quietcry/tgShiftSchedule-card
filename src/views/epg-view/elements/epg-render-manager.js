@@ -224,11 +224,10 @@ export class EpgRenderManager {
         </div>
         <!-- Programme der Gruppe -->
         ${groupChannels.map(channel => {
-          // Hole den vollständigen Kanal mit Programmen aus der _channels Map
-          const fullChannel = this.epgBox._channels.get(channel.id);
-          const programs = fullChannel
+          // Hole die Programme direkt aus dem Kanal-Objekt in der _sortedChannels Struktur
+          const programs = channel.programs
             ? this.epgBox.dataManager.getProgramsForChannel(
-                fullChannel,
+                channel,
                 this.epgBox.dataManager.generateTimeSlots()
               )
             : [];
@@ -238,7 +237,7 @@ export class EpgRenderManager {
             gruppenName: group.name,
             kanal: channel.name,
             kanalId: channel.id,
-            hatVollständigenKanal: !!fullChannel,
+            hatProgramme: !!channel.programs,
             rowIndex: currentRowIndex,
             anzahlProgramme: programs.length,
             programme: programs.map(p => ({
