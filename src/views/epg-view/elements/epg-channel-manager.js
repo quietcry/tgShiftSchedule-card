@@ -164,20 +164,29 @@ export class EpgChannelManager {
         // Prüfe, ob der Kanal zum Pattern passt
         if (this.channelMatchesPattern(channel, pattern.pattern)) {
           // Prüfe, ob der Kanal bereits in diesem Pattern ist
-          const existingChannel = pattern.channels.find(c => c.id === channel.id);
-          if (!existingChannel) {
-            // Füge den Kanal hinzu
+          const existingChannelIndex = pattern.channels.findIndex(c => c.id === channel.id);
+          if (existingChannelIndex >= 0) {
+            // Aktualisiere bestehenden Kanal mit Programmen
+            pattern.channels[existingChannelIndex] = {
+              ...pattern.channels[existingChannelIndex],
+              ...channel,
+              programs: channel.programs || pattern.channels[existingChannelIndex].programs || [],
+            };
+          } else {
+            // Füge neuen Kanal mit Programmen hinzu
             pattern.channels.push({
               id: channel.id,
               name: channel.name,
-            });
-
-            this.epgBox._debug('EpgChannelManager: Kanal zu Pattern hinzugefügt', {
-              kanal: channel.name,
-              gruppe: group.name,
-              pattern: pattern.pattern,
+              programs: channel.programs || [],
             });
           }
+
+          this.epgBox._debug('EpgChannelManager: Kanal zu Pattern hinzugefügt/aktualisiert', {
+            kanal: channel.name,
+            gruppe: group.name,
+            pattern: pattern.pattern,
+            anzahlProgramme: channel.programs ? channel.programs.length : 0,
+          });
         }
       });
     });
@@ -201,26 +210,6 @@ export class EpgChannelManager {
       // Fallback: Exakte Übereinstimmung
       return channel.name.toLowerCase().includes(pattern.toLowerCase());
     }
-  }
-
-  /**
-   * Aktualisiert die Sortierung für alle vorhandenen Kanäle
-   */
-  updateAllChannelSorting() {
-    // Leere alle Pattern-Kanäle
-    this.epgBox._sortedChannels.forEach(group => {
-      group.patterns.forEach(pattern => {
-        pattern.channels = [];
-      });
-    });
-
-    // Sortiere alle Kanäle neu ein
-    Array.from(this.epgBox._channels.values()).forEach(channel => {
-      this.sortChannelIntoStructure(channel);
-    });
-
-    // Sortiere alle Pattern-Kanäle alphanumerisch
-    this.sortAllPatternChannels();
   }
 
   /**

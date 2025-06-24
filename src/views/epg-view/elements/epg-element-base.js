@@ -6,7 +6,6 @@ export class EpgElementBase extends SuperBase {
 
   static properties = {
     // EPG-spezifische Properties
-    epgData: { type: Object },
     currentTime: { type: Number },
     showTime: { type: Boolean },
     showDuration: { type: Boolean },
@@ -104,7 +103,6 @@ export class EpgElementBase extends SuperBase {
     this._debug('EpgElementBase-Konstruktor: Start');
 
     // EPG-spezifische Initialisierung
-    this.epgData = {};
     this.currentTime = Date.now() / 1000; // Aktuelle Zeit als Unix-Timestamp
     this.showTime = true;
     this.showDuration = true;

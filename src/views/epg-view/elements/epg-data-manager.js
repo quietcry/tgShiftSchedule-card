@@ -8,60 +8,22 @@ export class EpgDataManager {
   }
 
   /**
-   * Fügt EPG-Daten hinzu
-   * Kann wahrscheinlich entfallen
-   */
-  addEpgData(data) {
-    if (!data || !data.channeldata) {
-      this.epgBox._debug('EpgDataManager: Ungültige EPG-Daten erhalten', { data });
-      return;
-    }
-
-    const channel = data.channeldata;
-    const programs = data.epg && typeof data.epg === 'object' ? Object.values(data.epg) : [];
-
-    this.epgBox._debug('EpgDataManager: Füge EPG-Daten hinzu', {
-      kanal: channel.name,
-      kanalId: channel.id,
-      anzahlProgramme: programs.length,
-    });
-
-    // Speichere den Kanal mit seinen Programmen
-    this.epgBox._channels.set(channel.id, {
-      ...channel,
-      programs: programs,
-    });
-
-    // Initialisiere die Sortierungsstruktur beim ersten Kanal
-    if (!this.epgBox._channelOrderInitialized) {
-      this.epgBox.channelManager.initializeChannelOrder();
-    }
-
-    // Sortiere den neuen Kanal in die Struktur ein
-    this.epgBox.channelManager.sortChannelIntoStructure(channel);
-
-    this.epgBox.requestUpdate();
-  }
-
-  /**
    * Fügt Teil-EPG-Daten hinzu
    */
   addTeilEpg(teilEpg) {
-    this.epgBox._debug('EpgDataManager: Teil-EPG-Daten erhalten', { teilEpg });
+    this.epgBox._debug('EpgDataManager: Teil-EPG-Daten erhalten',  teilEpg );
 
     if (!teilEpg || !teilEpg.channeldata) {
-      this.epgBox._debug('EpgDataManager: Ungültige Teil-EPG-Daten erhalten', { teilEpg });
+      this.epgBox._debug('EpgDataManager: Ungültige Teil-EPG-Daten erhalten',  teilEpg );
       return;
     }
 
     const channel = teilEpg.channeldata;
-    const programs =
-      teilEpg.epg && typeof teilEpg.epg === 'object' ? Object.values(teilEpg.epg) : [];
+    const programs = teilEpg.epg && typeof teilEpg.epg === 'object' ? Object.values(teilEpg.epg) : [];
 
     this.epgBox._debug('EpgDataManager: Füge Teil-EPG hinzu', {
-      epg: teilEpg,
       kanal: channel.name,
-      kanalId: channel.id,
+      kanalId: channel.channelid,
       anzahlProgramme: programs.length,
       isFirstLoad: this.epgBox.isFirstLoad,
     });
@@ -69,46 +31,42 @@ export class EpgDataManager {
     // Erhöhe den Update-Counter
     this.epgBox.isChannelUpdate++;
 
-    // Hole den bestehenden Kanal oder erstelle einen neuen
-    let existingChannel = this.epgBox._channels.get(channel.id);
-    if (!existingChannel) {
-      existingChannel = {
-        id: channel.id,
-        name: channel.name,
-        programs: [],
-      };
-      this.epgBox._channels.set(channel.id, existingChannel);
-    }
+    // Erstelle Kanal-Objekt mit Programmen
+    const channelWithPrograms = {
+      id: channel.id,
+      name: channel.name,
+      programs: [],
+    };
 
     // Füge die Programme hinzu oder aktualisiere sie
     if (programs && Array.isArray(programs)) {
       programs.forEach(newProgram => {
         // Suche nach bestehendem Programm mit gleicher Startzeit
-        const existingProgramIndex = existingChannel.programs.findIndex(
+        const existingProgramIndex = channelWithPrograms.programs.findIndex(
           p => p.start === newProgram.start
         );
 
         if (existingProgramIndex >= 0) {
           // Aktualisiere bestehendes Programm
-          existingChannel.programs[existingProgramIndex] = {
-            ...existingChannel.programs[existingProgramIndex],
+          channelWithPrograms.programs[existingProgramIndex] = {
+            ...channelWithPrograms.programs[existingProgramIndex],
             ...newProgram,
           };
         } else {
           // Füge neues Programm hinzu
-          existingChannel.programs.push(newProgram);
+          channelWithPrograms.programs.push(newProgram);
         }
       });
 
       // Sortiere Programme nach Startzeit
-      existingChannel.programs.sort((a, b) => a.start - b.start);
+      channelWithPrograms.programs.sort((a, b) => a.start - b.start);
     }
 
     // Aktualisiere die Sortierungsstruktur
     if (!this.epgBox._channelOrderInitialized) {
       this.epgBox.channelManager.initializeChannelOrder();
     }
-    this.epgBox.channelManager.sortChannelIntoStructure(existingChannel);
+    this.epgBox.channelManager.sortChannelIntoStructure(channelWithPrograms);
 
     this.epgBox.requestUpdate();
   }

@@ -24,7 +24,7 @@ export class EpgBox extends EpgElementBase {
 
   constructor() {
     super();
-    this._channels = new Map(); // Speichert die Kanäle mit ihren Programmen
+    // this._channels = new Map(); // Entfernt - Programme werden direkt in _sortedChannels gespeichert
     this._sortedChannels = []; // Neue detaillierte Sortierungsstruktur
     this._channelOrderInitialized = false; // Flag für initialisierte Sortierung
     this.scale = 1; // Standard-Scale
@@ -48,14 +48,7 @@ export class EpgBox extends EpgElementBase {
       this._debug('channelOrder geändert');
       this._channelOrderInitialized = false;
       this.channelManager.initializeChannelOrder();
-      this.channelManager.updateAllChannelSorting();
       this.requestUpdate();
-    }
-
-    if (changedProperties.has('epgData')) {
-      if (this.epgData?.channel) {
-        this.dataManager.addEpgData(this.epgData);
-      }
     }
 
     // Wenn sich epgShowWidth ändert, aktualisiere den Scale
@@ -106,7 +99,7 @@ export class EpgBox extends EpgElementBase {
           detail: {
             isFirstLoad: this.isFirstLoad,
             isChannelUpdate: this.isChannelUpdate,
-            channelCount: this._channels.size,
+            channelCount: this._sortedChannels.length,
           },
           bubbles: true,
           composed: true,
@@ -317,16 +310,16 @@ export class EpgBox extends EpgElementBase {
   ];
 
   render() {
-    if (!this._channels.size) {
+    if (!this._sortedChannels.length) {
       return this.renderManager.renderLoading();
     }
 
     // Die Logik zur Auswahl des Render-Pfades (gruppiert vs. einfach)
     // ist jetzt direkt im Template. Wir bereiten hier keine flache Liste mehr vor.
-    const channelsToRenderForSimpleMode = Array.from(this._channels.values());
+    const channelsToRenderForSimpleMode = this._sortedChannels;
 
     this._debug('EpgBox: Render gestartet', {
-      anzahlKanäle: this._channels.size,
+      anzahlKanäle: this._sortedChannels.length,
       showChannelGroups: this.showChannelGroups,
       sortedChannelsCount: this._sortedChannels.length,
     });
@@ -379,10 +372,6 @@ export class EpgBox extends EpgElementBase {
         composed: true,
       })
     );
-  }
-
-  addEpgData(data) {
-    this.dataManager.addEpgData(data);
   }
 
   addTeilEpg(teilEpg) {
