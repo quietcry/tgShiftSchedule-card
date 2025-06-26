@@ -64,17 +64,43 @@ export class EpgChannelList extends EpgElementBase {
   }
 
   render() {
+    // Neue Hilfsfunktionen für die flache Struktur
+    const isGroup = item => item && item.type === 'group' && typeof item.pattern === 'string';
+    const isPattern = item => item && item.type === 'channel' && typeof item.pattern === 'string';
+
     return html`
       <div class="channel-list">
-        ${this.channels.map(
-          channel => html`
-            <div
-              class="channel-item ${channel.id === this.selectedChannel ? 'selected' : ''}"
-              @click=${() => this._onChannelClick(channel)}
-            >
-              <div class="channel-name">${channel.name}</div>
-            </div>
-          `
+        ${this.channels.map(item =>
+          isGroup(item)
+            ? html`
+                <div class="channelGroup">${item.name}</div>
+                ${item.channels.map(
+                  channel => html`
+                    <div
+                      class="channel-item ${channel.id === this.selectedChannel ? 'selected' : ''}"
+                      @click=${() => this._onChannelClick(channel)}
+                    >
+                      <div class="channel-name">${channel.channeldata?.name || channel.name}</div>
+                    </div>
+                  `
+                )}
+              `
+            : isPattern(item)
+              ? html`
+                  ${item.channels.map(
+                    channel => html`
+                      <div
+                        class="channel-item ${channel.id === this.selectedChannel
+                          ? 'selected'
+                          : ''}"
+                        @click=${() => this._onChannelClick(channel)}
+                      >
+                        <div class="channel-name">${channel.channeldata?.name || channel.name}</div>
+                      </div>
+                    `
+                  )}
+                `
+              : null
         )}
       </div>
     `;

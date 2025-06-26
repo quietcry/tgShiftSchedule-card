@@ -345,9 +345,10 @@ export class EpgBox extends EpgElementBase {
   }
 
   _onChannelSelected(channel) {
-    this._debug('EpgBox: Kanal ausgewählt', {
-      kanal: channel.name,
+    this._debug('EpgBox: Verarbeite Kanal', {
+      kanal: channel.channeldata?.name || channel.name,
       kanalId: channel.id,
+      anzahlProgramme: channel.programs ? channel.programs.length : 0,
     });
 
     this.dispatchEvent(

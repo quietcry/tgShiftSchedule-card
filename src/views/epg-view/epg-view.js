@@ -319,9 +319,10 @@ export class EPGView extends ViewBase {
     const epgResponse = epgData?.response || [];
 
     if (!Array.isArray(epgResponse) || epgResponse.length === 0) {
-      this._debug('Keine EPG-Daten für Kanal:', channel.name, {
-        epgData,
-        response: epgData?.response,
+      this._debug('Keine EPG-Daten für Kanal:', channel.channeldata?.name || channel.name, {
+        kanalId: channel.id,
+        kanalName: channel.channeldata?.name || channel.name,
+        anzahlProgramme: channel.programs ? channel.programs.length : 0,
       });
       return {
         ...channel,
@@ -338,7 +339,7 @@ export class EPGView extends ViewBase {
       duration: program.duration || 0,
     }));
 
-    this._debug('Verarbeitete Programme für Kanal:', channel.name, {
+    this._debug('Verarbeitete Programme für Kanal:', channel.channeldata?.name || channel.name, {
       programs,
       epgResponse,
     });

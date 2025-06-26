@@ -116,8 +116,18 @@ export class DataProvider {
       this._debug('Kanal-Liste vor Filterung:', response);
 
       // Konvertiere YAML-Boxen in Arrays
-      const blacklist = config.blacklist ? config.blacklist.split('\n').filter(Boolean) : [];
-      const whitelist = config.whitelist ? config.whitelist.split('\n').filter(Boolean) : [];
+      const blacklist = config.blacklist
+        ? config.blacklist
+            .split(/,|\n/)
+            .map(s => s.trim())
+            .filter(Boolean)
+        : [];
+      const whitelist = config.whitelist
+        ? config.whitelist
+            .split(/,|\n/)
+            .map(s => s.trim())
+            .filter(Boolean)
+        : [];
 
       this._debug('Filter-Konfiguration:', {
         blacklist,
@@ -195,13 +205,17 @@ export class DataProvider {
       for (const channel of channelList) {
         try {
           this._debug('fetchEpgData(): Hole EPG-Daten für Kanal', {
-            kanal: channel.name,
+            kanal: channel.channeldata?.name || channel.name,
             id: channel.id,
           });
 
           const response = await this.fetchChannelEpg(entity, channel.id, timeWindow, date);
           if (!response) {
-            this._debug('fetchEpgData(): für Kanal', channel.name, 'Keine EPG-Daten gefunden');
+            this._debug(
+              'fetchEpgData(): für Kanal',
+              channel.channeldata?.name || channel.name,
+              'Keine EPG-Daten gefunden'
+            );
             continue;
           }
 
@@ -235,7 +249,7 @@ export class DataProvider {
           });
         } catch (error) {
           this._debug('fetchEpgData(): Fehler beim Abrufen der EPG-Daten für Kanal', {
-            kanal: channel.name,
+            kanal: channel.channeldata?.name || channel.name,
             fehler: error.message,
           });
         }

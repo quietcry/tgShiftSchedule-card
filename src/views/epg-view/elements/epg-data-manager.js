@@ -11,18 +11,19 @@ export class EpgDataManager {
    * Fügt Teil-EPG-Daten hinzu
    */
   addTeilEpg(teilEpg) {
-    this.epgBox._debug('EpgDataManager: Teil-EPG-Daten erhalten',  teilEpg );
+    this.epgBox._debug('EpgDataManager: Teil-EPG-Daten erhalten', teilEpg);
 
     if (!teilEpg || !teilEpg.channeldata) {
-      this.epgBox._debug('EpgDataManager: Ungültige Teil-EPG-Daten erhalten',  teilEpg );
+      this.epgBox._debug('EpgDataManager: Ungültige Teil-EPG-Daten erhalten', teilEpg);
       return;
     }
 
     const channel = teilEpg.channeldata;
-    const programs = teilEpg.epg && typeof teilEpg.epg === 'object' ? Object.values(teilEpg.epg) : [];
+    const programs =
+      teilEpg.epg && typeof teilEpg.epg === 'object' ? Object.values(teilEpg.epg) : [];
 
     this.epgBox._debug('EpgDataManager: Füge Teil-EPG hinzu', {
-      kanal: channel.name,
+      kanal: channel.channeldata?.name || channel.name,
       kanalId: channel.channelid,
       anzahlProgramme: programs.length,
       isFirstLoad: this.epgBox.isFirstLoad,
@@ -31,12 +32,26 @@ export class EpgDataManager {
     // Erhöhe den Update-Counter
     this.epgBox.isChannelUpdate++;
 
-    // Erstelle Kanal-Objekt mit Programmen
+    // Erstelle Kanal-Objekt - behalte die komplette ursprüngliche Struktur
     const channelWithPrograms = {
-      id: channel.id,
-      name: channel.name,
-      programs: [],
+      ...teilEpg, // Behalte die komplette ursprüngliche Struktur (channeldata + epg)
+      id: channel.id || channel.channelid || channel.name, // Stelle sicher, dass eine ID vorhanden ist
+      programs: [], // Füge leeres Programm-Array hinzu
     };
+
+    this.epgBox._debug('EpgDataManager: Kanal-Objekt erstellt', {
+      originalId: channel.id,
+      originalChannelId: channel.channelid,
+      finalId: channelWithPrograms.id,
+      name: channelWithPrograms.name,
+      alleEigenschaften: Object.keys(channelWithPrograms),
+      hatChanneldata: 'channeldata' in channelWithPrograms,
+      hatEpg: 'epg' in channelWithPrograms,
+      channeldataInhalt: channelWithPrograms.channeldata
+        ? Object.keys(channelWithPrograms.channeldata)
+        : 'nicht vorhanden',
+      epgInhalt: channelWithPrograms.epg ? Object.keys(channelWithPrograms.epg) : 'nicht vorhanden',
+    });
 
     // Füge die Programme hinzu oder aktualisiere sie
     if (programs && Array.isArray(programs)) {
@@ -123,7 +138,7 @@ export class EpgDataManager {
     const currentTime = Math.floor(Date.now() / 1000);
 
     this.epgBox._debug('EpgDataManager: Filtere Programme für Kanal', {
-      kanal: channel.name,
+      kanal: channel.channeldata?.name || channel.name,
       anzahlProgramme: channel.programs.length,
       minTime,
       maxTime,

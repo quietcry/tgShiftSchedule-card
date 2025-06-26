@@ -3,8 +3,8 @@ export class TgCardHelper {
     this.cardName = cardName;
     this.debugMode = debugMode;
 
-    if (this.debugMode) console.debug(`[${this.cardName}] tgCardHelper-Modul wird geladen`);
-    this._debug('tgCardHelper initialisiert');
+    // if (this.debugMode) console.debug(`[${this.cardName}] tgCardHelper-Modul wird geladen`);
+    // this._debug('tgCardHelper initialisiert');
   }
   _debug(className, message, data = null) {
     if (!this.debugMode) return;
