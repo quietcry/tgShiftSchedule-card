@@ -14,47 +14,47 @@ export class EpgProgramList extends EpgElementBase {
   static styles = [
     super.styles,
     css`
-    :host {
-      display: block;
-      width: 100%;
-      height: 100%;
-    }
-    .program-list {
-      display: flex;
-      flex-direction: column;
-      height: 100%;
-    }
-    .program-item {
+      :host {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+      .program-list {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+      }
+      .program-item {
         padding: var(--epg-padding);
-      border-bottom: 1px solid var(--epg-border-color);
-      cursor: pointer;
-      transition: background-color 0.2s;
+        border-bottom: 1px solid var(--epg-border-color);
+        cursor: pointer;
+        transition: background-color 0.2s;
         height: var(--epg-row-height);
         display: flex;
         flex-direction: column;
         justify-content: center;
         box-sizing: border-box;
-    }
-    .program-item:hover {
-      background-color: var(--epg-hover-bg);
-    }
-    .program-item.current {
-      background-color: var(--epg-current-bg);
-    }
-    .program-time {
-      font-size: 12px;
-      color: var(--epg-time-color);
-      margin-bottom: 4px;
-    }
-    .program-title {
-      font-weight: bold;
-      color: var(--epg-text-color);
-      margin-bottom: 4px;
-    }
-    .program-description {
-      font-size: 12px;
-      color: var(--epg-description-color);
-    }
+      }
+      .program-item:hover {
+        background-color: var(--epg-hover-bg);
+      }
+      .program-item.current {
+        background-color: var(--epg-current-bg);
+      }
+      .program-time {
+        font-size: 12px;
+        color: var(--epg-time-color);
+        margin-bottom: 4px;
+      }
+      .program-title {
+        font-weight: bold;
+        color: var(--epg-text-color);
+        margin-bottom: 4px;
+      }
+      .program-description {
+        font-size: 12px;
+        color: var(--epg-description-color);
+      }
     `,
   ];
 

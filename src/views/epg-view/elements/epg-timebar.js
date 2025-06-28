@@ -13,38 +13,38 @@ export class EpgTimebar extends EpgElementBase {
   static styles = [
     super.styles,
     css`
-    :host {
-      display: block;
-      width: 100%;
-      height: 100%;
-    }
-    .timebar {
-      display: flex;
-      height: 100%;
-      position: relative;
-      background-color: var(--epg-timebar-bg);
+      :host {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+      .timebar {
+        display: flex;
+        height: 100%;
+        position: relative;
+        background-color: var(--epg-timebar-bg);
         height: var(--epg-timebar-height);
-    }
-    .time-slot {
-      flex: 1;
-      text-align: center;
-      padding: 5px;
-      border-right: 1px solid var(--epg-border-color);
-      font-size: 12px;
-      color: var(--epg-time-color);
+      }
+      .time-slot {
+        flex: 1;
+        text-align: center;
+        padding: 5px;
+        border-right: 1px solid var(--epg-border-color);
+        font-size: 12px;
+        color: var(--epg-time-color);
         display: flex;
         align-items: center;
         justify-content: center;
         box-sizing: border-box;
-    }
-    .now-marker {
-      position: absolute;
-      top: 0;
-      bottom: 0;
-      width: 2px;
-      background-color: var(--epg-now-marker-color);
-      z-index: 1;
-    }
+      }
+      .now-marker {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background-color: var(--epg-now-marker-color);
+        z-index: 1;
+      }
     `,
   ];
 
