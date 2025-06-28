@@ -1,7 +1,3 @@
-/**
- * EPG Scale Manager
- * Verwaltet alle scale-bezogenen Funktionen für die EPG-Box
- */
 export class EpgScaleManager {
   constructor(epgBox) {
     this.epgBox = epgBox;
@@ -23,39 +19,21 @@ export class EpgScaleManager {
   }
 
   /**
-   * Misst die tatsächliche Container-Breite
+   * Validiert die epgShowPastTime Konfiguration
    */
-  measureContainerWidth() {
-    const programBox = this.epgBox.shadowRoot?.querySelector('.programBox');
-    if (programBox) {
-      const measuredWidth = programBox.clientWidth;
-      if (measuredWidth > 0) {
-        this.epgBox._containerWidth = measuredWidth;
-        this.epgBox._containerWidthMeasured = true;
-
-        // Recalculate scale with new container width
-        this.epgBox.scale = this.calculateScale();
-        this.epgBox.requestUpdate();
-      }
-    }
-  }
-
-  /**
-   * Validiert die epgBackview Konfiguration
-   */
-  validateEpgBackview() {
+  validateEpgShowPastTime() {
     const epgPastTime = this.epgBox.epgPastTime || 30;
-    const epgShowWidth = this.epgBox.epgShowWidth || 180;
-    const epgBackview = this.epgBox.epgBackview || 0;
+    const epgShowFutureTime = this.epgBox.epgShowFutureTime || 180;
+    const epgShowPastTime = this.epgBox.epgShowPastTime || 0;
 
-    // epgBackview darf nicht größer als epgPastTime oder epgShowWidth sein
-    if (epgBackview > epgPastTime || epgBackview > epgShowWidth) {
-      this.epgBox._debug('EpgScaleManager: epgBackview zu groß, wird auf 0 gesetzt', {
-        epgBackview,
+    // epgShowPastTime darf nicht größer als epgPastTime oder epgShowFutureTime sein
+    if (epgShowPastTime > epgPastTime || epgShowPastTime > epgShowFutureTime) {
+      this.epgBox._debug('EpgScaleManager: epgShowPastTime zu groß, wird auf 0 gesetzt', {
+        epgShowPastTime,
         epgPastTime,
-        epgShowWidth,
+        epgShowFutureTime,
       });
-      this.epgBox.epgBackview = 0;
+      this.epgBox.epgShowPastTime = 0;
     }
   }
 }

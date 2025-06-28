@@ -77,7 +77,7 @@ export class EpgBox extends EpgElementBase {
       changedProperties.has('epgPastTime') ||
       changedProperties.has('epgShowWidth')
     ) {
-      this.scaleManager.validateEpgBackview();
+      this.scaleManager.validateEpgShowPastTime();
     }
 
     // Verringere isChannelUpdate nach erfolgreichem Update
@@ -134,8 +134,6 @@ export class EpgBox extends EpgElementBase {
   firstUpdated() {
     super.firstUpdated();
 
-    // Messen der Container-Breite nach dem ersten Render
-    this.scaleManager.measureContainerWidth();
 
     // Einrichten der Scroll-Synchronisation
     this.scrollManager.setupScrollSync();
@@ -188,7 +186,7 @@ export class EpgBox extends EpgElementBase {
     const currentTime = now.getHours() * 60 + now.getMinutes(); // Minuten seit Mitternacht
 
     // Berechne die Position basierend auf der aktuellen Zeit
-    const scale = this.scaleManager.getScale();
+    const scale = this.scaleManager.calculateScale();
     const pastTime = this.epgShowPastTime || 60;
 
     // Position = (aktuelle Zeit - Startzeit) * Skalierung
