@@ -15,8 +15,9 @@ export class EpgScaleManager {
     const containerWidth = this.epgBox._containerWidth;
     const showWidth = this.epgBox.epgShowWidth || 180; // Minuten sichtbar
 
-    // Berechne Scale: Container-Breite / Anzeigebreite in Minuten
-    const scale = containerWidth / showWidth;
+    // Berechne Scale: Container-Breite / Anzeigebreite in Sekunden
+    // showWidth ist in Minuten, daher * 60 für Sekunden
+    const scale = containerWidth / (showWidth * 60);
 
     return scale;
   }

@@ -282,7 +282,7 @@ export class EPGView extends ViewBase {
     this._debug('EPG-View: EPG-Box ist bereit, starte Datenabruf');
     if (!this._dataFetchStarted) {
       this._dataFetchStarted = true;
-      this._fetchViewData(this.config);
+    this._fetchViewData(this.config);
     } else {
       this._debug('EPG-View: Datenabruf bereits gestartet, überspringe');
     }

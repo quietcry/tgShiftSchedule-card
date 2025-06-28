@@ -94,7 +94,7 @@ export class EpgChannelManager {
               const { type, ...rest } = pat;
               return {
                 ...rest,
-                channels: pat.channels || [],
+                channels: [],
               };
             });
           }
@@ -103,7 +103,7 @@ export class EpgChannelManager {
           const pattern = {
             type: 'channel',
             pattern: item.pattern,
-            channels: item.channels || [],
+            channels: [],
           };
           Object.keys(item).forEach(key => {
             if (!['type', 'pattern', 'channels'].includes(key)) {
@@ -114,7 +114,7 @@ export class EpgChannelManager {
         } else if (item.type === 'unvisiblegroup') {
           const pattern = {
             type: 'unvisiblegroup',
-            channels: item.channels || [],
+            channels: [],
             name: item.name || `Gruppe ${idx + 1}`,
           };
           result.push(pattern);
@@ -145,6 +145,13 @@ export class EpgChannelManager {
             patternObj.channels = patternObj.channels || [];
             if (!patternObj.channels.find(c => c.id === channel.id)) {
               patternObj.channels.push(channel);
+              // Debug-Ausgabe: Was wird in die Gruppe einsortiert?
+              console.log('DEBUG: Kanal in Gruppe einsortiert', {
+                gruppe: item.name,
+                pattern: patternObj.pattern,
+                kanal: channel,
+                programme: channel.programs,
+              });
             }
             matched = true;
             break;

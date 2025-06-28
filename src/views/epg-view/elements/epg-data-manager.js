@@ -83,6 +83,11 @@ export class EpgDataManager {
     }
     this.epgBox.channelManager.sortChannelIntoStructure(channelWithPrograms);
 
+    // Aktualisiere den frühesten Programmstart nach dem Hinzufügen neuer Programme
+    if (this.updateEarliestProgramStart(channelWithPrograms.programs[0].start)) {
+      this.epgBox.renderManager.updateGapItems();
+    }
+
     this.epgBox.requestUpdate();
   }
 
@@ -174,5 +179,15 @@ export class EpgDataManager {
     });
 
     return filteredPrograms;
+  }
+
+  /**
+   * Berechnet den frühesten Programmstart aller Kanäle und aktualisiert earliestProgramStart
+   */
+  updateEarliestProgramStart(newEarliestStart) {
+    if (newEarliestStart < this.epgBox._channelsParameters.earliestProgramStart) {
+      this.epgBox._channelsParameters.earliestProgramStart = newEarliestStart;
+      return this.epgBox._channelsParameters.earliestProgramStart;
+    }
   }
 }
