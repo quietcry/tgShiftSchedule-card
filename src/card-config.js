@@ -1,16 +1,16 @@
-const Version = '2025.06-0091';
+const Version = '2025.06-0093';
 const CardRegname = 'tgepg-card';
 const CardName = 'TG EPG Card';
 const CardDescription = 'Eine Karte für die EPG-Anzeige';
 const CardFilename = 'tgepg-card.js';
-const DebugMode = 'true'; // Aktiviere Debug für alle Komponenten
+const DebugMode = 'true, EpgProgramItem'; // Aktiviere Debug für alle Komponenten
 const showVersion = true;
 
 // EPG-Zeitkonfiguration
 const DefaultEpgPastTime = 30; // Minuten in die Vergangenheit
 const DefaultEpgFutureTime = 120; // Minuten in die Zukunft
-const DefaultEpgShowWidth = 180; // Minuten sichtbar in der Ansicht
-const DefaultEpgBackview = 60; // Minuten für Rückblick (Backview)
+const DefaultEpgShowFutureTime = 180; // Minuten sichtbar in der Ansicht
+const DefaultEpgShowPastTime = 60; // Minuten für Rückblick (Backview)
 
 export {
   CardRegname,
@@ -22,6 +22,6 @@ export {
   showVersion,
   DefaultEpgPastTime,
   DefaultEpgFutureTime,
-  DefaultEpgShowWidth,
-  DefaultEpgBackview,
+  DefaultEpgShowFutureTime,
+  DefaultEpgShowPastTime,
 };

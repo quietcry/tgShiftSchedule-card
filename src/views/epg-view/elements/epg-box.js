@@ -20,6 +20,8 @@ export class EpgBox extends EpgElementBase {
     scale: { type: Number },
     showShortText: { type: Boolean },
     channelWidth: { type: Number }, // Breite der Kanalspalte in px
+    epgShowPastTime: { type: Number }, // Default: 60 Minuten für Rückblick
+    epgShowFutureTime: { type: Number }, // Default: 180 Minuten sichtbar
   };
 
   constructor() {
@@ -38,9 +40,17 @@ export class EpgBox extends EpgElementBase {
     this.isFirstLoad = 0; // Indikator für ersten Datenabruf (0=initial, 1=loading, 2=complete)
     this.isChannelUpdate = 0; // Counter für aktive Kanal-Updates
     this.channelWidth = 180; // Standardbreite der Kanalspalte
+    this.epgShowPastTime = 60; // Default: 60 Minuten für Rückblick
+    this.epgShowFutureTime = 180; // Default: 180 Minuten sichtbar
+
+    // Zeitmarker-Update-Timer
+    this._timeMarkerTimer = null;
 
     // Initialisiere Manager
-    this.scrollManager = new EpgScrollManager(this);
+    this.scrollManager = new EpgScrollManager(this, this.epgShowPastTime, this.epgShowFutureTime);
+
+    // Starte Zeitmarker-Update
+    this._startTimeMarkerUpdate();
     this.scaleManager = new EpgScaleManager(this);
     this.channelManager = new EpgChannelManager(this);
     this.dataManager = new EpgDataManager(this);
@@ -130,10 +140,63 @@ export class EpgBox extends EpgElementBase {
     // Einrichten der Scroll-Synchronisation
     this.scrollManager.setupScrollSync();
 
+    // Starte Zeitmarker-Update
+    this._startTimeMarkerUpdate();
+
     this._debug('EpgBox: firstUpdated abgeschlossen', {
-      containerWidth: this._containerWidth,
-      scale: this.scale,
+      channelCount: this._sortedChannels.length,
+      showChannelGroups: this.showChannelGroups,
+      epgShowPastTime: this.epgShowPastTime,
+      epgShowFutureTime: this.epgShowFutureTime
     });
+  }
+
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    // Stoppe Zeitmarker-Update
+    this._stopTimeMarkerUpdate();
+  }
+
+  // Zeitmarker-Methoden
+  _startTimeMarkerUpdate() {
+    if (this._timeMarkerTimer) {
+      clearInterval(this._timeMarkerTimer);
+    }
+    // Update jede Sekunde
+    this._timeMarkerTimer = setInterval(() => {
+      this._updateTimeMarker();
+    }, 1000);
+  }
+
+  _stopTimeMarkerUpdate() {
+    if (this._timeMarkerTimer) {
+      clearInterval(this._timeMarkerTimer);
+      this._timeMarkerTimer = null;
+    }
+  }
+
+  _updateTimeMarker() {
+    const timeMarker = this.shadowRoot?.querySelector('.timeMarker');
+    if (timeMarker) {
+      const leftPosition = this._calculateTimeMarkerPosition();
+      timeMarker.style.left = `${leftPosition}px`;
+    }
+  }
+
+  _calculateTimeMarkerPosition() {
+    const now = new Date();
+    const currentTime = now.getHours() * 60 + now.getMinutes(); // Minuten seit Mitternacht
+
+    // Berechne die Position basierend auf der aktuellen Zeit
+    const scale = this.scaleManager.getScale();
+    const pastTime = this.epgShowPastTime || 60;
+
+    // Position = (aktuelle Zeit - Startzeit) * Skalierung
+    const startTime = this.scaleManager.getStartTime();
+    const timeDiff = currentTime - startTime;
+    const position = timeDiff * scale;
+
+    return Math.max(0, position);
   }
 
   static styles = [
@@ -146,6 +209,19 @@ export class EpgBox extends EpgElementBase {
         height: auto; /* Automatische Höhe basierend auf Inhalt */
         overflow: visible; /* Kein Scroll, damit Inhalte sichtbar sind */
         position: relative;
+      }
+
+      /* Zeitmarker für aktuelle Zeit */
+      .timeMarker {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background-color: red;
+        z-index: 1000;
+        pointer-events: none;
+        box-shadow: 0 0 4px rgba(255, 0, 0, 0.5);
+      }
       }
 
       .channelBox {
@@ -172,6 +248,46 @@ export class EpgBox extends EpgElementBase {
         height: auto; /* Automatische Höhe basierend auf Inhalt */
         max-height: none; /* Keine Höhenbegrenzung */
         min-width: 0; /* Erlaubt Schrumpfen */
+        position: relative;
+      }
+
+      /* Zeitmarker für aktuelle Zeit */
+      .timeMarker {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background-color: red;
+        z-index: 1000;
+        pointer-events: none;
+        box-shadow: 0 0 4px rgba(255, 0, 0, 0.5);
+      }
+        position: relative;
+      }
+
+      /* Zeitmarker für aktuelle Zeit */
+      .timeMarker {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background-color: red;
+        z-index: 1000;
+        pointer-events: none;
+        box-shadow: 0 0 4px rgba(255, 0, 0, 0.5);
+      }
+      }
+
+      /* Zeitmarker für aktuelle Zeit */
+      .timeMarker {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background-color: red;
+        z-index: 1000;
+        pointer-events: none;
+        box-shadow: 0 0 4px rgba(255, 0, 0, 0.5);
       }
 
       .programRow {
@@ -381,6 +497,18 @@ export class EpgBox extends EpgElementBase {
         ${this.showChannelGroups && this._sortedChannels.length > 0
           ? this.renderManager.renderGroupedPrograms(this._sortedChannels)
           : this.renderManager.renderSimplePrograms(channelsToRenderForSimpleMode)}
+
+        <!-- Zeitmarker für aktuelle Zeit -->
+        <div
+          class="timeMarker"
+          style="left: ${this._calculateTimeMarkerPosition()}px;"
+        ></div>
+
+        <!-- Zeitmarker für aktuelle Zeit -->
+        <div
+          class="timeMarker"
+          style="left: ${this._calculateTimeMarkerPosition()}px;"
+        ></div>
       </div>
     `;
   }
