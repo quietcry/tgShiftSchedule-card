@@ -11,7 +11,52 @@ export class EpgUpdateManager {
   constructor(epgBox) {
     this.epgBox = epgBox;
     this.tgCardHelper = new TgCardHelper(CardName, DebugMode);
+
+    // ===== WERT-TRACKING =====
+    // Speichert die letzten bekannten Werte für Änderungsprüfung
+    this._lastValues = {
+      // Scale-relevante Werte
+      env: null,
+      epgShowFutureTime: null,
+      epgShowPastTime: null,
+      epgShowWidth: null,
+
+      // Zeit-relevante Werte
+      epgPastTime: null,
+      epgShowFutureTime: null, // Doppelt, da sowohl Scale als auch Zeit relevant
+
+      // Render-relevante Werte
+      showChannelGroups: null,
+      showShortText: null,
+      channelWidth: null,
+
+      // Channel-relevante Werte
+      channelOrder: null,
+
+      // Container-Werte
+      containerWidth: null,
+    };
+
     this._debug('EpgUpdateManager initialisiert');
+  }
+
+  /**
+   * Initialisiert die gespeicherten Werte mit den aktuellen Werten der epgBox
+   * Sollte beim ersten Aufruf von handleUpdate aufgerufen werden
+   */
+  _initializeValues() {
+    if (this._lastValues.env === null) {
+      this._debug('EpgUpdateManager: Initialisiere gespeicherte Werte');
+
+      // Lade alle aktuellen Werte
+      Object.keys(this._lastValues).forEach(property => {
+        if (this.epgBox.hasOwnProperty(property)) {
+          this._lastValues[property] = this._deepClone(this.epgBox[property]);
+        }
+      });
+
+      this._debug('EpgUpdateManager: Werte initialisiert', this._lastValues);
+    }
   }
 
   _debug(message, data = null) {
@@ -25,6 +70,9 @@ export class EpgUpdateManager {
    * @param {any} newValue - Neuer Wert (optional)
    */
   handleUpdate(changeType, changedProperties, newValue = null) {
+    // Initialisiere Werte beim ersten Aufruf
+    this._initializeValues();
+
     this._debug('EpgUpdateManager: Update empfangen', {
       changeType,
       changedProperties: Array.from(changedProperties.keys()),
@@ -56,38 +104,129 @@ export class EpgUpdateManager {
   }
 
   /**
-   * Behandelt Property-Änderungen
+   * Behandelt Property-Änderungen mit Änderungsprüfung
    */
   _handlePropertyChange(changedProperties) {
     this._debug('EpgUpdateManager: Verarbeite Property-Änderungen', {
       properties: Array.from(changedProperties.keys()),
     });
 
-    // Channel-Order Änderungen
-    if (changedProperties.has('channelOrder')) {
-      this._debug('EpgUpdateManager: Channel-Order geändert');
-      this.epgBox._channelOrderInitialized = false;
-      this.epgBox.channelManager.initializeChannelOrder();
-      this.epgBox.requestUpdate();
+    // Sammle alle echten Änderungen
+    const realChanges = new Set();
+
+    // Prüfe jede geänderte Property auf echte Änderung
+    for (const property of changedProperties) {
+      const newValue = this.epgBox[property];
+      const oldValue = this._lastValues[property];
+
+      if (this._hasValueChanged(property, oldValue, newValue)) {
+        this._debug('EpgUpdateManager: Echte Änderung erkannt', {
+          property,
+          oldValue,
+          newValue,
+        });
+
+        // Aktualisiere den gespeicherten Wert
+        this._lastValues[property] = this._deepClone(newValue);
+        realChanges.add(property);
+      } else {
+        this._debug('EpgUpdateManager: Keine echte Änderung', {
+          property,
+          oldValue,
+          newValue,
+        });
+      }
     }
 
-    // Scale-relevante Änderungen
-    if (this._isScaleRelevant(changedProperties)) {
-      this._debug('EpgUpdateManager: Scale-relevante Änderung erkannt');
-      this.handleUpdate('SCALE_UPDATE', changedProperties);
+    // Nur bei echten Änderungen weiterverarbeiten
+    if (realChanges.size > 0) {
+      this._debug('EpgUpdateManager: Verarbeite echte Änderungen', {
+        realChanges: Array.from(realChanges),
+      });
+
+      // Channel-Order Änderungen
+      if (realChanges.has('channelOrder')) {
+        this._debug('EpgUpdateManager: Channel-Order geändert');
+        this.epgBox._channelOrderInitialized = false;
+        this.epgBox.channelManager.initializeChannelOrder();
+        this.epgBox.requestUpdate();
+      }
+
+      // Scale-relevante Änderungen
+      if (this._isScaleRelevant(realChanges)) {
+        this._debug('EpgUpdateManager: Scale-relevante Änderung erkannt');
+        this.handleUpdate('SCALE_UPDATE', realChanges);
+      }
+
+      // Zeit-relevante Änderungen
+      if (this._isTimeRelevant(realChanges)) {
+        this._debug('EpgUpdateManager: Zeit-relevante Änderung erkannt');
+        this.handleUpdate('TIME_UPDATE', realChanges);
+      }
+
+      // Render-relevante Änderungen
+      if (this._isRenderRelevant(realChanges)) {
+        this._debug('EpgUpdateManager: Render-relevante Änderung erkannt');
+        this.handleUpdate('RENDER_UPDATE', realChanges);
+      }
+    } else {
+      this._debug('EpgUpdateManager: Keine echten Änderungen, überspringe Verarbeitung');
+    }
+  }
+
+  /**
+   * Prüft ob sich ein Wert wirklich geändert hat
+   */
+  _hasValueChanged(property, oldValue, newValue) {
+    // Spezielle Behandlung für verschiedene Datentypen
+    if (oldValue === null && newValue === null) return false;
+    if (oldValue === null || newValue === null) return true;
+
+    // Arrays vergleichen
+    if (Array.isArray(oldValue) && Array.isArray(newValue)) {
+      if (oldValue.length !== newValue.length) return true;
+      return !oldValue.every((item, index) => this._deepEqual(item, newValue[index]));
     }
 
-    // Zeit-relevante Änderungen
-    if (this._isTimeRelevant(changedProperties)) {
-      this._debug('EpgUpdateManager: Zeit-relevante Änderung erkannt');
-      this.handleUpdate('TIME_UPDATE', changedProperties);
+    // Objekte vergleichen
+    if (typeof oldValue === 'object' && typeof newValue === 'object') {
+      return !this._deepEqual(oldValue, newValue);
     }
 
-    // Render-relevante Änderungen
-    if (this._isRenderRelevant(changedProperties)) {
-      this._debug('EpgUpdateManager: Render-relevante Änderung erkannt');
-      this.handleUpdate('RENDER_UPDATE', changedProperties);
+    // Primitive Werte vergleichen
+    return oldValue !== newValue;
+  }
+
+  /**
+   * Deep Clone für Objekte und Arrays
+   */
+  _deepClone(value) {
+    if (value === null || typeof value !== 'object') return value;
+    if (Array.isArray(value)) return value.map(item => this._deepClone(item));
+    return JSON.parse(JSON.stringify(value));
+  }
+
+  /**
+   * Deep Equal Vergleich für Objekte und Arrays
+   */
+  _deepEqual(a, b) {
+    if (a === b) return true;
+    if (a === null || b === null) return false;
+    if (typeof a !== typeof b) return false;
+
+    if (Array.isArray(a) && Array.isArray(b)) {
+      if (a.length !== b.length) return false;
+      return a.every((item, index) => this._deepEqual(item, b[index]));
     }
+
+    if (typeof a === 'object') {
+      const keysA = Object.keys(a);
+      const keysB = Object.keys(b);
+      if (keysA.length !== keysB.length) return false;
+      return keysA.every(key => this._deepEqual(a[key], b[key]));
+    }
+
+    return false;
   }
 
   /**
