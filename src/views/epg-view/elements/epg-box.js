@@ -102,18 +102,26 @@ export class EpgBox extends EpgElementBase {
       this.requestUpdate();
     }
 
+    // ===== MIGRATION SCHRITT 2: SCALE-UPDATES =====
+    // TODO: Alte Scale-Logik wird durch UpdateManager ersetzt
     // Wenn sich epgShowWidth ändert, aktualisiere den Scale
-    if (changedProperties.has('epgShowWidth')) {
-      this.scale = this.scaleManager.calculateScale();
-      this.requestUpdate();
-    }
+    // if (changedProperties.has('epgShowWidth')) {
+    //   this.scale = this.scaleManager.calculateScale();
+    //   this.requestUpdate();
+    // }
 
     // Wenn sich env, epgShowFutureTime oder epgShowPastTime ändern, aktualisiere den Scale
-    if (changedProperties.has('env') ||
-        changedProperties.has('epgShowFutureTime') ||
-        changedProperties.has('epgShowPastTime')) {
-      this.scale = this.scaleManager.calculateScale();
-      this.requestUpdate();
+    // if (changedProperties.has('env') ||
+    //     changedProperties.has('epgShowFutureTime') ||
+    //     changedProperties.has('epgShowPastTime')) {
+    //   this.scale = this.scaleManager.calculateScale();
+    //   this.requestUpdate();
+    // }
+
+    // NEUE LOGIK: Scale-Updates über UpdateManager
+    if (this._isScaleRelevant(changedProperties)) {
+      this._debug('EpgBox: Scale-relevante Änderung erkannt, leite an UpdateManager weiter');
+      this.updateManager.handleUpdate('SCALE_UPDATE', changedProperties);
     }
 
     // Wenn sich epgPastTime oder epgShowFutureTime ändern, aktualisiere die Zeit-Parameter
@@ -159,6 +167,14 @@ export class EpgBox extends EpgElementBase {
       // Rufe testIsFirstLoadCompleteUpdated auf, wenn ein Teil-EPG fertig angezeigt wird
       this.testIsFirstLoadCompleteUpdated();
     }
+  }
+
+  /**
+   * Hilfsmethode für Scale-relevante Änderungen (temporär während Migration)
+   */
+  _isScaleRelevant(changedProperties) {
+    const scaleRelevantProps = ['env', 'epgShowFutureTime', 'epgShowPastTime', 'epgShowWidth'];
+    return scaleRelevantProps.some(prop => changedProperties.has(prop));
   }
 
   testIsFirstLoadCompleteUpdated() {
