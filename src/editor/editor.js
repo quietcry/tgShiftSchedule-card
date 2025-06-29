@@ -15,5 +15,6 @@ export class Editor extends EditorImpl {
   }
 }
 
-// Registriere die Editor-Komponente mit dem Namen aus card-config
-customElements.define(`${CardRegname}-editor`, Editor);
+if (!customElements.get(`${CardRegname}-editor`)) {
+  customElements.define(`${CardRegname}-editor`, Editor);
+}

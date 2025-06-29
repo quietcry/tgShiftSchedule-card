@@ -107,4 +107,6 @@ export class EpgChannelList extends EpgElementBase {
   }
 }
 
-customElements.define('epg-channel-list', EpgChannelList);
+if (!customElements.get('epg-channel-list')) {
+  customElements.define('epg-channel-list', EpgChannelList);
+}

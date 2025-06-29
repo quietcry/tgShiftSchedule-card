@@ -117,4 +117,6 @@ export class EpgProgramList extends EpgElementBase {
   }
 }
 
-customElements.define('epg-program-list', EpgProgramList);
+if (!customElements.get('epg-program-list')) {
+  customElements.define('epg-program-list', EpgProgramList);
+}

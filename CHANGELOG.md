@@ -6,7 +6,7 @@
 - Neue EPG-Zeitkonfigurationsvariablen:
   - `epgPastTime` (integer): Anzahl der Minuten in die Vergangenheit (Standard: 30)
   - `epgFutureTime` (integer): Anzahl der Minuten in die Zukunft (Standard: 120)
-  - `epgShowWidth` (integer): Anzahl der sichtbaren Minuten in der Ansicht (Standard: 180)
+  - `epgShowFutureTime` (integer): Anzahl der sichtbaren Minuten in der Ansicht (Standard: 180)
 
 ### Geändert
 - Editor-UI erweitert um neue Konfigurationsfelder im EPG-Bereich
@@ -25,7 +25,7 @@
 
 ### Added
 - Neue EPG-Karte für Home Assistant mit flexibler Zeitkonfiguration
-- Konfigurationsparameter: `epgPastTime`, `epgFutureTime`, `epgShowWidth`
+- Konfigurationsparameter: `epgPastTime`, `epgFutureTime`, `epgShowFutureTime`
 - Dynamische Programmbreiten basierend auf Programmdauer
 - Separate Custom Elements für EPG-Komponenten
 - Editor-Integration für alle Konfigurationsparameter

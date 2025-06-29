@@ -3,13 +3,15 @@ import { EditorBase } from './editor-base.js';
 import {
   CardName,
   CardRegname,
+  CardDescription,
+  CardFilename,
   Version,
   DebugMode,
   showVersion,
   DefaultEpgPastTime,
   DefaultEpgFutureTime,
-  DefaultEpgShowWidth,
-  DefaultEpgBackview,
+  DefaultEpgShowFutureTime,
+  DefaultEpgShowPastTime,
 } from '../card-config.js';
 import yaml from 'js-yaml';
 
@@ -36,8 +38,8 @@ export class EditorImpl extends EditorBase {
       view_mode: 'Liste',
       epgPastTime: DefaultEpgPastTime,
       epgFutureTime: DefaultEpgFutureTime,
-      epgShowWidth: DefaultEpgShowWidth,
-      epgBackview: DefaultEpgBackview,
+      epgShowFutureTime: DefaultEpgShowFutureTime,
+      epgShowPastTime: DefaultEpgShowPastTime,
       channelWidth: 180,
     });
     this._debug(`EditorImpl-Modul wird geladen`);
@@ -317,7 +319,7 @@ export class EditorImpl extends EditorBase {
         return 'EPG Vergangenheit (Minuten)';
       case 'epgFutureTime':
         return 'EPG Zukunft (Minuten)';
-      case 'epgShowWidth':
+      case 'epgShowFutureTime':
         return 'EPG Anzeigebreite (Minuten)';
       case 'show_shorttext':
         return 'Kurztext anzeigen';
@@ -582,8 +584,8 @@ export class EditorImpl extends EditorBase {
       importantlist: '',
       epgPastTime: DefaultEpgPastTime,
       epgFutureTime: DefaultEpgFutureTime,
-      epgShowWidth: DefaultEpgShowWidth,
-      epgBackview: DefaultEpgBackview,
+      epgShowFutureTime: DefaultEpgShowFutureTime,
+      epgShowPastTime: DefaultEpgShowPastTime,
     };
   }
 
@@ -629,17 +631,17 @@ export class EditorImpl extends EditorBase {
       },
       {
         type: 'number',
-        name: 'epgShowWidth',
+        name: 'epgShowFutureTime',
         label: 'EPG Anzeigebreite (Minuten)',
         description: 'Anzahl der sichtbaren Minuten in der Ansicht',
-        default: DefaultEpgShowWidth,
+        default: DefaultEpgShowFutureTime,
       },
       {
         type: 'number',
-        name: 'epgBackview',
+        name: 'epgShowPastTime',
         label: 'EPG Rückblick (Minuten)',
         description: 'Anzahl der Minuten für Rückblick (0-180)',
-        default: DefaultEpgBackview,
+        default: DefaultEpgShowPastTime,
       },
     ];
   }
@@ -680,7 +682,7 @@ export class EditorImpl extends EditorBase {
         },
       },
       {
-        name: 'epgShowWidth',
+        name: 'epgShowFutureTime',
         selector: {
           number: {
             min: 30,
@@ -691,7 +693,7 @@ export class EditorImpl extends EditorBase {
         },
       },
       {
-        name: 'epgBackview',
+        name: 'epgShowPastTime',
         selector: {
           number: {
             min: 0,
@@ -781,7 +783,7 @@ export class EditorImpl extends EditorBase {
         },
       },
       {
-        name: 'epgShowWidth',
+        name: 'epgShowFutureTime',
         selector: {
           number: {
             min: 30,
@@ -793,7 +795,7 @@ export class EditorImpl extends EditorBase {
         },
       },
       {
-        name: 'epgBackview',
+        name: 'epgShowPastTime',
         selector: {
           number: {
             min: 0,

@@ -97,7 +97,7 @@ export class EpgDataManager {
   generateTimeSlots() {
     const now = new Date();
     const pastTime = this.epgBox.epgPastTime || 30;
-    const showWidth = this.epgBox.epgShowWidth || 180;
+    const showWidth = this.epgBox.epgShowFutureTime || 180;
 
     // Berechne Start- und Endzeit
     const startTime = new Date(now.getTime() - pastTime * 60 * 1000);

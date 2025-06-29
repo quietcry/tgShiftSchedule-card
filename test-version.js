@@ -5,13 +5,16 @@ const Version = '2025.06';
 import {
   DefaultEpgPastTime,
   DefaultEpgFutureTime,
-  DefaultEpgShowWidth,
+  DefaultEpgShowFutureTime,
+  DefaultEpgShowPastTime,
+  DefaultEpgShowPastTime,
 } from './src/card-config.js';
 
 console.log('=== EPG-KONFIGURATION TEST ===');
 console.log('DefaultEpgPastTime:', DefaultEpgPastTime, 'Minuten');
 console.log('DefaultEpgFutureTime:', DefaultEpgFutureTime, 'Minuten');
-console.log('DefaultEpgShowWidth:', DefaultEpgShowWidth, 'Minuten');
+console.log('DefaultEpgShowFutureTime:', DefaultEpgShowFutureTime,
+  DefaultEpgShowPastTime, 'Minuten');
 
 // Test der Zeitberechnung
 const now = new Date();
@@ -25,12 +28,12 @@ console.log('Endzeit:', endTime.toISOString());
 console.log('Zeitspanne:', Math.round((endTime - startTime) / (1000 * 60)), 'Minuten');
 
 // Test der zentralen Scale-Berechnung (wie in epg-box.js)
-const testZentraleScaleBerechnung = (containerWidth, epgShowWidth = 180) => {
-  const scale = containerWidth / epgShowWidth;
+const testZentraleScaleBerechnung = (containerWidth, epgShowFutureTime = 180) => {
+  const scale = containerWidth / epgShowFutureTime;
 
   console.log(`\nZentrale Scale-Berechnung Test:`);
   console.log('Container-Breite:', containerWidth, 'Pixel');
-  console.log('Anzeigebreite:', epgShowWidth, 'Minuten');
+  console.log('Anzeigebreite:', epgShowFutureTime, 'Minuten');
   console.log('Scale:', scale.toFixed(2), 'px/Minute');
 
   return scale;
@@ -60,13 +63,13 @@ containerWidths.forEach(containerWidth => {
   testProgrammbreiten(60, scale);
 });
 
-// Teste verschiedene epgShowWidth Werte mit fester Container-Breite
+// Teste verschiedene epgShowFutureTime Werte mit fester Container-Breite
 console.log('\n=== EPGSHOWWIDTH VERGLEICH MIT DYNAMISCHER CONTAINER-BREITE ===');
 const testContainerWidth = 1200;
-const epgShowWidths = [90, 180, 360];
+const epgShowFutureTimes = [90, 180, 360];
 
-epgShowWidths.forEach(epgShowWidth => {
-  const scale = testZentraleScaleBerechnung(testContainerWidth, epgShowWidth);
+epgShowFutureTimes.forEach(epgShowFutureTime => {
+  const scale = testZentraleScaleBerechnung(testContainerWidth, epgShowFutureTime);
   testProgrammbreiten(60, scale);
 });
 

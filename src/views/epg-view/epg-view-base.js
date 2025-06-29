@@ -90,4 +90,6 @@ export class EpgViewBase extends ViewBase {
   }
 }
 
-customElements.define('epg-view-base', EpgViewBase);
+if (!customElements.get('epg-view-base')) {
+  customElements.define('epg-view-base', EpgViewBase);
+}

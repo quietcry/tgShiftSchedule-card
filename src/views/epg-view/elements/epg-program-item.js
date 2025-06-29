@@ -232,4 +232,6 @@ export class EpgProgramItem extends EpgElementBase {
   ];
 }
 
-customElements.define('epg-program-item', EpgProgramItem);
+if (!customElements.get('epg-program-item')) {
+  customElements.define('epg-program-item', EpgProgramItem);
+}

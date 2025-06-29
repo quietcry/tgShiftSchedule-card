@@ -8,13 +8,17 @@ export class EpgScaleManager {
    */
   calculateScale() {
     // Verwende die gemessene Container-Breite oder geschätzte Breite
-    const containerWidth = this.epgBox._containerWidth;
-    const showWidth = this.epgBox.epgShowWidth || 180; // Minuten sichtbar
+    const containerWidth = this.epgBox.containerWidth - this.epgBox.channelWidth || 1000;
+    const showWidth = this.epgBox.epgShowFutureTime + this.epgBox.epgShowPastTime || 180; // Minuten sichtbar
 
     // Berechne Scale: Container-Breite / Anzeigebreite in Sekunden
     // showWidth ist in Minuten, daher * 60 für Sekunden
     const scale = containerWidth / (showWidth * 60);
-
+    this.epgBox._debug('EpgScaleManager: calculateScale', {
+      containerWidth,
+      showWidth,
+      scale,
+    });
     return scale;
   }
 
@@ -35,5 +39,17 @@ export class EpgScaleManager {
       });
       this.epgBox.epgShowPastTime = 0;
     }
+  }
+
+  /**
+   * Berechnet die Startzeit für die EPG-Anzeige
+   */
+  getStartTime() {
+    const now = new Date();
+    const currentTime = now.getHours() * 60 + now.getMinutes(); // Minuten seit Mitternacht
+    const epgShowPastTime = this.epgBox.epgShowPastTime || 60;
+
+    // Startzeit = aktuelle Zeit - epgShowPastTime
+    return currentTime - epgShowPastTime;
   }
 }

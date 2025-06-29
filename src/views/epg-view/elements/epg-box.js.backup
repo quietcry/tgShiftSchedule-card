@@ -22,6 +22,8 @@ export class EpgBox extends EpgElementBase {
     showShortText: { type: Boolean },
     channelWidth: { type: Number }, // Breite der Kanalspalte in px
     env: { type: Object },
+    epgPastTime: { type: Number },
+    epgShowFutureTime: { type: Number },
   };
 
   constructor() {
@@ -35,8 +37,6 @@ export class EpgBox extends EpgElementBase {
       maxTime: 0,
       earliestProgramStart: Math.floor(Date.now() / 1000), // Aktuelle Zeit als Unix-Timestamp
     };
-    this._containerWidth = 1200; // Geschätzte Container-Breite, wird nach erstem Render aktualisiert
-    this._containerWidthMeasured = false; // Flag für gemessene Container-Breite
     this.isFirstLoad = 0; // Indikator für ersten Datenabruf (0=initial, 1=loading, 2=complete)
     this.isChannelUpdate = 0; // Counter für aktive Kanal-Updates
     this.channelWidth = 180; // Standardbreite der Kanalspalte
@@ -63,6 +63,7 @@ export class EpgBox extends EpgElementBase {
   }
 
   updated(changedProperties) {
+    this._debug('EpgBox: Update requested', changedProperties);
     if (changedProperties.has('channelOrder')) {
       this._debug('channelOrder geändert');
       this._channelOrderInitialized = false;
@@ -73,25 +74,8 @@ export class EpgBox extends EpgElementBase {
     // Wenn sich epgShowWidth ändert, aktualisiere den Scale
     if (changedProperties.has('epgShowWidth')) {
       this.scale = this.scaleManager.calculateScale();
-      this.requestUpdate();
-    }
-
-    // Wenn sich env, epgShowFutureTime oder epgShowPastTime ändern, aktualisiere den Scale
-    if (changedProperties.has('env') ||
-        changedProperties.has('epgShowFutureTime') ||
-        changedProperties.has('epgShowPastTime')) {
-      this.scale = this.scaleManager.calculateScale();
-      this.requestUpdate();
-    }
-
-    // Prüfe epgBackview Validierung
-    if (
-      changedProperties.has('epgBackview') ||
-      changedProperties.has('epgPastTime') ||
-      changedProperties.has('epgShowWidth')
-    ) {
-      //this.scaleManager.validateEpgBackview();
-    }
+        this.requestUpdate();
+      }
 
     // Verringere isChannelUpdate nach erfolgreichem Update
     if (this.isChannelUpdate > 0) {
@@ -110,43 +94,9 @@ export class EpgBox extends EpgElementBase {
     }
   }
 
-  testIsFirstLoadCompleteUpdated() {
-    this._debug('EpgBox: testIsFirstLoadCompleteUpdated aufgerufen', {
-      isFirstLoad: this.isFirstLoad,
-      isChannelUpdate: this.isChannelUpdate,
-    });
-
-    // Wenn isFirstLoad == 1 && isChannelUpdate == 0 dann isFirstLoad = 2
-    if (this.isFirstLoad === 1 && this.isChannelUpdate === 0) {
-      this.isFirstLoad = 2;
-      this._debug('EpgBox: testIsFirstLoadCompleteUpdated - isFirstLoad auf 2 gesetzt', {
-        isFirstLoad: this.isFirstLoad,
-        isChannelUpdate: this.isChannelUpdate,
-      });
-
-      // Sende Event, dass der erste Load abgeschlossen ist
-      this.dispatchEvent(
-        new CustomEvent('epg-first-load-complete', {
-          detail: {
-            isFirstLoad: this.isFirstLoad,
-            isChannelUpdate: this.isChannelUpdate,
-            channelCount: this._sortedChannels.length,
-          },
-          bubbles: true,
-          composed: true,
-        })
-      );
-    }
-
-    // // Scroll ProgramBox wenn isFirstLoad < 2
-    // if (this.isFirstLoad < 2) {
-    //   this.scrollManager.scrollToBackviewPosition();
-    // }
-  }
-
   firstUpdated() {
     super.firstUpdated();
-
+    this.scale = this.scaleManager.calculateScale()
     // Einrichten der Scroll-Synchronisation
     this.scrollManager.setupScrollSync();
 
@@ -156,50 +106,76 @@ export class EpgBox extends EpgElementBase {
     });
   }
 
+  disconnectedCallback() {
+    super.disconnectedCallback();
+  }
+
+  /**
+   * Testet ob der erste Load abgeschlossen ist und führt Time Marker Aktionen durch
+   */
+  testIsFirstLoadCompleteUpdated() {
+    this._debug('EpgBox: testIsFirstLoadCompleteUpdated aufgerufen', {
+      isFirstLoad: this.isFirstLoad,
+      isChannelUpdate: this.isChannelUpdate,
+    });
+
+    // Nur ausführen wenn der erste Load abgeschlossen ist und keine Kanal-Updates mehr laufen
+    if (this.isFirstLoad === 2 && this.isChannelUpdate === 0) {
+      this._debug('EpgBox: Erster Load abgeschlossen, aktualisiere Time Marker');
+
+      // Finde das Time Marker Element und aktualisiere es
+      const timeMarker = this.shadowRoot?.querySelector('epg-time-marker');
+      if (timeMarker) {
+        timeMarker.testIsFirstLoadCompleteUpdated(this);
+      }
+    }
+  }
+
   static styles = [
     super.styles,
     css`
-      :host {
+    :host {
         display: flex;
         flex-direction: row;
-        width: 100%;
+      width: 100%;
         height: auto; /* Automatische Höhe basierend auf Inhalt */
         overflow: visible; /* Kein Scroll, damit Inhalte sichtbar sind */
-        position: relative;
-      }
+      position: relative;
+    }
 
-      .channelBox {
+    .channelBox {
         border-right: 1px solid var(--epg-border-color);
-        margin: 0; /* Keine äußeren Abstände */
-        padding: 0; /* Keine inneren Abstände */
-        display: flex;
-        flex-direction: column;
-        flex-shrink: 0;
+      margin: 0; /* Keine äußeren Abstände */
+      padding: 0; /* Keine inneren Abstände */
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
         /* Die Breite wird dynamisch über einen Inline-Style gesetzt */
         align-items: stretch; /* Verhindert Verteilung über Höhe */
         justify-content: flex-start; /* Startet oben */
         height: fit-content; /* Höhe passt sich an Inhalt an */
         max-height: none; /* Keine Höhenbegrenzung */
-      }
+    }
 
-      .programBox {
-        flex: 1;
-        overflow-x: auto;
-        margin: 0; /* Keine äußeren Abstände */
-        padding: 0; /* Keine inneren Abstände */
-        display: flex;
-        flex-direction: column;
+    .programBox {
+      flex: 1;
+      overflow-x: auto;
+      margin: 0; /* Keine äußeren Abstände */
+      padding: 0; /* Keine inneren Abstände */
+      display: flex;
+      flex-direction: column;
         height: auto; /* Automatische Höhe basierend auf Inhalt */
         max-height: none; /* Keine Höhenbegrenzung */
         min-width: 0; /* Erlaubt Schrumpfen */
-      }
+        position: relative; /* Für den Zeitmarker */
+    }
 
-      .programRow {
-        display: flex;
+    .programRow {
+      display: flex;
         border-bottom: none; /* Kein Border */
-        margin: 0; /* Keine äußeren Abstände */
-        padding: 0; /* Keine inneren Abstände */
-        flex-shrink: 0;
+      margin: 0; /* Keine äußeren Abstände */
+      padding: 0; /* Keine inneren Abstände */
+      flex-shrink: 0;
         flex-grow: 0; /* Verhindert Wachsen */
         /* Höhenklassen werden über epg-row-height angewendet */
         height: calc(
@@ -241,29 +217,29 @@ export class EpgBox extends EpgElementBase {
       epg-program-item:hover {
         background-color: var(--epg-hover-bg) !important;
         color: var(--epg-text-color) !important;
-      }
+    }
 
-      .channelGroup {
+    .channelGroup {
         padding: 4px var(--epg-padding);
         background-color: var(--epg-header-bg);
         color: var(--epg-text-color);
-        font-weight: bold;
-        display: flex;
-        align-items: center;
-        margin: 0; /* Keine äußeren Abstände */
-        flex-shrink: 0; /* Verhindert Schrumpfen */
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      margin: 0; /* Keine äußeren Abstände */
+      flex-shrink: 0; /* Verhindert Schrumpfen */
         height: var(--epg-row-height);
         box-sizing: border-box;
-      }
+    }
 
-      .channelRow {
+    .channelRow {
         padding: 0; /* Kein Padding */
         border: none; /* Kein Border auf der Row selbst */
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        margin: 0; /* Keine äußeren Abstände */
-        flex-shrink: 0; /* Verhindert Schrumpfen */
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      margin: 0; /* Keine äußeren Abstände */
+      flex-shrink: 0; /* Verhindert Schrumpfen */
         flex-grow: 0; /* Verhindert Wachsen */
         /* Höhenklassen werden über epg-row-height angewendet */
         height: calc(
@@ -302,45 +278,45 @@ export class EpgBox extends EpgElementBase {
       .channelRow.selected .channelRowContent {
         background-color: var(--epg-accent);
         color: var(--epg-text-color);
-      }
+    }
 
-      .programSlot {
+    .programSlot {
         padding: var(--epg-padding);
         border: 1px solid var(--epg-border-color);
-        margin: 4px;
-        cursor: pointer;
-        transition: background-color 0.2s ease;
-      }
+      margin: 4px;
+      cursor: pointer;
+      transition: background-color 0.2s ease;
+    }
 
-      .programSlot:hover {
+    .programSlot:hover {
         background-color: var(--epg-hover-bg);
-      }
+    }
 
-      .programSlot.current {
+    .programSlot.current {
         background-color: var(--epg-accent);
         color: var(--epg-text-color);
-      }
+    }
 
-      .programTitle {
-        font-weight: bold;
-        margin-bottom: 4px;
-      }
+    .programTitle {
+      font-weight: bold;
+      margin-bottom: 4px;
+    }
 
-      .programTime {
-        font-size: 0.8em;
+    .programTime {
+      font-size: 0.8em;
         color: var(--epg-time-color);
-      }
+    }
 
-      .programDescription {
-        font-size: 0.8em;
+    .programDescription {
+      font-size: 0.8em;
         color: var(--epg-description-color);
-        margin-top: 4px;
-      }
+      margin-top: 4px;
+    }
 
-      .loading {
-        display: flex;
+    .loading {
+      display: flex;
         justify-content: center;
-        align-items: center;
+      align-items: center;
         height: 200px;
         color: var(--epg-text-color);
       }
@@ -398,53 +374,17 @@ export class EpgBox extends EpgElementBase {
 
       <!-- Program-Box -->
       <div class="programBox">
-        <!-- Time Marker über den Programmen -->
-        <epg-time-marker
-          .scale=${this.scale}
-          .minTime=${this.dataManager.minTime}
-        ></epg-time-marker>
-
         ${this.showChannelGroups && this._sortedChannels.length > 0
           ? this.renderManager.renderGroupedPrograms(this._sortedChannels)
           : this.renderManager.renderSimplePrograms(channelsToRenderForSimpleMode)}
+
+        <!-- Zeitmarker -->
+        <epg-time-marker
+          .scale=${this.scale}
+          .minTime=${this.epgPastTime ? (Date.now() / 1000 - this.epgPastTime * 60) : (Date.now() / 1000 - 30 * 60)}
+          .showWidth=${this.epgShowFutureTime || 180}
+        ></epg-time-marker>
       </div>
     `;
   }
-
-  _onChannelSelected(channel) {
-    this._debug('EpgBox: Verarbeite Kanal', {
-      kanal: channel.channeldata?.name || channel.name,
-      kanalId: channel.id,
-      anzahlProgramme: channel.programs ? channel.programs.length : 0,
-    });
-
-    this.dispatchEvent(
-      new CustomEvent('channel-selected', {
-        detail: { channel },
-        bubbles: true,
-        composed: true,
-      })
-    );
-  }
-
-  _onProgramSelected(program) {
-    this._debug('EpgBox: Programm ausgewählt', {
-      programm: program.title,
-      start: new Date(program.start * 1000).toISOString(),
-    });
-
-    this.dispatchEvent(
-      new CustomEvent('program-selected', {
-        detail: { program },
-        bubbles: true,
-        composed: true,
-      })
-    );
-  }
-
-  addTeilEpg(teilEpg) {
-    this.dataManager.addTeilEpg(teilEpg);
-  }
 }
-
-customElements.define('epg-box', EpgBox);

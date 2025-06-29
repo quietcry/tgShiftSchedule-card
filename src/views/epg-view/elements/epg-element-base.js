@@ -13,8 +13,8 @@ export class EpgElementBase extends SuperBase {
     showShortText: { type: Boolean },
     epgPastTime: { type: Number },
     epgFutureTime: { type: Number },
-    epgShowWidth: { type: Number },
-    epgBackview: { type: Number },
+    epgShowFutureTime: { type: Number },
+    epgShowPastTime: { type: Number },
     scale: { type: Number },
   };
 
@@ -110,8 +110,8 @@ export class EpgElementBase extends SuperBase {
     this.showShortText = false;
     this.epgPastTime = 30; // Minuten in die Vergangenheit
     this.epgFutureTime = 120; // Minuten in die Zukunft
-    this.epgShowWidth = 180; // Minuten sichtbar
-    this.epgBackview = 0; // Default value
+    this.epgShowFutureTime = 180; // Minuten sichtbar
+    this.epgShowPastTime = 0; // Default value
     this.scale = 1; // Darstellungsmaßstab
 
     this._debug('EpgElementBase-Konstruktor: Initialisierung abgeschlossen');
@@ -156,20 +156,6 @@ export class EpgElementBase extends SuperBase {
       .join(' ');
 
     return heightClasses;
-  }
-
-  _calculateScale() {
-    const containerWidth = 1200; // Geschätzte Container-Breite in Pixeln
-    const showWidth = this.epgShowWidth || 180; // Minuten sichtbar
-    const scale = containerWidth / showWidth;
-
-    this._debug('_calculateScale', {
-      containerWidth,
-      showWidth,
-      scale,
-    });
-
-    return scale;
   }
 
   _isCurrentProgram(program) {

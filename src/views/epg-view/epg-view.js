@@ -20,6 +20,7 @@ export class EPGView extends ViewBase {
     _dataProvider: { type: Object },
     _dataLoaded: { type: Boolean },
     _dataFetchStarted: { type: Boolean },
+    env: { type: Object },
   };
 
   static get styles() {
@@ -125,18 +126,22 @@ export class EPGView extends ViewBase {
 
   constructor() {
     super();
-    this._debug('EPGView-Konstruktor: Start');
+    this._debug('EPG-View: Constructor aufgerufen');
     this._dataProvider = new DataProvider();
     this._debug('EPGView-Konstruktor: DataProvider initialisiert');
     this._epgData = { channels: [] };
     this._debug('EPGView-Konstruktor: Initialisierung abgeschlossen');
-    this._currentTime = Math.floor(Date.now() / 1000);
+    this._currentTime = Date.now() / 1000;
     this._timeWindow = 'C';
     this._selectedChannel = null;
     this._isDataReady = false;
     this._processedChannels = [];
     this._lastUpdate = null;
     this._dataFetchStarted = false;
+    this._channels = [];
+    this._loading = false;
+    this._error = null;
+    this._config = null;
   }
 
   disconnectedCallback() {
@@ -180,6 +185,19 @@ export class EPGView extends ViewBase {
 
   get hass() {
     return this._hass;
+  }
+
+  set config(value) {
+    this._debug('EPG-View: config wird gesetzt', {
+      epgShowPastTime: value?.epgShowPastTime,
+      epgShowFutureTime: value?.epgShowFutureTime,
+      configKeys: value ? Object.keys(value) : [],
+    });
+    this._config = value;
+  }
+
+  get config() {
+    return this._config;
   }
 
   async _loadData() {
@@ -384,14 +402,27 @@ export class EPGView extends ViewBase {
   }
 
   render() {
+    // Debug: Überprüfe die Konfigurationswerte
+    this._debug('EPG-View render: Konfigurationswerte', {
+      epgShowPastTime: this.config.epgShowPastTime,
+      epgShowFutureTime: this.config.epgShowFutureTime,
+      configKeys: Object.keys(this.config),
+    });
+    // Debug: Überprüfe die Konfigurationswerte
+    this._debug('EPG-View render: Konfigurationswerte', {
+      epgShowPastTime: this.config.epgShowPastTime,
+      epgShowFutureTime: this.config.epgShowFutureTime,
+      configKeys: Object.keys(this.config),
+    });
+
     return html`
       <div class="gridcontainer">
         <div class="superbutton">${this._renderSuperButton()}</div>
         <div class="timeBar">${this._renderTimeBar()}</div>
         <epg-box
           .epgPastTime=${this.config.epgPastTime}
-          .epgShowWidth=${this.config.epgShowWidth}
-          .epgBackview=${this.config.epgBackview}
+          .epgShowFutureTime=${this.config.epgShowFutureTime}
+          .epgShowPastTime=${this.config.epgShowPastTime}
           .channelWidth=${this.config.channelWidth}
           .showChannelGroups=${this.config.show_channel_groups}
           .showTime=${this.config.show_time}
@@ -399,6 +430,7 @@ export class EPGView extends ViewBase {
           .showDescription=${this.config.show_description}
           .showShortText=${this.config.show_shorttext}
           .channelOrder=${this.config.group_order}
+          .env=${this.env}
           @epg-box-ready=${this._onEpgBoxReady}
           @epg-first-load-complete=${this._onEpgFirstLoadComplete}
         ></epg-box>
@@ -531,4 +563,6 @@ export class EPGView extends ViewBase {
   }
 }
 
-customElements.define('epg-view', EPGView);
+if (!customElements.get('epg-view')) {
+  customElements.define('epg-view', EPGView);
+}
