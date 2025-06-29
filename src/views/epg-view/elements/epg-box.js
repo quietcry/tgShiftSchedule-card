@@ -13,40 +13,67 @@ export class EpgBox extends EpgElementBase {
 
   static properties = {
     ...super.properties,
-    timeWindow: { type: Number },
-    showChannel: { type: Boolean },
-    selectedChannel: { type: String },
-    channelOrder: { type: Array }, // Array mit Kanaldefinitionen { name: string, style?: string, channels?: Array }
-    showChannelGroups: { type: Boolean }, // Zeigt Kanalgruppen an
-    scale: { type: Number },
-    showShortText: { type: Boolean },
-    channelWidth: { type: Number }, // Breite der Kanalspalte in px
-    env: { type: Object },
+    // ===== EXTERNE PROPERTIES (von Parent-Komponenten) =====
+    timeWindow: { type: Number }, // Zeitfenster für EPG-Anzeige (wird von ScaleManager verwendet)
+    showChannel: { type: Boolean }, // Zeigt Kanalspalte an/aus (wird von RenderManager verwendet)
+    selectedChannel: { type: String }, // Aktuell ausgewählter Kanal (wird von ChannelManager verwendet)
+    channelOrder: { type: Array }, // Array mit Kanaldefinitionen { name: string, style?: string, channels?: Array } (wird von ChannelManager verwendet)
+    showChannelGroups: { type: Boolean }, // Zeigt Kanalgruppen an (wird von RenderManager verwendet)
+    scale: { type: Number }, // Aktueller Scale-Faktor (wird von ScaleManager, TimeMarker, RenderManager verwendet)
+    showShortText: { type: Boolean }, // Zeigt kurze Programmtexte an (wird von RenderManager verwendet)
+    channelWidth: { type: Number }, // Breite der Kanalspalte in px (wird von RenderManager verwendet)
+    env: { type: Object }, // Umgebungsinformationen vom EnvSniffer (wird von ScaleManager für Container-Breite verwendet)
+
+    // ===== ZEIT-KONFIGURATION (wird von DataManager und ScaleManager verwendet) =====
+    epgPastTime: { type: Number }, // Minuten in die Vergangenheit (wird für minTime-Berechnung verwendet)
+    epgShowFutureTime: { type: Number }, // Minuten in die Zukunft (wird für maxTime-Berechnung verwendet)
+    epgShowPastTime: { type: Number }, // Alternative zu epgPastTime (wird von ScaleManager verwendet)
+    epgShowWidth: { type: Number }, // Breite der EPG-Anzeige (wird von ScaleManager verwendet)
+    epgBackview: { type: Number }, // Backview-Position (wird von ScaleManager verwendet)
   };
 
   constructor() {
     super();
-    // this._channels = new Map(); // Entfernt - Programme werden direkt in _sortedChannels gespeichert
-    this._sortedChannels = []; // Neue detaillierte Sortierungsstruktur
-    this._channelOrderInitialized = false; // Flag für initialisierte Sortierung
-    this.scale = 1; // Standard-Scale
-    this._channelsParameters = {
-      minTime: 0,
-      maxTime: 0,
-      earliestProgramStart: Math.floor(Date.now() / 1000), // Aktuelle Zeit als Unix-Timestamp
-    };
-    this._containerWidth = 1200; // Geschätzte Container-Breite, wird nach erstem Render aktualisiert
-    this._containerWidthMeasured = false; // Flag für gemessene Container-Breite
-    this.isFirstLoad = 0; // Indikator für ersten Datenabruf (0=initial, 1=loading, 2=complete)
-    this.isChannelUpdate = 0; // Counter für aktive Kanal-Updates
-    this.channelWidth = 180; // Standardbreite der Kanalspalte
 
-    // Initialisiere Manager
-    this.scrollManager = new EpgScrollManager(this);
-    this.scaleManager = new EpgScaleManager(this);
-    this.channelManager = new EpgChannelManager(this);
-    this.dataManager = new EpgDataManager(this);
-    this.renderManager = new EpgRenderManager(this);
+    // ===== ÜBERGREIFEND VERWENDETE VARIABLEN =====
+
+    // Kanal-Management
+    this._sortedChannels = []; // Array mit allen Kanälen in sortierter Reihenfolge (wird von allen Managern verwendet)
+    this._channelOrderInitialized = false; // Flag: true wenn Kanal-Reihenfolge initialisiert wurde (ChannelManager)
+
+    // Scale-Management (wird von ScaleManager, TimeMarker und RenderManager verwendet)
+    this.scale = 1; // Aktueller Scale-Faktor für Zeit-zu-Pixel-Konvertierung
+
+    // Zeit-Management (wird von DataManager, ScaleManager, TimeMarker verwendet)
+    const now = Math.floor(Date.now() / 1000);
+    const pastTime = this.epgPastTime || 30; // Minuten in die Vergangenheit
+    const futureTime = this.epgShowFutureTime || 180; // Minuten in die Zukunft
+
+    this._channelsParameters = {
+      minTime: now - (pastTime * 60), // Früheste sichtbare Zeit (Unix-Timestamp)
+      maxTime: now + (futureTime * 60), // Späteste sichtbare Zeit (Unix-Timestamp)
+      earliestProgramStart: now, // Frühester Programmstart aller Kanäle (Unix-Timestamp)
+    };
+
+    // Container-Management (wird von ScaleManager und RenderManager verwendet)
+    this._containerWidth = 1200; // Geschätzte Container-Breite (wird dynamisch aktualisiert)
+    this._containerWidthMeasured = false; // Flag: true wenn Container-Breite gemessen wurde
+
+    // Load-State-Management (wird von allen Managern für Status-Tracking verwendet)
+    this.isFirstLoad = 0; // Load-Status: 0=initial, 1=loading, 2=complete
+    this.isChannelUpdate = 0; // Counter für aktive Kanal-Updates (wird von DataManager erhöht/verringert)
+
+    // UI-Konfiguration (wird von RenderManager verwendet)
+    this.channelWidth = 180; // Breite der Kanalspalte in Pixeln
+
+    // ===== MANAGER-INSTANZEN =====
+    // Alle Manager haben Zugriff auf die obigen Variablen über this.epgBox
+
+    this.scrollManager = new EpgScrollManager(this); // Verwaltet Scroll-Verhalten
+    this.scaleManager = new EpgScaleManager(this); // Verwaltet Scale-Berechnung
+    this.channelManager = new EpgChannelManager(this); // Verwaltet Kanal-Sortierung
+    this.dataManager = new EpgDataManager(this); // Verwaltet EPG-Daten
+    this.renderManager = new EpgRenderManager(this); // Verwaltet Rendering
   }
 
   /**
@@ -81,6 +108,25 @@ export class EpgBox extends EpgElementBase {
         changedProperties.has('epgShowFutureTime') ||
         changedProperties.has('epgShowPastTime')) {
       this.scale = this.scaleManager.calculateScale();
+      this.requestUpdate();
+    }
+
+    // Wenn sich epgPastTime oder epgShowFutureTime ändern, aktualisiere die Zeit-Parameter
+    if (changedProperties.has('epgPastTime') || changedProperties.has('epgShowFutureTime')) {
+      const now = Math.floor(Date.now() / 1000);
+      const pastTime = this.epgPastTime || 30;
+      const futureTime = this.epgShowFutureTime || 180;
+
+      this._channelsParameters.minTime = now - (pastTime * 60);
+      this._channelsParameters.maxTime = now + (futureTime * 60);
+
+      this._debug('EpgBox: Zeit-Parameter aktualisiert', {
+        minTime: this._channelsParameters.minTime,
+        maxTime: this._channelsParameters.maxTime,
+        epgPastTime: this.epgPastTime,
+        epgShowFutureTime: this.epgShowFutureTime,
+      });
+
       this.requestUpdate();
     }
 
