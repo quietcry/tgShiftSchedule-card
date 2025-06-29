@@ -8,6 +8,20 @@ export class EpgDataManager {
   }
 
   /**
+   * Getter für minTime aus den Kanal-Parametern
+   */
+  get minTime() {
+    return this.epgBox._channelsParameters?.minTime || 0;
+  }
+
+  /**
+   * Getter für maxTime aus den Kanal-Parametern
+   */
+  get maxTime() {
+    return this.epgBox._channelsParameters?.maxTime || 0;
+  }
+
+  /**
    * Fügt Teil-EPG-Daten hinzu
    */
   addTeilEpg(teilEpg) {
