@@ -7,6 +7,7 @@ import { EpgScaleManager } from './epg-scale-manager.js';
 import { EpgChannelManager } from './epg-channel-manager.js';
 import { EpgDataManager } from './epg-data-manager.js';
 import { EpgRenderManager } from './epg-render-manager.js';
+import { EpgUpdateManager } from './epg-update-manager.js';
 
 export class EpgBox extends EpgElementBase {
   static className = 'EpgBox';
@@ -74,6 +75,10 @@ export class EpgBox extends EpgElementBase {
     this.channelManager = new EpgChannelManager(this); // Verwaltet Kanal-Sortierung
     this.dataManager = new EpgDataManager(this); // Verwaltet EPG-Daten
     this.renderManager = new EpgRenderManager(this); // Verwaltet Rendering
+
+    // ===== UPDATE MANAGER (ZENTRAL) =====
+    // TODO: Schrittweise Migration - noch nicht aktiv verwendet
+    this.updateManager = new EpgUpdateManager(this); // Verwaltet Update-Logik
   }
 
   /**
