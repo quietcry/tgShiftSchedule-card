@@ -124,23 +124,31 @@ export class EpgBox extends EpgElementBase {
       this.updateManager.handleUpdate('SCALE_UPDATE', changedProperties);
     }
 
+    // ===== MIGRATION SCHRITT 3: ZEIT-UPDATES =====
+    // TODO: Alte Zeit-Update-Logik wird durch UpdateManager ersetzt
     // Wenn sich epgPastTime oder epgShowFutureTime ändern, aktualisiere die Zeit-Parameter
-    if (changedProperties.has('epgPastTime') || changedProperties.has('epgShowFutureTime')) {
-      const now = Math.floor(Date.now() / 1000);
-      const pastTime = this.epgPastTime || 30;
-      const futureTime = this.epgShowFutureTime || 180;
+    // if (changedProperties.has('epgPastTime') || changedProperties.has('epgShowFutureTime')) {
+    //   const now = Math.floor(Date.now() / 1000);
+    //   const pastTime = this.epgPastTime || 30;
+    //   const futureTime = this.epgShowFutureTime || 180;
 
-      this._channelsParameters.minTime = now - (pastTime * 60);
-      this._channelsParameters.maxTime = now + (futureTime * 60);
+    //   this._channelsParameters.minTime = now - (pastTime * 60);
+    //   this._channelsParameters.maxTime = now + (futureTime * 60);
 
-      this._debug('EpgBox: Zeit-Parameter aktualisiert', {
-        minTime: this._channelsParameters.minTime,
-        maxTime: this._channelsParameters.maxTime,
-        epgPastTime: this.epgPastTime,
-        epgShowFutureTime: this.epgShowFutureTime,
-      });
+    //   this._debug('EpgBox: Zeit-Parameter aktualisiert', {
+    //     minTime: this._channelsParameters.minTime,
+    //     maxTime: this._channelsParameters.maxTime,
+    //     epgPastTime: this.epgPastTime,
+    //     epgShowFutureTime: this.epgShowFutureTime,
+    //   });
 
-      this.requestUpdate();
+    //   this.requestUpdate();
+    // }
+
+    // NEUE LOGIK: Zeit-Updates über UpdateManager
+    if (this._isTimeRelevant(changedProperties)) {
+      this._debug('EpgBox: Zeit-relevante Änderung erkannt, leite an UpdateManager weiter');
+      this.updateManager.handleUpdate('TIME_UPDATE', changedProperties);
     }
 
     // Prüfe epgBackview Validierung
@@ -175,6 +183,14 @@ export class EpgBox extends EpgElementBase {
   _isScaleRelevant(changedProperties) {
     const scaleRelevantProps = ['env', 'epgShowFutureTime', 'epgShowPastTime', 'epgShowWidth'];
     return scaleRelevantProps.some(prop => changedProperties.has(prop));
+  }
+
+  /**
+   * Hilfsmethode für Zeit-relevante Änderungen (temporär während Migration)
+   */
+  _isTimeRelevant(changedProperties) {
+    const timeRelevantProps = ['epgPastTime', 'epgShowFutureTime'];
+    return timeRelevantProps.some(prop => changedProperties.has(prop));
   }
 
   testIsFirstLoadCompleteUpdated() {
