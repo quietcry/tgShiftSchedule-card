@@ -1,9 +1,14 @@
+import { TgCardHelper } from '../../../tools/tg-card-helper.js';
+
 /**
  * EPG Data Manager
  * Verwaltet alle daten-bezogenen Funktionen für die EPG-Box
  */
-export class EpgDataManager {
+export class EpgDataManager extends TgCardHelper {
+  static className = 'EpgDataManager';
+
   constructor(epgBox) {
+    super('EpgDataManager', epgBox.debugMode);
     this.epgBox = epgBox;
   }
 
@@ -25,10 +30,10 @@ export class EpgDataManager {
    * Fügt Teil-EPG-Daten hinzu
    */
   addTeilEpg(teilEpg) {
-    this.epgBox._debug('EpgDataManager: Teil-EPG-Daten erhalten', teilEpg);
+    this._debug('addTeilEpg()', 'Teil-EPG-Daten erhalten', teilEpg);
 
     if (!teilEpg || !teilEpg.channeldata) {
-      this.epgBox._debug('EpgDataManager: Ungültige Teil-EPG-Daten erhalten', teilEpg);
+      this._debug('addTeilEpg()', 'Ungültige Teil-EPG-Daten erhalten', teilEpg);
       return;
     }
 
@@ -36,7 +41,7 @@ export class EpgDataManager {
     const programs =
       teilEpg.epg && typeof teilEpg.epg === 'object' ? Object.values(teilEpg.epg) : [];
 
-    this.epgBox._debug('EpgDataManager: Füge Teil-EPG hinzu', {
+    this._debug('addTeilEpg()', 'Füge Teil-EPG hinzu', {
       kanal: channel.channeldata?.name || channel.name,
       kanalId: channel.channelid,
       anzahlProgramme: programs.length,
@@ -53,7 +58,7 @@ export class EpgDataManager {
       programs: [], // Füge leeres Programm-Array hinzu
     };
 
-    this.epgBox._debug('EpgDataManager: Kanal-Objekt erstellt', {
+    this._debug('addTeilEpg()', 'Kanal-Objekt erstellt', {
       originalId: channel.id,
       originalChannelId: channel.channelid,
       finalId: channelWithPrograms.id,
@@ -89,20 +94,50 @@ export class EpgDataManager {
 
       // Sortiere Programme nach Startzeit
       channelWithPrograms.programs.sort((a, b) => a.start - b.start);
+      if (channelWithPrograms.programs.length > 0) {
+        this.updateEarliestProgramStart(channelWithPrograms.programs[0].start);
+      }
     }
 
     // Aktualisiere die Sortierungsstruktur
     if (!this.epgBox._channelOrderInitialized) {
       this.epgBox.channelManager.initializeChannelOrder();
     }
-    this.epgBox.channelManager.sortChannelIntoStructure(channelWithPrograms);
 
-    // Aktualisiere den frühesten Programmstart nach dem Hinzufügen neuer Programme
-    if (this.updateEarliestProgramStart(channelWithPrograms.programs[0].start)) {
-      this.epgBox.renderManager.updateGapItems();
+    // Prüfe, ob der Kanal bereits existiert
+    const existingChannelIndex = this.epgBox._flatChannels.findIndex(
+      c => c.id === channelWithPrograms.id
+    );
+
+    if (existingChannelIndex !== -1) {
+      // Kanal existiert bereits - aktualisiere nur die Programme
+      this._debug('addTeilEpg()', 'Kanal existiert bereits - aktualisiere Programme', {
+        channelId: channelWithPrograms.id,
+      });
+
+      const success = this.updateChannelPrograms(
+        channelWithPrograms.id,
+        channelWithPrograms.programs
+      );
+      if (!success) {
+        // Fallback: Verwende die ursprüngliche Methode
+        this.epgBox.channelManager.sortChannelIntoStructure(channelWithPrograms);
+      }
+    } else {
+      // Neuer Kanal - füge ihn zur Struktur hinzu
+      this._debug('addTeilEpg()', 'Neuer Kanal - füge zur Struktur hinzu', {
+        channelId: channelWithPrograms.id,
+      });
+      this.epgBox.channelManager.sortChannelIntoStructure(channelWithPrograms);
     }
 
-    this.epgBox.requestUpdate();
+    // Aktualisiere den frühesten Programmstart nach dem Hinzufügen neuer Programme
+    if (channelWithPrograms.programs.length > 0) {
+      this.updateEarliestProgramStart(channelWithPrograms.programs[0].start);
+    }
+
+    // Mit repeat-Direktive ist requestUpdate() nicht mehr nötig - Lit macht es automatisch
+    // this.epgBox.requestUpdate();
   }
 
   /**
@@ -123,7 +158,7 @@ export class EpgDataManager {
       maxTime: Math.floor(endTime.getTime() / 1000),
     };
 
-    this.epgBox._debug('EpgDataManager: Zeit-Slots generiert', {
+    this._debug('generateTimeSlots()', 'Zeit-Slots generiert', {
       jetzt: now.toISOString(),
       startTime: startTime.toISOString(),
       endTime: endTime.toISOString(),
@@ -156,7 +191,7 @@ export class EpgDataManager {
     const { minTime, maxTime } = this.epgBox._channelsParameters;
     const currentTime = Math.floor(Date.now() / 1000);
 
-    this.epgBox._debug('EpgDataManager: Filtere Programme für Kanal', {
+    this._debug('getProgramsForChannel()', 'Filtere Programme für Kanal', {
       kanal: channel.channeldata?.name || channel.name,
       anzahlProgramme: channel.programs.length,
       minTime,
@@ -182,7 +217,7 @@ export class EpgDataManager {
       return overlaps;
     });
 
-    this.epgBox._debug('EpgDataManager: Gefilterte Programme', {
+    this._debug('getProgramsForChannel()', 'Gefilterte Programme', {
       kanal: channel.name,
       gefiltert: filteredPrograms.length,
       programme: filteredPrograms.map(p => ({
@@ -203,5 +238,222 @@ export class EpgDataManager {
       this.epgBox._channelsParameters.earliestProgramStart = newEarliestStart;
       return this.epgBox._channelsParameters.earliestProgramStart;
     }
+  }
+
+  /**
+   * Optimierte Methode: Aktualisiert nur die Programme eines bestehenden Kanals
+   * Für effiziente Updates mit der repeat-Direktive
+   * @param {string} channelId - ID des Kanals
+   * @param {Array} newPrograms - Neue Programme
+   */
+  updateChannelPrograms(channelId, newPrograms) {
+    this._debug('updateChannelPrograms()', 'Update Programme für Kanal', {
+      channelId,
+      anzahlProgramme: newPrograms.length,
+    });
+
+    // Finde den Kanal im flachen Array
+    const channelIndex = this.epgBox._flatChannels.findIndex(c => c.id === channelId);
+    if (channelIndex === -1) {
+      this._debug('updateChannelPrograms()', 'Kanal nicht gefunden', { channelId });
+      return false;
+    }
+
+    // Aktualisiere die Programme
+    const updatedChannel = {
+      ...this.epgBox._flatChannels[channelIndex],
+      programs: newPrograms,
+    };
+
+    // Sortiere Programme nach Startzeit
+    updatedChannel.programs.sort((a, b) => a.start - b.start);
+
+    // Aktualisiere den Kanal in der Struktur
+    const success = this.epgBox.channelManager.updateChannelInStructure(updatedChannel);
+
+    if (success) {
+      // Aktualisiere den frühesten Programmstart
+      if (newPrograms.length > 0) {
+        this.updateEarliestProgramStart(newPrograms[0].start);
+      }
+
+      this._debug('updateChannelPrograms', 'Programme erfolgreich aktualisiert', {
+        channelId,
+        anzahlProgramme: newPrograms.length,
+      });
+    }
+
+    return success;
+  }
+
+  /**
+   * Optimierte Methode: Fügt Programme zu einem bestehenden Kanal hinzu
+   * Für effiziente Updates mit der repeat-Direktive
+   * @param {string} channelId - ID des Kanals
+   * @param {Array} additionalPrograms - Zusätzliche Programme
+   */
+  addProgramsToChannel(channelId, additionalPrograms) {
+    this._debug('addProgramsToChannel()', 'Füge Programme zu Kanal hinzu', {
+      channelId,
+      anzahlProgramme: additionalPrograms.length,
+    });
+
+    // Finde den Kanal im flachen Array
+    const channelIndex = this.epgBox._flatChannels.findIndex(c => c.id === channelId);
+    if (channelIndex === -1) {
+      this._debug('addProgramsToChannel()', 'Kanal nicht gefunden', { channelId });
+      return false;
+    }
+
+    const currentChannel = this.epgBox._flatChannels[channelIndex];
+    const currentPrograms = currentChannel.programs || [];
+
+    // Füge neue Programme hinzu oder aktualisiere bestehende
+    const updatedPrograms = [...currentPrograms];
+    additionalPrograms.forEach(newProgram => {
+      const existingIndex = updatedPrograms.findIndex(p => p.start === newProgram.start);
+      if (existingIndex >= 0) {
+        // Aktualisiere bestehendes Programm
+        updatedPrograms[existingIndex] = {
+          ...updatedPrograms[existingIndex],
+          ...newProgram,
+        };
+      } else {
+        // Füge neues Programm hinzu
+        updatedPrograms.push(newProgram);
+      }
+    });
+
+    // Sortiere Programme nach Startzeit
+    updatedPrograms.sort((a, b) => a.start - b.start);
+
+    // Aktualisiere den Kanal
+    return this.updateChannelPrograms(channelId, updatedPrograms);
+  }
+
+  /**
+   * Optimierte Methode: Entfernt Programme aus einem Kanal
+   * Für effiziente Updates mit der repeat-Direktive
+   * @param {string} channelId - ID des Kanals
+   * @param {Array} programStartTimes - Startzeiten der zu entfernenden Programme
+   */
+  removeProgramsFromChannel(channelId, programStartTimes) {
+    this._debug('removeProgramsFromChannel()', 'Entferne Programme von Kanal', {
+      channelId,
+      anzahlProgramme: programStartTimes.length,
+    });
+
+    // Finde den Kanal im flachen Array
+    const channelIndex = this.epgBox._flatChannels.findIndex(c => c.id === channelId);
+    if (channelIndex === -1) {
+      this._debug('removeProgramsFromChannel()', 'Kanal nicht gefunden', { channelId });
+      return false;
+    }
+
+    const currentChannel = this.epgBox._flatChannels[channelIndex];
+    const currentPrograms = currentChannel.programs || [];
+
+    // Entferne Programme mit den angegebenen Startzeiten
+    const updatedPrograms = currentPrograms.filter(
+      program => !programStartTimes.includes(program.start)
+    );
+
+    // Aktualisiere den Kanal
+    return this.updateChannelPrograms(channelId, updatedPrograms);
+  }
+
+  /**
+   * Optimierte Methode: Aktualisiert die Current-Zustände aller Programme
+   * Für effiziente Updates mit der repeat-Direktive
+   * @param {number} currentTime - Aktuelle Zeit für Current-Berechnung
+   */
+  updateAllCurrentStates(currentTime) {
+    this._debug('updateAllCurrentStates()', 'Update Current-Zustände für alle Programme', {
+      currentTime: new Date(currentTime * 1000).toISOString(),
+    });
+
+    let updated = false;
+
+    // Gehe durch alle Kanäle im flachen Array
+    this.epgBox._flatChannels.forEach(channel => {
+      if (channel.programs && Array.isArray(channel.programs)) {
+        channel.programs.forEach(program => {
+          const isCurrent = this.isCurrentTimeSlot(program, currentTime);
+          if (program.isCurrent !== isCurrent) {
+            program.isCurrent = isCurrent;
+            updated = true;
+          }
+        });
+      }
+    });
+
+    if (updated) {
+      this._debug('EpgDataManager', 'Current-Zustände aktualisiert');
+      // Trigger ein Update, damit Lit die Änderungen rendert
+      this.epgBox.requestUpdate();
+    }
+
+    return updated;
+  }
+
+  /**
+   * Optimierte Methode: Aktualisiert die Zeit-Parameter und triggert ein Update
+   * Für effiziente Updates mit der repeat-Direktive
+   */
+  updateTimeParameters() {
+    const timeSlots = this.generateTimeSlots();
+
+    this._debug('EpgDataManager', 'Zeit-Parameter aktualisiert', {
+      minTime: this.epgBox._channelsParameters.minTime,
+      maxTime: this.epgBox._channelsParameters.maxTime,
+    });
+
+    // Trigger ein Update, damit Lit die Änderungen rendert
+    this.epgBox.requestUpdate();
+
+    return timeSlots;
+  }
+
+  /**
+   * Optimierte Methode: Bereinigt alte Programme außerhalb des sichtbaren Zeitfensters
+   * Für bessere Performance mit der repeat-Direktive
+   */
+  cleanupOldPrograms() {
+    const { minTime, maxTime } = this.epgBox._channelsParameters;
+    let cleanedChannels = 0;
+
+    this.epgBox._flatChannels.forEach(channel => {
+      if (channel.programs && Array.isArray(channel.programs)) {
+        const originalLength = channel.programs.length;
+
+        // Entferne Programme, die komplett außerhalb des sichtbaren Zeitfensters liegen
+        channel.programs = channel.programs.filter(program => {
+          const programStart = program.start;
+          const programEnd = program.end || program.stop || programStart + 3600;
+
+          // Behalte Programme, die mit dem sichtbaren Zeitfenster überlappen
+          return programStart < maxTime && programEnd > minTime;
+        });
+
+        if (channel.programs.length !== originalLength) {
+          cleanedChannels++;
+          this._debug('EpgDataManager', 'Programme bereinigt', {
+            channelId: channel.id,
+            vorher: originalLength,
+            nachher: channel.programs.length,
+          });
+        }
+      }
+    });
+
+    if (cleanedChannels > 0) {
+      this._debug('EpgDataManager', 'Bereinigung abgeschlossen', {
+        bereinigteKanäle: cleanedChannels,
+      });
+      // Trigger ein Update, damit Lit die Änderungen rendert
+      this.epgBox.requestUpdate();
+    }
+
+    return cleanedChannels;
   }
 }

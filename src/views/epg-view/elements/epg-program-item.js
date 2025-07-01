@@ -17,6 +17,7 @@ export class EpgProgramItem extends EpgElementBase {
     showDuration: { type: Boolean },
     showDescription: { type: Boolean },
     showShortText: { type: Boolean },
+    isGap: { type: Boolean },
     rowIndex: { type: Number },
     itemIndex: { type: Number },
   };
@@ -35,6 +36,7 @@ export class EpgProgramItem extends EpgElementBase {
     this.showDuration = true;
     this.showDescription = true;
     this.showShortText = false;
+    this.isGap = false;
     this.rowIndex = 0;
     this.itemIndex = 0;
   }
@@ -48,24 +50,74 @@ export class EpgProgramItem extends EpgElementBase {
       changedProperties.has('stop') ||
       changedProperties.has('scale')
     ) {
-      const width = Math.max(0, (this.stop - this.start) * this.scale);
+      const rawWidth = Math.max(0, (this.stop - this.start) * this.scale);
+
+      // Sicherheitsgrenze: Maximale Breite von 10000px verhindert zu große Werte
+      const maxWidth = 10000;
+      const width = Math.min(rawWidth, maxWidth);
+
       this.style.width = `${width}px`;
       this._debug('EpgProgramItem: updated', {
         start: this.start,
         stop: this.stop,
         scale: this.scale,
+        rawWidth: rawWidth,
         width: width,
+        maxWidth: maxWidth,
+        isLimited: rawWidth > maxWidth,
+        isGap: this.isGap,
       });
+
       // CSS-Klasse für Zero-Width
       if (width <= 0) {
         this.classList.add('zero-width');
+        // Entferne alle CSS-Formatierungen bei 0 Breite
+        this.style.margin = '0';
+        this.style.padding = '0';
+        this.style.border = 'none';
+        this.style.background = 'transparent';
+        this.style.cursor = 'default';
       } else {
         this.classList.remove('zero-width');
+        // Stelle Standard-Formatierungen wieder her
+        this.style.margin = '';
+        this.style.padding = '';
+        this.style.border = '';
+        this.style.background = '';
+        this.style.cursor = '';
+      }
+
+      // CSS-Klasse für Gap-Elemente
+      if (this.isGap) {
+        this.classList.add('gap-element');
+      } else {
+        this.classList.remove('gap-element');
+      }
+
+      // Warnung bei zu großen Breiten
+      if (rawWidth > maxWidth) {
+        this._debug('EpgProgramItem: WARNUNG - Breite wurde begrenzt', {
+          rawWidth,
+          maxWidth,
+          start: this.start,
+          stop: this.stop,
+          scale: this.scale,
+        });
       }
     }
   }
 
   render() {
+    // Für Gap-Elemente: Zeige nur einen leeren Bereich
+    if (this.isGap) {
+      return html`
+        <div class="programSlot gap-slot">
+          <!-- Leerer Bereich für Gap -->
+        </div>
+      `;
+    }
+
+    // Normales Programm-Element
     return html`
       <div
         class="programSlot ${this.isCurrent ? 'current' : ''}"
@@ -96,6 +148,11 @@ export class EpgProgramItem extends EpgElementBase {
   }
 
   _onClick() {
+    // Gap-Elemente haben keine Klick-Events
+    if (this.isGap) {
+      return;
+    }
+
     this.dispatchEvent(
       new CustomEvent('program-selected', {
         detail: {
@@ -112,11 +169,21 @@ export class EpgProgramItem extends EpgElementBase {
   }
 
   _onMouseEnter() {
+    // Gap-Elemente haben keine Hover-Effekte
+    if (this.isGap) {
+      return;
+    }
+
     this.style.backgroundColor = 'var(--epg-hover-bg)';
     this.style.color = 'var(--epg-text-color)';
   }
 
   _onMouseLeave() {
+    // Gap-Elemente haben keine Hover-Effekte
+    if (this.isGap) {
+      return;
+    }
+
     // Berechne die ursprünglichen Farben neu
     // const isOddRow = this.rowIndex % 2 === 1;
     // const isOddItem = this.itemIndex % 2 === 1;
@@ -135,7 +202,7 @@ export class EpgProgramItem extends EpgElementBase {
     // } else {
     //   if (isOddItem) {
     //     bgColor = 'var(--epg-even-program-odd-bg)';
-    //     textColor = 'var(--epg-even-program-odd-text)';
+    //     textColor = 'var(--epg-even-program-even-text)';
     //   } else {
     //     bgColor = 'var(--epg-even-program-even-bg)';
     //     textColor = 'var(--epg-even-program-even-text)';
@@ -178,6 +245,40 @@ export class EpgProgramItem extends EpgElementBase {
         border: none;
         margin: 0;
         background: transparent;
+        cursor: default;
+        min-width: 0;
+        max-width: 0;
+        width: 0;
+        overflow: hidden;
+      }
+
+      /* Gap-Elemente: Leere Bereiche zwischen Programmen */
+      :host(.gap-element) .programSlot {
+        padding: 0;
+        border: none;
+        margin: 0;
+        background: transparent;
+        cursor: default;
+      }
+
+      /* Gap-Elemente mit 0 Breite: Komplett unsichtbar */
+      :host(.gap-element.zero-width) .programSlot {
+        padding: 0;
+        border: none;
+        margin: 0;
+        background: transparent;
+        cursor: default;
+        min-width: 0;
+        max-width: 0;
+        width: 0;
+        overflow: hidden;
+        display: none;
+      }
+
+      .gap-slot {
+        background: transparent !important;
+        border: none !important;
+        cursor: default !important;
       }
 
       .programTitle {

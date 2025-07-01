@@ -51,11 +51,40 @@ export class CardImpl extends CardBase {
     this._envSniffer = new EnvSniffer();
     this._envSniffer.init(this);
     this.env = this._envSniffer.env;
+    this._debug('CardImpl: EnvSniffer initialisiert', {
+      env: this.env,
+      cardWidth: this.env.cardWidth,
+      typeOfView: this.env.typeOfView,
+    });
     this._envSniffer.addEventListener(
       'environment-changed',
       this._handleEnvironmentChange.bind(this)
     );
+
+    // Event-Listener für Environment-Requests von der epg-box
+    this.addEventListener('request-environment', this._handleEnvironmentRequest.bind(this));
+
     this._debug('CardImpl-Konstruktor: Initialisierung abgeschlossen');
+  }
+
+  /**
+   * Behandelt Environment-Requests von der epg-box
+   */
+  _handleEnvironmentRequest(event) {
+    this._debug('CardImpl: Environment-Request von epg-box erhalten');
+
+    // Stößt den EnvSniffer nochmal an
+    this._envSniffer.detectEnvironment();
+
+    // Aktualisiere env und leite an epg-view weiter
+    this.env = this._envSniffer.env;
+    if (this._view) {
+      this._debug('CardImpl: Leite env an epg-view weiter (nach Request)', {
+        cardWidth: this.env.cardWidth,
+        typeOfView: this.env.typeOfView,
+      });
+      this._view.env = this.env;
+    }
   }
 
   /**
@@ -64,6 +93,16 @@ export class CardImpl extends CardBase {
   _handleEnvironmentChange(event) {
     const { oldState, newState } = event.detail;
     this._debug('CardImpl: Umgebungsänderung erkannt', { oldState, newState });
+
+    // Aktualisiere env und leite an epg-view weiter
+    this.env = this._envSniffer.env;
+    if (this._view) {
+      this._debug('CardImpl: Leite env-Änderung an epg-view weiter', {
+        cardWidth: this.env.cardWidth,
+        typeOfView: this.env.typeOfView,
+      });
+      this._view.env = this.env;
+    }
 
     // Hier kann die Karte auf Umgebungsänderungen reagieren
     // z.B. Layout anpassen, andere Darstellung wählen, etc.
@@ -133,7 +172,7 @@ export class CardImpl extends CardBase {
       ...config,
     };
     this._debug('CardImpl config nach setConfig:', this.config);
-    this._debug("CardImpl: Spezifische EPG-Werte", {
+    this._debug('CardImpl: Spezifische EPG-Werte', {
       epgShowPastTime: this.config.epgShowPastTime,
       epgShowFutureTime: this.config.epgShowFutureTime,
       configKeys: Object.keys(this.config),
@@ -146,7 +185,7 @@ export class CardImpl extends CardBase {
 
     try {
       this._view = new EPGView();
-      this._debug("CardImpl: Übergebe Konfiguration an EPG-View", {
+      this._debug('CardImpl: Übergebe Konfiguration an EPG-View', {
         epgShowPastTime: this.config.epgShowPastTime,
         epgShowFutureTime: this.config.epgShowFutureTime,
       });

@@ -200,6 +200,29 @@ export class EPGView extends ViewBase {
     return this._config;
   }
 
+  set env(value) {
+    this._debug('EPG-View: env wird gesetzt', {
+      cardWidth: value?.cardWidth,
+      typeOfView: value?.typeOfView,
+      isDesktop: value?.isDesktop,
+    });
+
+    if (this._env !== value) {
+      this._env = value;
+
+      // Übergebe env an die epg-box, falls sie bereits existiert
+      const epgBox = this.shadowRoot?.querySelector('epg-box');
+      if (epgBox) {
+        this._debug('EPG-View: Übergebe env an epg-box');
+        epgBox.env = value;
+      }
+    }
+  }
+
+  get env() {
+    return this._env;
+  }
+
   async _loadData() {
     this._debug('EPG-View: _loadData wird aufgerufen');
     if (!this._dataProvider || !this.config.entity) {

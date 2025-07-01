@@ -334,10 +334,13 @@ export class EpgTimeMarkerManager {
     // Wenn isFirstLoad == 1 && isChannelUpdate == 0 dann isFirstLoad = 2
     if (this.epgBox.isFirstLoad === 1 && this.epgBox.isChannelUpdate === 0) {
       this.epgBox.isFirstLoad = 2;
-      this.epgBox._debug('EpgTimeMarkerManager: testIsFirstLoadCompleteUpdated - isFirstLoad auf 2 gesetzt', {
-        isFirstLoad: this.epgBox.isFirstLoad,
-        isChannelUpdate: this.epgBox.isChannelUpdate,
-      });
+      this.epgBox._debug(
+        'EpgTimeMarkerManager: testIsFirstLoadCompleteUpdated - isFirstLoad auf 2 gesetzt',
+        {
+          isFirstLoad: this.epgBox.isFirstLoad,
+          isChannelUpdate: this.epgBox.isChannelUpdate,
+        }
+      );
 
       // Sende Event, dass der erste Load abgeschlossen ist
       this.epgBox.dispatchEvent(

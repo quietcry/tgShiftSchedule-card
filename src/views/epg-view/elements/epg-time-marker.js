@@ -321,18 +321,9 @@ export class EpgTimeMarker extends EpgElementBase {
     });
 
     return html`
-      <div
-        class="time-marker-line"
-        title="${timeString}"
-      ></div>
-      <div
-        class="time-marker-dot"
-      ></div>
-      <div
-        class="time-tooltip"
-      >
-        ${timeString}
-      </div>
+      <div class="time-marker-line" title="${timeString}"></div>
+      <div class="time-marker-dot"></div>
+      <div class="time-tooltip">${timeString}</div>
     `;
   }
 }

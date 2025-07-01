@@ -1,5 +1,5 @@
-import { CardName, DebugMode } from '../../card-config.js';
-import { TgCardHelper } from '../../tools/tg-card-helper.js';
+import { CardName, DebugMode } from '../../../card-config.js';
+import { TgCardHelper } from '../../../tools/tg-card-helper.js';
 
 /**
  * EPG Update Manager
@@ -13,54 +13,100 @@ export class EpgUpdateManager {
     this.tgCardHelper = new TgCardHelper(CardName, DebugMode);
 
     // ===== WERT-TRACKING =====
-    // Speichert die letzten bekannten Werte für Änderungsprüfung
-    this._lastValues = {
-      // Scale-relevante Werte
-      env: null,
-      epgShowFutureTime: null,
-      epgShowPastTime: null,
-      epgShowWidth: null,
-
-      // Zeit-relevante Werte
-      epgPastTime: null,
-      epgShowFutureTime: null, // Doppelt, da sowohl Scale als auch Zeit relevant
-
-      // Render-relevante Werte
-      showChannelGroups: null,
-      showShortText: null,
-      channelWidth: null,
-
-      // Channel-relevante Werte
-      channelOrder: null,
-
-      // Container-Werte
-      containerWidth: null,
-    };
+    // Dynamisches Map für die letzten bekannten Werte
+    // Wird nur bei Bedarf mit Properties gefüllt
+    this._lastValues = new Map();
 
     this._debug('EpgUpdateManager initialisiert');
   }
 
-  /**
-   * Initialisiert die gespeicherten Werte mit den aktuellen Werten der epgBox
-   * Sollte beim ersten Aufruf von handleUpdate aufgerufen werden
-   */
-  _initializeValues() {
-    if (this._lastValues.env === null) {
-      this._debug('EpgUpdateManager: Initialisiere gespeicherte Werte');
-
-      // Lade alle aktuellen Werte
-      Object.keys(this._lastValues).forEach(property => {
-        if (this.epgBox.hasOwnProperty(property)) {
-          this._lastValues[property] = this._deepClone(this.epgBox[property]);
-        }
-      });
-
-      this._debug('EpgUpdateManager: Werte initialisiert', this._lastValues);
-    }
-  }
-
   _debug(message, data = null) {
     this.tgCardHelper._debug(this.constructor.className, message, data);
+  }
+
+  /**
+   * Filtert nur echte Änderungen heraus und speichert sie in _lastValues
+   * @param {Set|Map|Object} changedProperties - Geänderte Properties (Set, Map oder Object)
+   * @returns {Set} - Nur Properties mit echten Änderungen
+   */
+  _filterRealChanges(changedProperties) {
+    const realChanges = new Set();
+
+    // Null-Check für undefined oder null
+    if (!changedProperties) {
+      this._debug('EpgUpdateManager: changedProperties ist undefined/null');
+      return realChanges;
+    }
+
+    // Prüfe den Typ von changedProperties
+    if (changedProperties instanceof Set) {
+      // Set: Einfache Property-Namen ohne Werte
+      for (const property of changedProperties) {
+        // Hole die aktuellen Werte aus der epgBox
+        const newValue = this.epgBox[property];
+        const oldValue = this._lastValues.get(property);
+
+        if (this._hasValueChanged(property, oldValue, newValue)) {
+          this._debug('EpgUpdateManager: Echte Änderung erkannt (Set)', {
+            property,
+            oldValue,
+            newValue,
+          });
+          this._lastValues.set(property, this._deepClone(newValue));
+          realChanges.add(property);
+        } else {
+          this._debug('EpgUpdateManager: Keine echte Änderung (Set)', {
+            property,
+            oldValue,
+            newValue,
+          });
+        }
+      }
+    } else if (changedProperties instanceof Map) {
+      // Map: Property-Namen mit zugehörigen Werten
+      for (const [property, newValue] of changedProperties) {
+        const oldValue = this._lastValues.get(property);
+
+        if (this._hasValueChanged(property, oldValue, newValue)) {
+          this._debug('EpgUpdateManager: Echte Änderung erkannt (Map)', {
+            property,
+            oldValue,
+            newValue,
+          });
+          this._lastValues.set(property, this._deepClone(newValue));
+          realChanges.add(property);
+        } else {
+          this._debug('EpgUpdateManager: Keine echte Änderung (Map)', {
+            property,
+            oldValue,
+            newValue,
+          });
+        }
+      }
+    } else {
+      // Fallback: Behandle als Object
+      for (const [property, newValue] of Object.entries(changedProperties)) {
+        const oldValue = this._lastValues.get(property);
+
+        if (this._hasValueChanged(property, oldValue, newValue)) {
+          this._debug('EpgUpdateManager: Echte Änderung erkannt (Object)', {
+            property,
+            oldValue,
+            newValue,
+          });
+          this._lastValues.set(property, this._deepClone(newValue));
+          realChanges.add(property);
+        } else {
+          this._debug('EpgUpdateManager: Keine echte Änderung (Object)', {
+            property,
+            oldValue,
+            newValue,
+          });
+        }
+      }
+    }
+
+    return realChanges;
   }
 
   /**
@@ -70,107 +116,82 @@ export class EpgUpdateManager {
    * @param {any} newValue - Neuer Wert (optional)
    */
   handleUpdate(changeType, changedProperties, newValue = null) {
-    // Initialisiere Werte beim ersten Aufruf
-    this._initializeValues();
+    // Filtere nur echte Änderungen heraus
+    const realChanges = this._filterRealChanges(changedProperties);
 
     this._debug('EpgUpdateManager: Update empfangen', {
       changeType,
-      changedProperties: Array.from(changedProperties.keys()),
+      changedProperties,
+      allChangedProperties: Array.from(changedProperties.keys()),
+      realChanges: Array.from(realChanges.keys()),
       newValue,
     });
 
-    switch (changeType) {
-      case 'PROPERTY_CHANGE':
-        this._handlePropertyChange(changedProperties);
-        break;
-      case 'DATA_UPDATE':
-        this._handleDataUpdate(changedProperties);
-        break;
-      case 'SCALE_UPDATE':
-        this._handleScaleUpdate(changedProperties);
-        break;
-      case 'TIME_UPDATE':
-        this._handleTimeUpdate(changedProperties);
-        break;
-      case 'CHANNEL_UPDATE':
-        this._handleChannelUpdate(changedProperties);
-        break;
-      case 'RENDER_UPDATE':
-        this._handleRenderUpdate(changedProperties);
-        break;
-      default:
-        this._debug('EpgUpdateManager: Unbekannter Update-Typ', changeType);
+    // Nur weiterverarbeiten, wenn es echte Änderungen gibt
+    if (realChanges.size === 0) {
+      this._debug('EpgUpdateManager: Keine echten Änderungen, ignoriere Update');
+      return;
+    }
+
+    let exclusive = false;
+    // Verarbeite verschiedene Update-Typen basierend auf den geänderten Properties
+    if (!exclusive && this._isUpdateRelevant(realChanges, ['env'])) {
+      this._debug('EpgUpdateManager: ENV Update erkannt');
+      exclusive = this._handleEnvUpdate(realChanges);
+    }
+
+    if (!exclusive && this._isUpdateRelevant(realChanges, ['epgPastTime', 'epgShowFutureTime'])) {
+      this._debug('EpgUpdateManager: Zeit-relevante Änderung erkannt');
+      exclusive = this._handleTimeUpdate(realChanges);
+    }
+
+    if (
+      !exclusive &&
+      this._isUpdateRelevant(realChanges, ['showChannelGroups', 'showShortText', 'channelWidth'])
+    ) {
+      this._debug('EpgUpdateManager: Render-relevante Änderung erkannt');
+      this._handleRenderUpdate(realChanges);
+    }
+
+    // Spezielle Behandlung für env-Änderungen
+    if (realChanges.has('env')) {
+      this._debug('EpgUpdateManager: ENV-Änderung erkannt');
+      this._handleEnvUpdate(realChanges);
     }
   }
 
   /**
-   * Behandelt Property-Änderungen mit Änderungsprüfung
+   * Behandelt Property-Änderungen (bereits gefiltert für echte Änderungen)
    */
   _handlePropertyChange(changedProperties) {
     this._debug('EpgUpdateManager: Verarbeite Property-Änderungen', {
       properties: Array.from(changedProperties.keys()),
     });
 
-    // Sammle alle echten Änderungen
-    const realChanges = new Set();
-
-    // Prüfe jede geänderte Property auf echte Änderung
-    for (const property of changedProperties) {
-      const newValue = this.epgBox[property];
-      const oldValue = this._lastValues[property];
-
-      if (this._hasValueChanged(property, oldValue, newValue)) {
-        this._debug('EpgUpdateManager: Echte Änderung erkannt', {
-          property,
-          oldValue,
-          newValue,
-        });
-
-        // Aktualisiere den gespeicherten Wert
-        this._lastValues[property] = this._deepClone(newValue);
-        realChanges.add(property);
-      } else {
-        this._debug('EpgUpdateManager: Keine echte Änderung', {
-          property,
-          oldValue,
-          newValue,
-        });
-      }
+    // Channel-Order Änderungen
+    if (changedProperties.has('channelOrder')) {
+      this._debug('EpgUpdateManager: Channel-Order geändert');
+      this.epgBox._channelOrderInitialized = false;
+      this.epgBox.channelManager.initializeChannelOrder();
+      this.epgBox.requestUpdate();
     }
 
-    // Nur bei echten Änderungen weiterverarbeiten
-    if (realChanges.size > 0) {
-      this._debug('EpgUpdateManager: Verarbeite echte Änderungen', {
-        realChanges: Array.from(realChanges),
-      });
+    // Scale-relevante Änderungen
+    if (this._isScaleRelevant(changedProperties)) {
+      this._debug('EpgUpdateManager: Scale-relevante Änderung erkannt');
+      this.handleUpdate('SCALE_UPDATE', changedProperties);
+    }
 
-      // Channel-Order Änderungen
-      if (realChanges.has('channelOrder')) {
-        this._debug('EpgUpdateManager: Channel-Order geändert');
-        this.epgBox._channelOrderInitialized = false;
-        this.epgBox.channelManager.initializeChannelOrder();
-        this.epgBox.requestUpdate();
-      }
+    // Zeit-relevante Änderungen
+    if (this._isTimeRelevant(changedProperties)) {
+      this._debug('EpgUpdateManager: Zeit-relevante Änderung erkannt');
+      this.handleUpdate('TIME_UPDATE', changedProperties);
+    }
 
-      // Scale-relevante Änderungen
-      if (this._isScaleRelevant(realChanges)) {
-        this._debug('EpgUpdateManager: Scale-relevante Änderung erkannt');
-        this.handleUpdate('SCALE_UPDATE', realChanges);
-      }
-
-      // Zeit-relevante Änderungen
-      if (this._isTimeRelevant(realChanges)) {
-        this._debug('EpgUpdateManager: Zeit-relevante Änderung erkannt');
-        this.handleUpdate('TIME_UPDATE', realChanges);
-      }
-
-      // Render-relevante Änderungen
-      if (this._isRenderRelevant(realChanges)) {
-        this._debug('EpgUpdateManager: Render-relevante Änderung erkannt');
-        this.handleUpdate('RENDER_UPDATE', realChanges);
-      }
-    } else {
-      this._debug('EpgUpdateManager: Keine echten Änderungen, überspringe Verarbeitung');
+    // Render-relevante Änderungen
+    if (this._isRenderRelevant(changedProperties)) {
+      this._debug('EpgUpdateManager: Render-relevante Änderung erkannt');
+      this.handleUpdate('RENDER_UPDATE', changedProperties);
     }
   }
 
@@ -178,9 +199,21 @@ export class EpgUpdateManager {
    * Prüft ob sich ein Wert wirklich geändert hat
    */
   _hasValueChanged(property, oldValue, newValue) {
-    // Spezielle Behandlung für verschiedene Datentypen
-    if (oldValue === null && newValue === null) return false;
-    if (oldValue === null || newValue === null) return true;
+    // Wenn beide undefined sind, keine Änderung
+    if (oldValue === undefined && newValue === undefined) {
+      return false;
+    }
+
+    // Wenn oldValue undefined ist, aber newValue nicht, ist es die erste Initialisierung
+    // Das sollte als echte Änderung behandelt werden
+    if (oldValue === undefined && newValue !== undefined) {
+      return true;
+    }
+
+    // Wenn newValue undefined ist, aber oldValue nicht, ist es eine Änderung
+    if (newValue === undefined && oldValue !== undefined) {
+      return true;
+    }
 
     // Arrays vergleichen
     if (Array.isArray(oldValue) && Array.isArray(newValue)) {
@@ -230,6 +263,25 @@ export class EpgUpdateManager {
   }
 
   /**
+   * Behandelt ENV-Updates
+   */
+  _handleEnvUpdate(changedProperties) {
+    this._debug('EpgUpdateManager: Verarbeite ENV-Update');
+
+    // changedProperties ist ein Set, also holen wir die env-Werte aus der epgBox
+    const realENVChanges = this._filterRealChanges(new Set(['env']));
+
+    // ENV-Änderungen können Scale-Updates auslösen
+    if (this._isUpdateRelevant(realENVChanges, ['env'])) {
+      this._debug('EpgUpdateManager: ENV-Änderung löst Scale-Update aus');
+      this._handleScaleUpdate(changedProperties);
+    }
+
+    this.epgBox.requestUpdate();
+    return true;
+  }
+
+  /**
    * Behandelt Scale-Updates
    */
   _handleScaleUpdate(changedProperties) {
@@ -239,7 +291,7 @@ export class EpgUpdateManager {
     this.epgBox.scale = this.epgBox.scaleManager.calculateScale();
 
     // Benachrichtige abhängige Manager
-    this.epgBox.renderManager.onScaleChanged(this.epgBox.scale);
+    //this.epgBox.renderManager.onScaleChanged(this.epgBox.scale);
 
     // Time Marker aktualisieren (falls vorhanden)
     const timeMarker = this.epgBox.shadowRoot?.querySelector('epg-time-marker');
@@ -248,6 +300,7 @@ export class EpgUpdateManager {
     }
 
     this.epgBox.requestUpdate();
+    return true;
   }
 
   /**
@@ -261,8 +314,8 @@ export class EpgUpdateManager {
     const futureTime = this.epgBox.epgShowFutureTime || 180;
 
     // Aktualisiere Zeit-Parameter
-    this.epgBox._channelsParameters.minTime = now - (pastTime * 60);
-    this.epgBox._channelsParameters.maxTime = now + (futureTime * 60);
+    this.epgBox._channelsParameters.minTime = now - pastTime * 60;
+    this.epgBox._channelsParameters.maxTime = now + futureTime * 60;
 
     this._debug('EpgUpdateManager: Zeit-Parameter aktualisiert', {
       minTime: this.epgBox._channelsParameters.minTime,
@@ -329,27 +382,10 @@ export class EpgUpdateManager {
   }
 
   /**
-   * Prüft ob Änderungen Scale-relevant sind
+   * Prüft ob Änderungen für einen bestimmten Update-Typ relevant sind
    */
-  _isScaleRelevant(changedProperties) {
-    const scaleRelevantProps = ['env', 'epgShowFutureTime', 'epgShowPastTime', 'epgShowWidth'];
-    return scaleRelevantProps.some(prop => changedProperties.has(prop));
-  }
-
-  /**
-   * Prüft ob Änderungen Zeit-relevant sind
-   */
-  _isTimeRelevant(changedProperties) {
-    const timeRelevantProps = ['epgPastTime', 'epgShowFutureTime'];
-    return timeRelevantProps.some(prop => changedProperties.has(prop));
-  }
-
-  /**
-   * Prüft ob Änderungen Render-relevant sind
-   */
-  _isRenderRelevant(changedProperties) {
-    const renderRelevantProps = ['showChannelGroups', 'showShortText', 'channelWidth'];
-    return renderRelevantProps.some(prop => changedProperties.has(prop));
+  _isUpdateRelevant(changedProperties, relevantProps = []) {
+    return relevantProps.some(prop => changedProperties.has(prop));
   }
 
   /**

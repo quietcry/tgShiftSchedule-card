@@ -20,6 +20,22 @@ export class EpgChannelManager {
   }
 
   /**
+   * Hilfsfunktion: Prüft, ob ein Element ein Gruppen-Header ist
+   */
+  isGroupHeader(item) {
+    return item && item.type === 'group-header' && item.isGroupHeader === true;
+  }
+
+  /**
+   * Hilfsfunktion: Findet den Index eines Gruppen-Headers im flachen Array
+   */
+  findGroupHeaderIndex(groupName) {
+    return this.epgBox._flatChannels.findIndex(
+      item => this.isGroupHeader(item) && item.name === groupName
+    );
+  }
+
+  /**
    * Initialisiert die Kanal-Reihenfolge basierend auf channelOrder
    */
   initializeChannelOrder() {
@@ -52,6 +68,89 @@ export class EpgChannelManager {
       'EpgChannelManager: Kanal-Reihenfolge Grundstruktur extrahiert',
       this.epgBox._sortedChannels
     );
+
+    // Aktualisiere das flache Array für die repeat-Direktive
+    this.updateFlatChannels();
+  }
+
+  /**
+   * Aktualisiert das flache Array für die repeat-Direktive
+   * Diese Methode wird aufgerufen, wenn sich _sortedChannels ändert
+   */
+  updateFlatChannels() {
+    if (!this.epgBox._sortedChannels || !this.epgBox._sortedChannels.length) {
+      this.epgBox._flatChannels = [];
+      this.epgBox._channelGroups = [];
+      return;
+    }
+
+    const flatChannels = [];
+    const channelGroups = [];
+
+    this.epgBox._sortedChannels.forEach(item => {
+      if (item.type === 'group' && Array.isArray(item.patterns)) {
+        // Gruppe mit Header
+        const groupInfo = {
+          type: 'group',
+          name: item.name,
+          startIndex: flatChannels.length,
+          endIndex: flatChannels.length,
+        };
+
+        // Füge Gruppen-Header hinzu
+        flatChannels.push({
+          type: 'group-header',
+          name: item.name,
+          isGroupHeader: true,
+          groupType: 'visible',
+        });
+
+        item.patterns.forEach(patternObj => {
+          if (patternObj.channels && Array.isArray(patternObj.channels)) {
+            patternObj.channels.forEach(channel => {
+              flatChannels.push({
+                ...channel,
+                group: item.name,
+                groupType: 'visible',
+              });
+              groupInfo.endIndex = flatChannels.length - 1;
+            });
+          }
+        });
+
+        if (groupInfo.endIndex >= groupInfo.startIndex) {
+          channelGroups.push(groupInfo);
+        }
+      } else if (item.type === 'channel' && Array.isArray(item.channels)) {
+        // Einzelne Kanäle ohne Gruppen-Header
+        item.channels.forEach(channel => {
+          flatChannels.push({
+            ...channel,
+            group: null,
+            groupType: 'none',
+          });
+        });
+      } else if (item.type === 'unvisiblegroup' && Array.isArray(item.channels)) {
+        // Unsichtbare Gruppe - nur Kanäle, kein Header
+        item.channels.forEach(channel => {
+          flatChannels.push({
+            ...channel,
+            group: null,
+            groupType: 'invisible',
+          });
+        });
+      }
+    });
+
+    this.epgBox._flatChannels = flatChannels;
+    this.epgBox._channelGroups = channelGroups;
+
+    this.epgBox._debug('EpgChannelManager: Flaches Array aktualisiert', {
+      anzahlKanäle: flatChannels.length,
+      anzahlGruppen: channelGroups.length,
+      gruppen: channelGroups.map(g => ({ name: g.name, start: g.startIndex, end: g.endIndex })),
+      gruppenHeaders: flatChannels.filter(c => c.isGroupHeader).map(h => h.name),
+    });
   }
 
   /**
@@ -184,6 +283,9 @@ export class EpgChannelManager {
       'EpgChannelManager: _sortedChannels nach Einsortierung',
       this.epgBox._sortedChannels
     );
+
+    // Aktualisiere das flache Array für die repeat-Direktive
+    this.updateFlatChannels();
   }
 
   /**
@@ -228,5 +330,108 @@ export class EpgChannelManager {
       'EpgChannelManager: Finale _sortedChannels Struktur nach Einsortierung',
       this.epgBox._sortedChannels
     );
+
+    // Aktualisiere das flache Array für die repeat-Direktive
+    this.updateFlatChannels();
+  }
+
+  /**
+   * Entfernt einen Kanal aus der Struktur
+   * @param {string} channelId - ID des zu entfernenden Kanals
+   */
+  removeChannelFromStructure(channelId) {
+    let removed = false;
+
+    for (const item of this.epgBox._sortedChannels) {
+      if (item.type === 'group' && Array.isArray(item.patterns)) {
+        for (const patternObj of item.patterns) {
+          if (patternObj.channels && Array.isArray(patternObj.channels)) {
+            const index = patternObj.channels.findIndex(c => c.id === channelId);
+            if (index !== -1) {
+              patternObj.channels.splice(index, 1);
+              removed = true;
+              this.epgBox._debug('EpgChannelManager: Kanal aus Gruppe entfernt', {
+                gruppe: item.name,
+                pattern: patternObj.pattern,
+                channelId: channelId,
+              });
+              break;
+            }
+          }
+        }
+        if (removed) break;
+      } else if (item.channels && Array.isArray(item.channels)) {
+        const index = item.channels.findIndex(c => c.id === channelId);
+        if (index !== -1) {
+          item.channels.splice(index, 1);
+          removed = true;
+          this.epgBox._debug('EpgChannelManager: Kanal entfernt', {
+            type: item.type,
+            channelId: channelId,
+          });
+          break;
+        }
+      }
+    }
+
+    if (removed) {
+      // Aktualisiere das flache Array für die repeat-Direktive
+      this.updateFlatChannels();
+    } else {
+      this.epgBox._debug('EpgChannelManager: Kanal nicht gefunden', { channelId });
+    }
+
+    return removed;
+  }
+
+  /**
+   * Aktualisiert einen bestehenden Kanal in der Struktur
+   * @param {Object} updatedChannel - Der aktualisierte Kanal
+   */
+  updateChannelInStructure(updatedChannel) {
+    let updated = false;
+
+    for (const item of this.epgBox._sortedChannels) {
+      if (item.type === 'group' && Array.isArray(item.patterns)) {
+        for (const patternObj of item.patterns) {
+          if (patternObj.channels && Array.isArray(patternObj.channels)) {
+            const index = patternObj.channels.findIndex(c => c.id === updatedChannel.id);
+            if (index !== -1) {
+              patternObj.channels[index] = updatedChannel;
+              updated = true;
+              this.epgBox._debug('EpgChannelManager: Kanal in Gruppe aktualisiert', {
+                gruppe: item.name,
+                pattern: patternObj.pattern,
+                channelId: updatedChannel.id,
+              });
+              break;
+            }
+          }
+        }
+        if (updated) break;
+      } else if (item.channels && Array.isArray(item.channels)) {
+        const index = item.channels.findIndex(c => c.id === updatedChannel.id);
+        if (index !== -1) {
+          item.channels[index] = updatedChannel;
+          updated = true;
+          this.epgBox._debug('EpgChannelManager: Kanal aktualisiert', {
+            type: item.type,
+            channelId: updatedChannel.id,
+          });
+          break;
+        }
+      }
+    }
+
+    if (updated) {
+      // Aktualisiere das flache Array für die repeat-Direktive
+      this.updateFlatChannels();
+    } else {
+      this.epgBox._debug('EpgChannelManager: Kanal zum Aktualisieren nicht gefunden', {
+        channelId: updatedChannel.id,
+      });
+    }
+
+    return updated;
   }
 }

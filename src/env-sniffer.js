@@ -34,6 +34,10 @@ export class EnvSniffer {
     this.setupEventListeners();
     this.setupResizeObserver();
 
+    // Löse initiales Event aus, damit die Karte die Umgebung erkennt
+    const initialState = this.getEnvironmentState();
+    this.dispatchEnvironmentChangeEvent(null, initialState);
+
     console.log('EnvSniffer: Initialisiert', this.getEnvironmentState());
   }
 

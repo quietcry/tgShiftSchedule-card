@@ -90,28 +90,53 @@ export class EpgRenderManager {
    * Rendert ein einzelnes Programm-Item
    */
   renderProgramItem(program, channelId) {
-    // Normales Programm-Item
-    return html`
-      <epg-program-item
-        .start=${program.start || 0}
-        .stop=${program.end || program.stop || 0}
-        .duration=${program.duration || 0}
-        .title=${program.title || ''}
-        .description=${program.description || ''}
-        .shortText=${program.shorttext || ''}
-        .isCurrent=${this.epgBox.dataManager.isCurrentTimeSlot(
-          program,
-          Math.floor(Date.now() / 1000)
-        )}
-        .scale=${this.epgBox.scale}
-        .showTime=${this.epgBox.showTime}
-        .showDuration=${this.epgBox.showDuration}
-        .showDescription=${this.epgBox.showDescription}
-        .showShortText=${this.epgBox.showShortText}
-        .id=${channelId + '_' + program.id || ''}
-        @program-selected=${e => this.epgBox._onProgramSelected(e.detail)}
-      ></epg-program-item>
-    `;
+    // Prüfe, ob es sich um ein Gap-Element handelt
+    if (program.type === 'gap') {
+      // Gap-Element - rendere es als leeres Element mit korrekter Breite
+      return html`
+        <epg-program-item
+          .start=${program.start || 0}
+          .stop=${program.stop || 0}
+          .duration=${(program.stop || 0) - (program.start || 0)}
+          .title=${''}
+          .description=${''}
+          .shortText=${''}
+          .isCurrent=${false}
+          .scale=${this.epgBox.scale}
+          .showTime=${false}
+          .showDuration=${false}
+          .showDescription=${false}
+          .showShortText=${false}
+          .id=${channelId + '_' + program.id || ''}
+          .isGap=${true}
+          @program-selected=${e => this.epgBox._onProgramSelected(e.detail)}
+        ></epg-program-item>
+      `;
+    } else {
+      // Normales Programm-Item
+      return html`
+        <epg-program-item
+          .start=${program.start || 0}
+          .stop=${program.end || program.stop || 0}
+          .duration=${program.duration || 0}
+          .title=${program.title || ''}
+          .description=${program.description || ''}
+          .shortText=${program.shorttext || ''}
+          .isCurrent=${this.epgBox.dataManager.isCurrentTimeSlot(
+            program,
+            Math.floor(Date.now() / 1000)
+          )}
+          .scale=${this.epgBox.scale}
+          .showTime=${this.epgBox.showTime}
+          .showDuration=${this.epgBox.showDuration}
+          .showDescription=${this.epgBox.showDescription}
+          .showShortText=${this.epgBox.showShortText}
+          .id=${channelId + '_' + program.id || ''}
+          .isGap=${false}
+          @program-selected=${e => this.epgBox._onProgramSelected(e.detail)}
+        ></epg-program-item>
+      `;
+    }
   }
 
   /**
@@ -136,6 +161,82 @@ export class EpgRenderManager {
         end: new Date((p.end || p.stop) * 1000).toISOString(),
       })),
     });
+
+    // Berechne alle Gaps (Startgap und Gaps zwischen Programmen)
+    const gaps = [];
+    const minTime = this.epgBox.dataManager.minTime;
+    const maxTime = this.epgBox.dataManager.maxTime;
+
+    this.epgBox._debug('EpgRenderManager: Gap-Berechnung', {
+      minTime: new Date(minTime * 1000).toISOString(),
+      maxTime: new Date(maxTime * 1000).toISOString(),
+      anzahlProgramme: programs.length,
+    });
+
+    if (programs.length > 0) {
+      // Startgap: Von earliestProgramStart bis zum ersten Programm (immer einfügen, auch bei 0 Breite)
+      const firstProgramStart = programs[0].start;
+      const earliestProgramStart =
+        this.epgBox._channelsParameters.earliestProgramStart || firstProgramStart;
+      const gapWidth = (firstProgramStart - earliestProgramStart) * this.epgBox.scale;
+
+      gaps.push({
+        start: earliestProgramStart,
+        stop: firstProgramStart,
+        scale: this.epgBox.scale,
+        id: 'startgap',
+        type: 'gap',
+      });
+      this.epgBox._debug('EpgRenderManager: Startgap hinzugefügt', {
+        earliestProgramStart: new Date(earliestProgramStart * 1000).toISOString(),
+        firstProgramStart: new Date(firstProgramStart * 1000).toISOString(),
+        gapDuration: firstProgramStart - earliestProgramStart,
+        scale: this.epgBox.scale,
+        calculatedWidth: gapWidth,
+        firstProgramTitle: programs[0].title,
+      });
+    } else {
+      // Keine Programme - zeige ein großes Gap über das gesamte Zeitfenster
+      gaps.push({
+        start: minTime,
+        stop: maxTime,
+        scale: this.epgBox.scale,
+        id: 'nogaps',
+        type: 'gap',
+      });
+      this.epgBox._debug('EpgRenderManager: Keine Programme - großes Gap hinzugefügt');
+    }
+
+    this.epgBox._debug('EpgRenderManager: Alle Gaps berechnet', {
+      anzahlGaps: gaps.length,
+      gaps: gaps.map(g => ({
+        id: g.id,
+        start: new Date(g.start * 1000).toISOString(),
+        stop: new Date(g.stop * 1000).toISOString(),
+      })),
+    });
+
+    // Erstelle ein Array mit allen Elementen (Gaps und Programme) in der richtigen Reihenfolge
+    const allElements = [];
+
+    // Füge Startgap hinzu, falls vorhanden
+    if (gaps.length > 0) {
+      allElements.push(gaps[0]); // Nur das Startgap
+    }
+
+    // Füge alle Programme hinzu
+    allElements.push(...programs);
+
+    this.epgBox._debug('EpgRenderManager: Alle Elemente erstellt', {
+      anzahlElemente: allElements.length,
+      elemente: allElements.map((el, idx) => ({
+        index: idx,
+        type: el.type || 'program',
+        id: el.id || el.title,
+        start: el.start ? new Date(el.start * 1000).toISOString() : 'N/A',
+      })),
+    });
+
     return html`
       <div
         class="programRow epg-row-height ${this.epgBox._calculateHeightClasses(
@@ -149,19 +250,14 @@ export class EpgRenderManager {
         )}"
         id="programRow-${channel.id}"
       >
-        ${programs.length > 0
-          ? [
-              this.renderProgramItem(
-                {
-                  start: this.epgBox._channelsParameters.earliestProgramStart,
-                  stop: programs[0].start,
-                  scale: this.epgBox.scale,
-                  id: 'startgap',
-                },
-                channel.id
-              ),
-              ...programs.map((program, itemIndex) => this.renderProgramItem(program, channel.id)),
-            ]
+        ${allElements.length > 0
+          ? allElements.map((element, itemIndex) => {
+              if (element.type === 'gap') {
+                return this.renderProgramItem(element, channel.id);
+              } else {
+                return this.renderProgramItem(element, channel.id);
+              }
+            })
           : html` <div class="noPrograms">Keine Programme verfügbar</div> `}
       </div>
     `;
@@ -219,15 +315,15 @@ export class EpgRenderManager {
   /**
    * Aktualisiert alle Gap-Elemente mit dem neuen earliestProgramStart-Wert
    * Nur die ersten epg-program-item Elemente in jeder programRow sind Gap-Elemente
+   * @deprecated Diese Methode ist nicht mehr nötig mit der repeat-Direktive
    */
   updateGapItems() {
-    const programBox = this.epgBox.shadowRoot.querySelector('.programBox');
-    const programRows = programBox?.querySelectorAll('.programRow') || [];
-    const gapItems = [];
+    this.epgBox._debug(
+      'EpgRenderManager: WARNUNG - updateGapItems() ist deprecated! Mit repeat-Direktive nicht mehr nötig'
+    );
 
-    programRows.forEach(row => {
-      const firstItem = row.querySelector('epg-program-item');
-      if (firstItem) firstItem.start = this.epgBox._channelsParameters.earliestProgramStart || 99;
-    });
+    // Mit der repeat-Direktive werden Startgaps automatisch korrekt berechnet
+    // Diese Methode ist nur noch für Kompatibilität vorhanden
+    return;
   }
 }
