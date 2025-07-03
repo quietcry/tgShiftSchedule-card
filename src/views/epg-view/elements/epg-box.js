@@ -69,7 +69,7 @@ export class EpgBox extends EpgElementBase {
     this._channelsParameters = {
       minTime: now - pastTime * 60, // Früheste sichtbare Zeit (Unix-Timestamp)
       maxTime: now + futureTime * 60, // Späteste sichtbare Zeit (Unix-Timestamp)
-      earliestProgramStart: now, // Frühester Programmstart aller Kanäle (Unix-Timestamp)
+      earliestProgramStart: Math.floor(Date.now() / 1000), // Aktuelle Zeit als Unix-Timestamp
     };
 
     // Container-Management (wird von ScaleManager und RenderManager verwendet)

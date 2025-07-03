@@ -36,29 +36,71 @@ export class EpgDataManager extends TgCardHelper {
       this._debug('addTeilEpg()', 'Ungültige Teil-EPG-Daten erhalten', teilEpg);
       return;
     }
+    if (!teilEpg.epg || typeof teilEpg.epg !== 'object') {
+      this._debug('addTeilEpg()', 'Teil-EPG-Daten enthalten keine EPG-Daten', teilEpg);
+      return;
+    }
 
     const channel = teilEpg.channeldata;
-    const programs =
-      teilEpg.epg && typeof teilEpg.epg === 'object' ? Object.values(teilEpg.epg) : [];
+    const now = new Date();
+    const seconds = Math.floor(now.getTime() / 1000);
+    const epgPastTime = seconds - (this.epgBox.epgPastTime || 30) * 60; // Sekunden in die Vergangenheit
+    const epgFutureTime = seconds + (this.epgBox.epgFutureTime || 120) * 60; // Sekunden in die Zukunft
 
-    this._debug('addTeilEpg()', 'Füge Teil-EPG hinzu', {
-      kanal: channel.channeldata?.name || channel.name,
-      kanalId: channel.channelid,
-      anzahlProgramme: programs.length,
-      isFirstLoad: this.epgBox.isFirstLoad,
+    let programs = Object.values(teilEpg.epg)
+    // Sortiere Programme nach Startzeit
+    programs.sort((a, b) => a.start - b.start);
+    let bis = 0;
+    let von = 0;
+    programs.forEach((program, index) => {
+    if (program.stop < epgPastTime ) {
+        bis++;
+      } else {
+        return; // Beende Schleife, da Array sortiert ist
+    }
     });
 
-    // Erhöhe den Update-Counter
-    this.epgBox.isChannelUpdate++;
+    programs.splice(von, bis);
+
+    // Entferne Programme, die komplett außerhalb des sichtbaren Zeitfensters liegen
+    bis = 0;
+    von = programs.length - 1;
+    [...programs].reverse().forEach((program, index) => {
+        if (program.start > epgFutureTime ) {
+        bis++;
+      } else {
+        return; // Beende Schleife, da Array sortiert ist
+      }
+    });
+
+    programs.splice(von-bis, bis);
+
+    if (programs.length > 0) {
+        this.updateEarliestProgramStart(programs[0].start);
+      }
+
+    this._debug('addTeilEpg()', 'Earliest Start', {
+      earliest: this.epgBox._channelsParameters.earliestProgramStart
+    });
+
+      const channelWithPrograms = {
+        ...teilEpg, // Behalte die komplette ursprüngliche Struktur (channeldata + epg)
+        id: channel.id || channel.channelid || channel.name, // Stelle sicher, dass eine ID vorhanden ist
+        programs: programs, // Füge Programm-Array hinzu
+      };
+
+
+
 
     // Erstelle Kanal-Objekt - behalte die komplette ursprüngliche Struktur
-    const channelWithPrograms = {
-      ...teilEpg, // Behalte die komplette ursprüngliche Struktur (channeldata + epg)
-      id: channel.id || channel.channelid || channel.name, // Stelle sicher, dass eine ID vorhanden ist
-      programs: [], // Füge leeres Programm-Array hinzu
-    };
+    // const channelWithPrograms = {
+    //   ...teilEpg, // Behalte die komplette ursprüngliche Struktur (channeldata + epg)
+    //   id: channel.id || channel.channelid || channel.name, // Stelle sicher, dass eine ID vorhanden ist
+    //   programs: [], // Füge leeres Programm-Array hinzu
+    // };
 
     this._debug('addTeilEpg()', 'Kanal-Objekt erstellt', {
+      original: channelWithPrograms,
       originalId: channel.id,
       originalChannelId: channel.channelid,
       finalId: channelWithPrograms.id,
@@ -73,31 +115,34 @@ export class EpgDataManager extends TgCardHelper {
     });
 
     // Füge die Programme hinzu oder aktualisiere sie
-    if (programs && Array.isArray(programs)) {
-      programs.forEach(newProgram => {
-        // Suche nach bestehendem Programm mit gleicher Startzeit
-        const existingProgramIndex = channelWithPrograms.programs.findIndex(
-          p => p.start === newProgram.start
-        );
+    // if (programs && Array.isArray(programs)) {
+    //   programs.forEach(newProgram => {
+    //     // Suche nach bestehendem Programm mit gleicher Startzeit
+    //     const existingProgramIndex = channelWithPrograms.programs.findIndex(
+    //       p => p.start === newProgram.start
+    //     );
 
-        if (existingProgramIndex >= 0) {
-          // Aktualisiere bestehendes Programm
-          channelWithPrograms.programs[existingProgramIndex] = {
-            ...channelWithPrograms.programs[existingProgramIndex],
-            ...newProgram,
-          };
-        } else {
-          // Füge neues Programm hinzu
-          channelWithPrograms.programs.push(newProgram);
-        }
-      });
+    //     if (existingProgramIndex >= 0) {
+    //       // Aktualisiere bestehendes Programm
+    //       channelWithPrograms.programs[existingProgramIndex] = {
+    //         ...channelWithPrograms.programs[existingProgramIndex],
+    //         ...newProgram,
+    //       };
+    //     } else {
+    //       // Füge neues Programm hinzu
+    //       channelWithPrograms.programs.push(newProgram);
+    //     }
+    //   });
 
-      // Sortiere Programme nach Startzeit
-      channelWithPrograms.programs.sort((a, b) => a.start - b.start);
-      if (channelWithPrograms.programs.length > 0) {
-        this.updateEarliestProgramStart(channelWithPrograms.programs[0].start);
-      }
-    }
+    //   // Sortiere Programme nach Startzeit
+    //   channelWithPrograms.programs.sort((a, b) => a.start - b.start);
+    //   if (channelWithPrograms.programs.length > 0) {
+    //     this.updateEarliestProgramStart(channelWithPrograms.programs[0].start);
+    //   }
+    // }
+    // Erhöhe den Update-Counter
+    this.epgBox.isChannelUpdate++;
+
 
     // Aktualisiere die Sortierungsstruktur
     if (!this.epgBox._channelOrderInitialized) {
@@ -132,9 +177,9 @@ export class EpgDataManager extends TgCardHelper {
     }
 
     // Aktualisiere den frühesten Programmstart nach dem Hinzufügen neuer Programme
-    if (channelWithPrograms.programs.length > 0) {
-      this.updateEarliestProgramStart(channelWithPrograms.programs[0].start);
-    }
+    // if (channelWithPrograms.programs.length > 0) {
+    //   this.updateEarliestProgramStart(channelWithPrograms.programs[0].start);
+    // }
 
     // Mit repeat-Direktive ist requestUpdate() nicht mehr nötig - Lit macht es automatisch
     // this.epgBox.requestUpdate();
@@ -152,10 +197,11 @@ export class EpgDataManager extends TgCardHelper {
     const startTime = new Date(now.getTime() - pastTime * 60 * 1000);
     const endTime = new Date(now.getTime() + showWidth * 60 * 1000);
 
-    // Aktualisiere die Kanal-Parameter
+    // Aktualisiere die Kanal-Parameter - behalte earliestProgramStart
     this.epgBox._channelsParameters = {
       minTime: Math.floor(startTime.getTime() / 1000),
       maxTime: Math.floor(endTime.getTime() / 1000),
+      earliestProgramStart: this.epgBox._channelsParameters?.earliestProgramStart || Math.floor(Date.now() / 1000),
     };
 
     this._debug('generateTimeSlots()', 'Zeit-Slots generiert', {
@@ -234,6 +280,13 @@ export class EpgDataManager extends TgCardHelper {
    * Berechnet den frühesten Programmstart aller Kanäle und aktualisiert earliestProgramStart
    */
   updateEarliestProgramStart(newEarliestStart) {
+    this._debug('updateEarliestProgramStart()', 'Aktualisiere frühesten Programmstart',
+      {
+        newEarliestStart,
+        currentEarliest: this.epgBox._channelsParameters.earliestProgramStart
+      }
+    );
+
     if (newEarliestStart < this.epgBox._channelsParameters.earliestProgramStart) {
       this.epgBox._channelsParameters.earliestProgramStart = newEarliestStart;
       return this.epgBox._channelsParameters.earliestProgramStart;
