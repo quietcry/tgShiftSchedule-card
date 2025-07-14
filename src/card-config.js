@@ -1,4 +1,4 @@
-const Version = '2025.07-0007';
+const Version = '2025.07-0009';
 const CardRegname = 'tgepg-card';
 const CardName = 'TG EPG Card';
 const CardDescription = 'Eine Karte für die EPG-Anzeige';

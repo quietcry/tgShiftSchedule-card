@@ -9,6 +9,7 @@ export class EpgTimeMarker extends EpgElementBase {
     currentTime: { type: Number },
     scale: { type: Number },
     minTime: { type: Number },
+    earliestProgramStart: { type: Number },
     showWidth: { type: Number },
     position: { type: Number },
     showTooltip: { type: Boolean },
@@ -19,10 +20,12 @@ export class EpgTimeMarker extends EpgElementBase {
     this.currentTime = Date.now() / 1000;
     this.scale = 1;
     this.minTime = 0;
+    this.earliestProgramStart = 0;
     this.showWidth = 180;
     this.position = 0;
     this.showTooltip = false;
     this.updateInterval = null;
+    this._scrollHandler = null; // Speichere Referenz auf Scroll-Handler
     this.startTimeUpdate();
   }
 
@@ -77,21 +80,49 @@ export class EpgTimeMarker extends EpgElementBase {
   }
 
   /**
+   * Fügt einen Scroll-Event-Listener zur programBox hinzu
+   */
+  addScrollListener() {
+    const programBox = this.shadowRoot?.host?.parentElement?.querySelector('.programBox');
+    if (programBox) {
+      this._debug('EpgTimeMarker: Füge Scroll-Listener hinzu');
+      this._scrollHandler = () => {
+        this.calculateAndSetPosition();
+      };
+      programBox.addEventListener('scroll', this._scrollHandler);
+    } else {
+      this._debug('EpgTimeMarker: ProgramBox nicht gefunden für Scroll-Listener');
+    }
+  }
+
+  /**
    * Berechnet die Position basierend auf der aktuellen Zeit und den eigenen Properties
    */
   calculatePosition() {
     const now = Date.now() / 1000; // Aktuelle Zeit in Sekunden
-    const positionPixels = (now - this.minTime) * this.scale;
+    const positionPixels = (now - this.earliestProgramStart) * this.scale;
+
+    // Berücksichtige die Scroll-Position der programBox
+    const programBox = this.shadowRoot?.host?.parentElement?.querySelector('.programBox');
+    const scrollOffset = programBox ? programBox.scrollLeft : 0;
+
+    // Die finale Position ist die berechnete Position minus der Scroll-Position
+    const finalPosition = positionPixels - scrollOffset;
 
     this._debug('EpgTimeMarker: Position berechnet', {
       currentTime: new Date(now * 1000).toISOString(),
       now,
-      minTime: this.minTime,
+      earliestProgramStart: this.earliestProgramStart,
       scale: this.scale,
       positionPixels,
+      scrollOffset,
+      finalPosition,
+      earliestProgramStartDate: new Date(this.earliestProgramStart * 1000).toISOString(),
+      timeDiff: now - this.earliestProgramStart,
+      timeDiffMinutes: Math.round((now - this.earliestProgramStart) / 60)
     });
 
-    return Math.max(0, positionPixels); // Position darf nicht negativ sein
+    return Math.max(0, finalPosition); // Position darf nicht negativ sein
   }
 
   /**
@@ -216,22 +247,32 @@ export class EpgTimeMarker extends EpgElementBase {
   disconnectedCallback() {
     super.disconnectedCallback();
     this.stopTimeUpdate();
+
+    // Entferne Scroll-Event-Listener
+    const programBox = this.shadowRoot?.host?.parentElement?.querySelector('.programBox');
+    if (programBox && this._scrollHandler) {
+      programBox.removeEventListener('scroll', this._scrollHandler);
+      this._scrollHandler = null;
+    }
   }
 
   firstUpdated() {
     super.firstUpdated();
     // Initialisiere die Position
     this.calculateAndSetPosition();
+
+    // Füge Scroll-Event-Listener hinzu
+    this.addScrollListener();
   }
 
   updated(changedProperties) {
     super.updated(changedProperties);
 
-    // Wenn sich scale oder minTime ändern, berechne die Position neu
-    if (changedProperties.has('scale') || changedProperties.has('minTime')) {
+    // Wenn sich scale oder earliestProgramStart ändern, berechne die Position neu
+    if (changedProperties.has('scale') || changedProperties.has('earliestProgramStart')) {
       this._debug('EpgTimeMarker: Properties geändert, berechne Position neu', {
         scale: this.scale,
-        minTime: this.minTime,
+        earliestProgramStart: this.earliestProgramStart,
       });
       this.calculateAndSetPosition();
     }
