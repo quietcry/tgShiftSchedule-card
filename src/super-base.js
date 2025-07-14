@@ -1,12 +1,14 @@
 import { LitElement, css } from 'lit';
-import { CardName, Version, DebugMode, showVersion } from './card-config.js';
+import { CardName, Version, DebugMode, showVersion, UseDummyData } from './card-config.js';
 import { TgCardHelper } from './tools/tg-card-helper.js';
 
 export class SuperBase extends LitElement {
   static cardName = CardName;
   static version = Version;
   static debugMode = DebugMode;
+  static useDummyData = UseDummyData;
   static showVersion = showVersion;
+  static className = 'SuperBase';
 
   static properties = {
     hass: { type: Object },
@@ -26,6 +28,7 @@ export class SuperBase extends LitElement {
     this.cardName = this.constructor.cardName;
     this.version = this.constructor.version;
     this.debugMode = this.constructor.debugMode;
+    this.useDummyData = this.constructor.useDummyData;
     this.showVersion = this.constructor.showVersion;
     this.tgCardHelper = new TgCardHelper(this.constructor.cardName, this.constructor.debugMode);
     this._debug('SuperBase-Konstruktor wird aufgerufen');
@@ -51,7 +54,7 @@ export class SuperBase extends LitElement {
     else if (this.cardName) {
       className = this.cardName;
     }
-
-    this.tgCardHelper._debug(className, message, data);
+    this.tgCardHelper.className = className
+    this.tgCardHelper._debug(message, data);
   }
 }

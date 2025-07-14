@@ -1,25 +1,32 @@
+import { TgCardHelper } from './tools/tg-card-helper.js';
+
 /**
  * EnvSniffer - Überwacht Umgebungsinformationen und löst Events bei Änderungen aus
  */
-export class EnvSniffer {
+export class EnvSniffer extends TgCardHelper {
+  static className = 'EnvSniffer';
+
   constructor() {
+    super();
+    
     // Umgebungsinformationen
-    this.isDesktop = false;
-    this.isMobile = false;
-    this.isHorizontal = false;
-    this.isVertical = false;
-    this.cardWidth = 0;
-    this.cardHeight = 0;
-    this.isTouchscreen = false;
-    this.typeOfView = 'unknown';
-    this.screenWidth = 0;
-    this.screenHeight = 0;
+    this.envSnifferIsDesktop = false;
+    this.envSnifferIsMobile = false;
+    this.envSnifferIsHorizontal = false;
+    this.envSnifferIsVertical = false;
+    this.envSnifferCardWidth = 0;
+    this.envSnifferCardHeight = 0;
+    this.envSnifferIsTouchscreen = false;
+    this.envSnifferTypeOfView = 'unknown';
+    this.envSnifferScreenWidth = 0;
+    this.envSnifferScreenHeight = 0;
 
     // Interne Variablen
-    this.cardElement = null;
-    this.resizeObserver = null;
-    this.resizeTimeout = null;
-    this.eventTarget = new EventTarget();
+    this.envSnifferCardElement = null;
+    this.envSnifferResizeObserver = null;
+    this.envSnifferResizeTimeout = null;
+    this.envSnifferEventTarget = new EventTarget();
+    this._envSnifferDetectionInProgress = false;
 
     // Öffentliche env-Property
     this.env = this.getEnvironmentState();
@@ -29,41 +36,51 @@ export class EnvSniffer {
    * Initialisiert die Umgebungsüberwachung
    */
   init(cardElement) {
-    this.cardElement = cardElement;
+    this.envSnifferCardElement = cardElement;
     this.detectEnvironment();
     this.setupEventListeners();
     this.setupResizeObserver();
+    this.detectEnvironment();
+
 
     // Löse initiales Event aus, damit die Karte die Umgebung erkennt
     const initialState = this.getEnvironmentState();
+    this._debug('EnvSniffer: Initialisiert', this.getEnvironmentState());
     this.dispatchEnvironmentChangeEvent(null, initialState);
 
-    console.log('EnvSniffer: Initialisiert', this.getEnvironmentState());
   }
 
   /**
    * Event-Listener hinzufügen
    */
   addEventListener(type, listener) {
-    this.eventTarget.addEventListener(type, listener);
+    this.envSnifferEventTarget.addEventListener(type, listener);
   }
 
   /**
    * Event-Listener entfernen
    */
   removeEventListener(type, listener) {
-    this.eventTarget.removeEventListener(type, listener);
+    this.envSnifferEventTarget.removeEventListener(type, listener);
   }
 
   /**
    * Erkennt die aktuelle Umgebung
    */
   detectEnvironment() {
+    // Verhindere mehrfache Aufrufe während Retry-Schleife
+    if (this._envSnifferDetectionInProgress) {
+      this._debug('EnvSniffer: detectEnvironment bereits in Bearbeitung, überspringe');
+      return;
+    }
+    
+    this._envSnifferDetectionInProgress = true;
+    
     const oldState = this.getEnvironmentState();
 
     // Bildschirm-Größe
-    this.screenWidth = window.innerWidth;
-    this.screenHeight = window.innerHeight;
+    this.envSnifferScreenWidth = window.innerWidth;
+    this.envSnifferScreenHeight = window.innerHeight;
 
     // Desktop vs Mobile über CSS Media Queries
     this.detectDeviceType();
@@ -72,19 +89,21 @@ export class EnvSniffer {
     this.detectOrientation();
 
     // Touchscreen
-    this.isTouchscreen = this.detectTouchscreen();
+    this.envSnifferIsTouchscreen = this.detectTouchscreen();
 
-    // Karten-Größe
+    // Karten-Größe (mit Retry-Mechanismus)
     this.updateCardDimensions();
 
     // View-Typ
-    this.typeOfView = this.detectViewType();
+    this.envSnifferTypeOfView = this.detectViewType();
 
     // Prüfe auf Änderungen und sende Event
     const newState = this.getEnvironmentState();
     if (this.hasEnvironmentChanged(oldState, newState)) {
       this.dispatchEnvironmentChangeEvent(oldState, newState);
     }
+    
+    this._envSnifferDetectionInProgress = false;
   }
 
   /**
@@ -92,16 +111,16 @@ export class EnvSniffer {
    */
   detectDeviceType() {
     // Mobile: Kein Hover + grobe Pointer
-    this.isMobile = window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+    this.envSnifferIsMobile = window.matchMedia('(hover: none) and (pointer: coarse)').matches;
 
     // Desktop: Hover + feine Pointer
-    this.isDesktop = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+    this.envSnifferIsDesktop = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
 
     // Fallback: Wenn Media Queries nicht funktionieren
-    if (!this.isMobile && !this.isDesktop) {
+    if (!this.envSnifferIsMobile && !this.envSnifferIsDesktop) {
       // Verwende Touchscreen als Indikator
-      this.isMobile = this.isTouchscreen;
-      this.isDesktop = !this.isMobile;
+      this.envSnifferIsMobile = this.envSnifferIsTouchscreen;
+      this.envSnifferIsDesktop = !this.envSnifferIsMobile;
     }
   }
 
@@ -110,16 +129,16 @@ export class EnvSniffer {
    */
   detectOrientation() {
     // Portrait: Höhe größer als Breite
-    this.isVertical = window.matchMedia('(orientation: portrait)').matches;
+    this.envSnifferIsVertical = window.matchMedia('(orientation: portrait)').matches;
 
     // Landscape: Breite größer als Höhe
-    this.isHorizontal = window.matchMedia('(orientation: landscape)').matches;
+    this.envSnifferIsHorizontal = window.matchMedia('(orientation: landscape)').matches;
 
     // Fallback: Wenn Media Queries nicht funktionieren
-    if (!this.isVertical && !this.isHorizontal) {
+    if (!this.envSnifferIsVertical && !this.envSnifferIsHorizontal) {
       // Verwende manuelle Berechnung als Fallback
-      this.isHorizontal = this.screenWidth > this.screenHeight;
-      this.isVertical = this.screenWidth <= this.screenHeight;
+      this.envSnifferIsHorizontal = this.envSnifferScreenWidth > this.envSnifferScreenHeight;
+      this.envSnifferIsVertical = this.envSnifferScreenWidth <= this.envSnifferScreenHeight;
     }
   }
 
@@ -137,10 +156,10 @@ export class EnvSniffer {
    */
   detectViewType() {
     // Prüfe DOM-Hierarchie für Lovelace-Einbindung
-    const haCard = this.cardElement?.closest('ha-card');
-    const grid = this.cardElement?.closest('.grid');
-    const panel = this.cardElement?.closest('hui-panel-view');
-    const sidebar = this.cardElement?.closest('.sidebar');
+    const haCard = this.envSnifferCardElement?.closest('ha-card');
+    const grid = this.envSnifferCardElement?.closest('.grid');
+    const panel = this.envSnifferCardElement?.closest('hui-panel-view');
+    const sidebar = this.envSnifferCardElement?.closest('.sidebar');
 
     // Panel-View: Ganze Seite
     if (panel) return 'panel';
@@ -165,10 +184,70 @@ export class EnvSniffer {
    * Aktualisiert Karten-Dimensionen
    */
   updateCardDimensions() {
-    if (this.cardElement) {
-      const rect = this.cardElement.getBoundingClientRect();
-      this.cardWidth = rect.width;
-      this.cardHeight = rect.height;
+    this._updateCardDimensionsWithRetry();
+  }
+
+  /**
+   * Aktualisiert Karten-Dimensionen mit Retry-Mechanismus
+   */
+  _updateCardDimensionsWithRetry(retryCount = 0) {
+    const maxRetries = 50; // 5 Sekunden (50 * 100ms)
+    
+    if (!this.envSnifferCardElement) {
+      this._debug('EnvSniffer: cardElement nicht verfügbar, warte...', { retryCount });
+      if (retryCount < maxRetries) {
+        setTimeout(() => this._updateCardDimensionsWithRetry(retryCount + 1), 100);
+      }
+      return;
+    }
+
+    const rect = this.envSnifferCardElement.getBoundingClientRect();
+    
+    // Prüfe ob gültige Dimensionen vorhanden sind
+    if (rect.width <= 0 || rect.height <= 0) {
+      this._debug('EnvSniffer: Karten-Dimensionen noch 0, warte...', {
+        width: rect.width,
+        height: rect.height,
+        retryCount
+      });
+      
+      if (retryCount < maxRetries) {
+        setTimeout(() => this._updateCardDimensionsWithRetry(retryCount + 1), 100);
+      } else {
+        this._debug('EnvSniffer: Max-Versuche erreicht, verwende Fallback-Dimensionen');
+        // Verwende Fallback-Dimensionen
+        this.envSnifferCardWidth = 0;
+        this.envSnifferCardHeight = 0;
+        // Löse Event aus mit Fallback-Werten
+        this._triggerEnvironmentUpdate();
+      }
+      return;
+    }
+
+    // Gültige Dimensionen gefunden
+    this.envSnifferCardWidth = rect.width;
+    this.envSnifferCardHeight = rect.height;
+    
+    if (retryCount > 0) {
+      this._debug('EnvSniffer: Karten-Dimensionen erfolgreich aktualisiert', {
+        width: this.envSnifferCardWidth,
+        height: this.envSnifferCardHeight,
+        retryCount
+      });
+      // Löse Event aus mit neuen Werten
+      this._triggerEnvironmentUpdate();
+    }
+  }
+
+  /**
+   * Löst ein Environment-Update aus
+   */
+  _triggerEnvironmentUpdate() {
+    const oldState = this.env;
+    const newState = this.getEnvironmentState();
+    
+    if (this.hasEnvironmentChanged(oldState, newState)) {
+      this.dispatchEnvironmentChangeEvent(oldState, newState);
     }
   }
 
@@ -177,16 +256,16 @@ export class EnvSniffer {
    */
   getEnvironmentState() {
     return {
-      isDesktop: this.isDesktop,
-      isMobile: this.isMobile,
-      isHorizontal: this.isHorizontal,
-      isVertical: this.isVertical,
-      cardWidth: this.cardWidth,
-      cardHeight: this.cardHeight,
-      isTouchscreen: this.isTouchscreen,
-      typeOfView: this.typeOfView,
-      screenWidth: this.screenWidth,
-      screenHeight: this.screenHeight,
+      envSnifferIsDesktop: this.envSnifferIsDesktop,
+      envSnifferIsMobile: this.envSnifferIsMobile,
+      envSnifferIsHorizontal: this.envSnifferIsHorizontal,
+      envSnifferIsVertical: this.envSnifferIsVertical,
+      envSnifferCardWidth: this.envSnifferCardWidth,
+      envSnifferCardHeight: this.envSnifferCardHeight,
+      envSnifferIsTouchscreen: this.envSnifferIsTouchscreen,
+      envSnifferTypeOfView: this.envSnifferTypeOfView,
+      envSnifferScreenWidth: this.envSnifferScreenWidth,
+      envSnifferScreenHeight: this.envSnifferScreenHeight,
     };
   }
 
@@ -214,11 +293,11 @@ export class EnvSniffer {
       composed: true,
     });
 
-    this.eventTarget.dispatchEvent(event);
+    this.envSnifferEventTarget.dispatchEvent(event);
 
     // Optional: Event auch auf dem Karten-Element auslösen
-    if (this.cardElement) {
-      this.cardElement.dispatchEvent(event);
+    if (this.envSnifferCardElement) {
+      this.envSnifferCardElement.dispatchEvent(event);
     }
   }
 
@@ -251,9 +330,11 @@ export class EnvSniffer {
    * Richtet Resize Observer ein
    */
   setupResizeObserver() {
-    if (this.cardElement && window.ResizeObserver) {
-      this.resizeObserver = new ResizeObserver(this.handleCardResize.bind(this));
-      this.resizeObserver.observe(this.cardElement);
+    if (this.envSnifferCardElement && window.ResizeObserver) {
+      this.envSnifferResizeObserver = new ResizeObserver(this.handleCardResize.bind(this));
+      this.envSnifferResizeObserver.observe(this.envSnifferCardElement);
+    } else {
+      this._debug('env sniffer ResizeObserver nicht verfügbar', { cardElement: this.envSnifferCardElement, window: window, ResizeObserver: window.ResizeObserver });
     }
   }
 
@@ -261,9 +342,9 @@ export class EnvSniffer {
    * Bereinigt Resize Observer
    */
   cleanupResizeObserver() {
-    if (this.resizeObserver) {
-      this.resizeObserver.disconnect();
-      this.resizeObserver = null;
+    if (this.envSnifferResizeObserver) {
+      this.envSnifferResizeObserver.disconnect();
+      this.envSnifferResizeObserver = null;
     }
   }
 
@@ -272,11 +353,11 @@ export class EnvSniffer {
    */
   handleResize() {
     // Debounce Resize-Events
-    if (this.resizeTimeout) {
-      clearTimeout(this.resizeTimeout);
+    if (this.envSnifferResizeTimeout) {
+      clearTimeout(this.envSnifferResizeTimeout);
     }
 
-    this.resizeTimeout = setTimeout(() => {
+    this.envSnifferResizeTimeout = setTimeout(() => {
       this.detectEnvironment();
     }, 100);
   }
@@ -295,7 +376,7 @@ export class EnvSniffer {
    * Handler für Touch Start
    */
   handleTouchStart() {
-    this.isTouchscreen = true;
+    this.envSnifferIsTouchscreen = true;
     this.detectEnvironment();
   }
 
@@ -320,23 +401,23 @@ export class EnvSniffer {
   matchesCondition(condition) {
     switch (condition) {
       case 'desktop':
-        return this.isDesktop;
+        return this.envSnifferIsDesktop;
       case 'mobile':
-        return this.isMobile;
+        return this.envSnifferIsMobile;
       case 'horizontal':
-        return this.isHorizontal;
+        return this.envSnifferIsHorizontal;
       case 'vertical':
-        return this.isVertical;
+        return this.envSnifferIsVertical;
       case 'touchscreen':
-        return this.isTouchscreen;
+        return this.envSnifferIsTouchscreen;
       case 'sidebar':
-        return this.typeOfView === 'sidebar';
+        return this.envSnifferTypeOfView === 'sidebar';
       case 'panel':
-        return this.typeOfView === 'panel';
+        return this.envSnifferTypeOfView === 'panel';
       case 'tile':
-        return this.typeOfView === 'tile';
+        return this.envSnifferTypeOfView === 'tile';
       case 'abschnitt':
-        return this.typeOfView === 'abschnitt';
+        return this.envSnifferTypeOfView === 'abschnitt';
       default:
         return false;
     }
@@ -348,6 +429,6 @@ export class EnvSniffer {
   destroy() {
     this.cleanupEventListeners();
     this.cleanupResizeObserver();
-    this.cardElement = null;
+    this.envSnifferCardElement = null;
   }
 }

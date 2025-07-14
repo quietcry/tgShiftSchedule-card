@@ -15,7 +15,6 @@ export class EpgElementBase extends SuperBase {
     epgFutureTime: { type: Number },
     epgShowFutureTime: { type: Number },
     epgShowPastTime: { type: Number },
-    scale: { type: Number },
   };
 
   static styles = css`

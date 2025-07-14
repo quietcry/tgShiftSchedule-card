@@ -78,6 +78,9 @@ export class EpgChannelManager {
    * Diese Methode wird aufgerufen, wenn sich _sortedChannels ändert
    */
   updateFlatChannels() {
+    this.epgBox._debug('EpgChannelManager: Aktualisiere flaches Array', {
+      sortedChannels: this.epgBox._sortedChannels,
+    });
     if (!this.epgBox._sortedChannels || !this.epgBox._sortedChannels.length) {
       this.epgBox._flatChannels = [];
       this.epgBox._channelGroups = [];
@@ -146,6 +149,7 @@ export class EpgChannelManager {
     this.epgBox._channelGroups = channelGroups;
 
     this.epgBox._debug('EpgChannelManager: Flaches Array aktualisiert', {
+      flatChannels: flatChannels,
       anzahlKanäle: flatChannels.length,
       anzahlGruppen: channelGroups.length,
       gruppen: channelGroups.map(g => ({ name: g.name, start: g.startIndex, end: g.endIndex })),
@@ -236,6 +240,9 @@ export class EpgChannelManager {
    * Sortiert einen Kanal in die Struktur ein
    */
   sortChannelIntoStructure(channel) {
+    this.epgBox._debug('EpgChannelManager: Sortiere Kanal in die Struktur ein', {
+      channel: channel,
+    });
     let matched = false;
     for (const item of this.epgBox._sortedChannels) {
       if (item.type === 'group' && Array.isArray(item.patterns)) {

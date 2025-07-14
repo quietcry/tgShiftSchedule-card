@@ -14,14 +14,22 @@ export class EpgScaleManager {
     // Berechne Scale: Container-Breite / Anzeigebreite in Sekunden
     // showWidth ist in Minuten, daher * 60 für Sekunden
     const scale = containerWidth / (showWidth * 60);
-    this.epgBox._debug('EpgScaleManager: calculateScale', {
+    const oldScale = this.epgBox.scale;
+    this.epgBox.scale = scale;
+    this.epgBox._debug('EpgScaleManager: Scale! berechnet', {
       containerWidth,
       showWidth,
       scale,
+      oldScale: oldScale,
+      newScale: this.epgBox.scale,
+      
     });
-    return scale;
+    this.epgBox.updated(new Map([['scale', scale]]));
   }
 
+
+
+  
   /**
    * Validiert die epgShowPastTime Konfiguration
    */

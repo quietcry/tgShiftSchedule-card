@@ -96,5 +96,5 @@ export class EpgTimebar extends EpgElementBase {
 }
 
 if (!customElements.get('epg-timebar')) {
-  customElements.define('epg-timebar', EpgTimebar);
+customElements.define('epg-timebar', EpgTimebar);
 }

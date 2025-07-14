@@ -2,6 +2,8 @@ import { SuperBase } from '../super-base.js';
 import { css } from 'lit';
 
 export class ViewBase extends SuperBase {
+  static className = 'ViewBase';
+
   static properties = {
     config: { type: Object },
     epgData: { type: Array },

@@ -8,6 +8,8 @@ import { EpgBox } from './elements/epg-box.js';
 import { DataProvider } from '../../tools/data-provider.js';
 
 export class EPGView extends ViewBase {
+  static className = 'EPGView';
+
   static properties = {
     ...ViewBase.properties,
     _currentTime: { type: Number },
@@ -162,6 +164,14 @@ export class EPGView extends ViewBase {
         this._debug('EPGView set hass: DataProvider hass aktualisiert');
       }
 
+      // // Bei Dummy-Daten keine hass-Updates verarbeiten
+      // if (this.useDummyData && this.useDummyData.toLowerCase() === 'true') {
+      //   this._debug('EPGView: Dummy-Daten aktiv, überspringe hass-Updates', {
+      //     useDummyData: this.useDummyData,
+      //   });
+      //   return;
+      // }
+
       // Nur wenn sich last_update ändert oder hass zum ersten Mal gesetzt wird
       if (newLastUpdate !== this._lastUpdate || !this._hass) {
         if (this._hass && this.config.entity) {
@@ -211,11 +221,12 @@ export class EPGView extends ViewBase {
       this._env = value;
 
       // Übergebe env an die epg-box, falls sie bereits existiert
-      const epgBox = this.shadowRoot?.querySelector('epg-box');
-      if (epgBox) {
-        this._debug('EPG-View: Übergebe env an epg-box');
-        epgBox.env = value;
-      }
+      // const epgBox = this.shadowRoot?.querySelector('epg-box');
+      // if (epgBox) {
+      //   this._debug('EPG-View: Übergebe env an epg-box');
+      //   epgBox.env = value;
+      // }
+      // Nicht mehr nötig - Observer-Pattern übernimmt das
     }
   }
 
@@ -225,6 +236,52 @@ export class EPGView extends ViewBase {
 
   async _loadData() {
     this._debug('EPG-View: _loadData wird aufgerufen');
+    
+    // Hole die EPG-Box
+    const epgBox = this.shadowRoot?.querySelector('epg-box');
+    if (!epgBox) {
+      this._debug('EPG-View: _loadData: EPG-Box nicht gefunden, überspringe Datenabruf');
+      return;
+    }
+
+    // Prüfe, ob Dummy-Daten verwendet werden sollen (Build-Variable)
+    if (this.useDummyData && this.useDummyData.toLowerCase() === 'true') {
+      this._debug('EPG-View: _loadData: Verwende Dummy-Daten (Build-Variable)', {
+        useDummyData: this.useDummyData,
+      });
+      
+      try {
+        // Rufe die Dummy-Daten-Generierung im DataManager auf
+        const dummyData = epgBox.dataManager.generateDummyData();
+        
+        if (dummyData && dummyData.length > 0) {
+          this._debug('EPG-View: Dummy-Daten erfolgreich generiert', {
+            anzahlKanäle: dummyData.length,
+            kanäle: dummyData.map(channel => ({
+              id: channel.id,
+              name: channel.name,
+              anzahlProgramme: channel.programs?.length || 0
+            }))
+          });
+          
+          // Füge jeden Kanal als Teil-EPG hinzu
+          dummyData.forEach(channelData => {
+            epgBox.addTeilEpg(channelData);
+          });
+          
+          this._debug('EPG-View: Dummy-Daten erfolgreich geladen', {
+            anzahlKanäle: dummyData.length
+          });
+        } else {
+          this._debug('EPG-View: Keine Dummy-Daten generiert');
+        }
+      } catch (error) {
+        this._debug('EPG-View: Fehler beim Laden der Dummy-Daten', { error: error.message });
+      }
+      return;
+    }
+
+    // Normale EPG-Daten laden
     if (!this._dataProvider || !this.config.entity) {
       this._debug('EPG-View: _loadData: Übersprungen - dataProvider oder entity fehlt', {
         dataProvider: !!this._dataProvider,
@@ -234,7 +291,7 @@ export class EPGView extends ViewBase {
     }
 
     // Starte den Datenabruf direkt
-    this._debug('EPG-View: Starte Datenabruf');
+    this._debug('EPG-View: Starte Datenabruf für echte EPG-Daten');
     await this._fetchViewData(this.config);
   }
 
@@ -323,7 +380,7 @@ export class EPGView extends ViewBase {
     this._debug('EPG-View: EPG-Box ist bereit, starte Datenabruf');
     if (!this._dataFetchStarted) {
       this._dataFetchStarted = true;
-      this._fetchViewData(this.config);
+      this._loadData(); // Verwende _loadData statt _fetchViewData für Entscheidung Dummy/echte Daten
     } else {
       this._debug('EPG-View: Datenabruf bereits gestartet, überspringe');
     }
@@ -344,7 +401,7 @@ export class EPGView extends ViewBase {
     if (epgBox && !this._dataFetchStarted) {
       this._debug('EPG-View: EPG-Box bereits verfügbar, starte Datenabruf');
       this._dataFetchStarted = true;
-      this._fetchViewData(this.config);
+      this._loadData(); // Verwende _loadData statt _fetchViewData für Entscheidung Dummy/echte Daten
     }
   }
 
@@ -444,6 +501,7 @@ export class EPGView extends ViewBase {
         <div class="timeBar">${this._renderTimeBar()}</div>
         <epg-box
           .epgPastTime=${this.config.epgPastTime}
+          .epgFutureTime=${this.config.epgFutureTime}
           .epgShowFutureTime=${this.config.epgShowFutureTime}
           .epgShowPastTime=${this.config.epgShowPastTime}
           .channelWidth=${this.config.channelWidth}
@@ -453,7 +511,6 @@ export class EPGView extends ViewBase {
           .showDescription=${this.config.show_description}
           .showShortText=${this.config.show_shorttext}
           .channelOrder=${this.config.group_order}
-          .env=${this.env}
           @epg-box-ready=${this._onEpgBoxReady}
           @epg-first-load-complete=${this._onEpgFirstLoadComplete}
         ></epg-box>

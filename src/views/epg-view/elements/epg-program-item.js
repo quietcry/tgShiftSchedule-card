@@ -8,7 +8,6 @@ export class EpgProgramItem extends EpgElementBase {
     start: { type: Number },
     stop: { type: Number },
     duration: { type: Number },
-    scale: { type: Number },
     title: { type: String },
     description: { type: String },
     shortText: { type: String },
@@ -17,7 +16,7 @@ export class EpgProgramItem extends EpgElementBase {
     showDuration: { type: Boolean },
     showDescription: { type: Boolean },
     showShortText: { type: Boolean },
-    isGap: { type: Boolean },
+    type: { type: String }, // 'endgap', 'startgap', 'item', 'title' oder undefined/null
     rowIndex: { type: Number },
     itemIndex: { type: Number },
   };
@@ -27,7 +26,6 @@ export class EpgProgramItem extends EpgElementBase {
     this.start = 0;
     this.stop = 0;
     this.duration = 0;
-    this.scale = 1;
     this.title = '';
     this.description = '';
     this.shortText = '';
@@ -36,75 +34,96 @@ export class EpgProgramItem extends EpgElementBase {
     this.showDuration = true;
     this.showDescription = true;
     this.showShortText = false;
-    this.isGap = false;
+    this.type = undefined; // Standard: normales Programmitem
     this.rowIndex = 0;
     this.itemIndex = 0;
   }
+
+  // Getter für Kompatibilität
+  get isGap() {
+    return this.type === 'startgap' || this.type === 'endgap' || this.type === 'fillergap';
+  }
+
+  get isGroup() {
+    return this.type === 'group';
+  }
+
+  /**
+   * Aktualisiert die CSS-Variablen für die Breitenberechnung
+   * Wird aufgerufen, wenn start/stop direkt über JavaScript gesetzt werden
+   */
+  updateCSSVariables() {
+    // Debug: Werte vor dem Update
+    const computedStyleBefore = getComputedStyle(this);
+    const cssStartBefore = computedStyleBefore.getPropertyValue('--start');
+    const cssStopBefore = computedStyleBefore.getPropertyValue('--stop');
+    const cssScaleBefore = computedStyleBefore.getPropertyValue('--epg-scale');
+    const widthBefore = this.offsetWidth;
+    this._debug('EpgProgramItem: VOR CSS-Update', {
+      id: this.id,
+      start: this.start,
+      stop: this.stop,
+      type: this.type,
+      isGap: this.isGap,
+      cssStart: cssStartBefore,
+      cssStop: cssStopBefore,
+      cssScale: cssScaleBefore,
+      width: widthBefore
+    });
+
+    // Setze CSS-Variablen für automatische Breitenberechnung
+    this.style.setProperty('--start', this.start);
+    this.style.setProperty('--stop', this.stop);
+    
+    // Debug: Werte nach dem Update
+    const computedStyleAfter = getComputedStyle(this);
+    const cssStartAfter = computedStyleAfter.getPropertyValue('--start');
+    const cssStopAfter = computedStyleAfter.getPropertyValue('--stop');
+    const cssScaleAfter = computedStyleAfter.getPropertyValue('--epg-scale');
+    const widthAfter = this.offsetWidth;
+    this._debug('EpgProgramItem: NACH CSS-Update', {
+      id: this.id,
+      start: this.start,
+      stop: this.stop,
+      type: this.type,
+      isGap: this.isGap,
+      cssStart: cssStartAfter,
+      cssStop: cssStopAfter,
+      cssScale: cssScaleAfter,
+      width: widthAfter,
+      cssCalc: `calc((${cssStopAfter} - ${cssStartAfter}) * ${cssScaleAfter} * 1px)`
+    });
+  }
+
   updated(changedProperties) {
     super.updated(changedProperties);
-    this._debug('EpgProgramItem: updated reqested', changedProperties);
+    this._debug('EpgProgramItem: updated requested', changedProperties);
 
-    // Setze die width über CSS auf das :host Element
+    // Setze nur die CSS-Variablen für die automatische Breitenberechnung
     if (
       changedProperties.has('start') ||
-      changedProperties.has('stop') ||
-      changedProperties.has('scale')
+      changedProperties.has('stop')
     ) {
-      const rawWidth = Math.max(0, (this.stop - this.start) * this.scale);
+      this.updateCSSVariables();
 
-      // Sicherheitsgrenze: Maximale Breite von 10000px verhindert zu große Werte
-      const maxWidth = 10000;
-      const width = Math.min(rawWidth, maxWidth);
-
-      this.style.width = `${width}px`;
-      this._debug('EpgProgramItem: updated', {
-        start: this.start,
-        stop: this.stop,
-        scale: this.scale,
-        rawWidth: rawWidth,
-        width: width,
-        maxWidth: maxWidth,
-        isLimited: rawWidth > maxWidth,
-        isGap: this.isGap,
-      });
-
-      // CSS-Klasse für Zero-Width
-      if (width <= 0) {
-        this.classList.add('zero-width');
-        // Entferne alle CSS-Formatierungen bei 0 Breite
-        this.style.margin = '0';
-        this.style.padding = '0';
-        this.style.border = 'none';
-        this.style.background = 'transparent';
-        this.style.cursor = 'default';
-      } else {
-        this.classList.remove('zero-width');
-        // Stelle Standard-Formatierungen wieder her
-        this.style.margin = '';
-        this.style.padding = '';
-        this.style.border = '';
-        this.style.background = '';
-        this.style.cursor = '';
-      }
-
-      // CSS-Klasse für Gap-Elemente
+      // CSS-Klassen für Gap-Elemente
       if (this.isGap) {
         this.classList.add('gap-element');
       } else {
         this.classList.remove('gap-element');
       }
-
-      // Warnung bei zu großen Breiten
-      if (rawWidth > maxWidth) {
-        this._debug('EpgProgramItem: WARNUNG - Breite wurde begrenzt', {
-          rawWidth,
-          maxWidth,
-          start: this.start,
-          stop: this.stop,
-          scale: this.scale,
-        });
-      }
     }
+
+          // Setze CSS-Klassen basierend auf dem type-Wert für querySelector
+      if (changedProperties.has('type')) {
+        // Entferne alle type-spezifischen Klassen
+        this.classList.remove('type-startgap', 'type-endgap', 'type-item', 'type-noprogram', 'type-title', 'type-fillergap', 'type-group');
+        
+        // Füge die entsprechende Klasse hinzu
+        if (this.type) {
+          this.classList.add(`type-${this.type}`);
+        }
+      }
   }
 
   render() {
@@ -113,6 +132,15 @@ export class EpgProgramItem extends EpgElementBase {
       return html`
         <div class="programSlot gap-slot">
           <!-- Leerer Bereich für Gap -->
+        </div>
+      `;
+    }
+
+    // Für Gruppen-Header: Zeige nur den Titel
+    if (this.isGroup) {
+      return html`
+        <div class="programSlot group-slot">
+          ${this.title ? html`<div class="groupTitle">${this.title}</div>` : ''}
         </div>
       `;
     }
@@ -220,6 +248,11 @@ export class EpgProgramItem extends EpgElementBase {
         height: 100%;
         display: flex;
         align-items: stretch;
+        /* Breite wird automatisch über CSS-Variable --epg-scale berechnet */
+        width: calc((var(--stop, 0) - var(--start, 0)) * var(--epg-scale, 1) * 1px);
+        min-width: 0;
+        /* Zero-width wird über CSS gehandhabt */
+        opacity: calc((var(--stop, 0) - var(--start, 0)) * var(--epg-scale, 1) > 0 ? 1 : 0);
       }
 
       .programSlot {
@@ -240,18 +273,6 @@ export class EpgProgramItem extends EpgElementBase {
           color 0.2s ease;
       }
 
-      :host(.zero-width) .programSlot {
-        padding: 0;
-        border: none;
-        margin: 0;
-        background: transparent;
-        cursor: default;
-        min-width: 0;
-        max-width: 0;
-        width: 0;
-        overflow: hidden;
-      }
-
       /* Gap-Elemente: Leere Bereiche zwischen Programmen */
       :host(.gap-element) .programSlot {
         padding: 0;
@@ -259,26 +280,36 @@ export class EpgProgramItem extends EpgElementBase {
         margin: 0;
         background: transparent;
         cursor: default;
-      }
-
-      /* Gap-Elemente mit 0 Breite: Komplett unsichtbar */
-      :host(.gap-element.zero-width) .programSlot {
-        padding: 0;
-        border: none;
-        margin: 0;
-        background: transparent;
-        cursor: default;
-        min-width: 0;
-        max-width: 0;
-        width: 0;
-        overflow: hidden;
-        display: none;
+        /* Breite wird über CSS-Variable berechnet */
       }
 
       .gap-slot {
         background: transparent !important;
         border: none !important;
         cursor: default !important;
+      }
+
+      /* Gruppen-Header: Spezielle Formatierung für Gruppen */
+      :host(.type-group) .programSlot {
+        background-color: var(--epg-group-bg, #e8f4fd);
+        border: 1px solid var(--epg-group-border, #b3d9ff);
+        color: var(--epg-group-text, #0066cc);
+        cursor: default;
+        font-weight: bold;
+      }
+
+      .group-slot {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.1em;
+        text-align: center;
+      }
+
+      .groupTitle {
+        font-weight: bold;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
       }
 
       .programTitle {
@@ -334,5 +365,5 @@ export class EpgProgramItem extends EpgElementBase {
 }
 
 if (!customElements.get('epg-program-item')) {
-  customElements.define('epg-program-item', EpgProgramItem);
+customElements.define('epg-program-item', EpgProgramItem);
 }

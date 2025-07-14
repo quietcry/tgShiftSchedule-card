@@ -321,6 +321,10 @@ export class EditorImpl extends EditorBase {
         return 'EPG Zukunft (Minuten)';
       case 'epgShowFutureTime':
         return 'EPG Anzeigebreite (Minuten)';
+      case 'epgShowPastTime':
+        return 'EPG Rückblick (Minuten)';
+      // case 'useDummyData':
+      //   return 'Dummy-Daten verwenden';
       case 'show_shorttext':
         return 'Kurztext anzeigen';
       default:
@@ -806,6 +810,11 @@ export class EditorImpl extends EditorBase {
           },
         },
       },
+      // useDummyData ist eine Build-Variable, keine Editor-Option
+      // {
+      //   name: 'useDummyData',
+      //   selector: { boolean: {} },
+      // },
       {
         name: 'channelWidth',
         selector: {

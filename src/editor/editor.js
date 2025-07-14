@@ -16,5 +16,5 @@ export class Editor extends EditorImpl {
 }
 
 if (!customElements.get(`${CardRegname}-editor`)) {
-  customElements.define(`${CardRegname}-editor`, Editor);
+customElements.define(`${CardRegname}-editor`, Editor);
 }

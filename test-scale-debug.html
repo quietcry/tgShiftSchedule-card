@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scale Debug Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f0f0f0;
+        }
+        
+        .test-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .debug-info {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+            margin: 10px 0;
+            white-space: pre-wrap;
+        }
+        
+        .test-button {
+            background: #007cba;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        
+        .test-button:hover {
+            background: #005a87;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>Scale Debug Test</h1>
+        
+        <div>
+            <button class="test-button" onclick="testScaleCalculation()">Test Scale Berechnung</button>
+            <button class="test-button" onclick="testCSSVariable()">Test CSS Variable</button>
+            <button class="test-button" onclick="clearDebug()">Clear Debug</button>
+        </div>
+        
+        <div class="debug-info" id="debug-output">
+            Debug-Ausgabe wird hier angezeigt...
+        </div>
+    </div>
+
+    <script>
+        function log(message, data = null) {
+            const debugOutput = document.getElementById('debug-output');
+            const timestamp = new Date().toLocaleTimeString();
+            let logMessage = `[${timestamp}] ${message}`;
+            
+            if (data) {
+                logMessage += '\n' + JSON.stringify(data, null, 2);
+            }
+            
+            debugOutput.textContent += '\n' + logMessage;
+            debugOutput.scrollTop = debugOutput.scrollHeight;
+        }
+        
+        function clearDebug() {
+            document.getElementById('debug-output').textContent = 'Debug-Ausgabe wird hier angezeigt...';
+        }
+        
+        function testScaleCalculation() {
+            log('=== Test Scale Berechnung ===');
+            
+            // Simuliere die Scale-Berechnung wie im ScaleManager
+            const containerWidth = 412; // Simulierte Container-Breite
+            const channelWidth = 180; // Kanal-Breite
+            const showWidth = 240; // Minuten sichtbar
+            
+            const availableWidth = containerWidth - channelWidth;
+            const scale = availableWidth / (showWidth * 60);
+            
+            log('Scale-Berechnung:', {
+                containerWidth,
+                channelWidth,
+                availableWidth,
+                showWidth,
+                scale
+            });
+            
+            // Teste CSS-Variable Setzen
+            const testElement = document.createElement('div');
+            testElement.style.setProperty('--epg-scale', scale);
+            
+            const computedScale = getComputedStyle(testElement).getPropertyValue('--epg-scale');
+            log('CSS-Variable Test:', {
+                setScale: scale,
+                computedScale,
+                isEqual: scale.toString() === computedScale
+            });
+        }
+        
+        function testCSSVariable() {
+            log('=== Test CSS Variable ===');
+            
+            // Erstelle ein Test-Element mit CSS-Variable
+            const testContainer = document.createElement('div');
+            testContainer.style.setProperty('--epg-scale', '0.02861111111111111');
+            
+            // Erstelle ein Kind-Element, das die Variable erbt
+            const childElement = document.createElement('div');
+            childElement.style.setProperty('--start', '0');
+            childElement.style.setProperty('--stop', '1800');
+            childElement.style.width = 'calc((var(--stop) - var(--start)) * var(--epg-scale, 1) * 1px)';
+            
+            testContainer.appendChild(childElement);
+            document.body.appendChild(testContainer);
+            
+            const computedStyle = getComputedStyle(childElement);
+            const inheritedScale = computedStyle.getPropertyValue('--epg-scale');
+            const calculatedWidth = computedStyle.width;
+            
+            log('CSS-Variable Vererbung:', {
+                parentScale: '0.02861111111111111',
+                inheritedScale,
+                start: '0',
+                stop: '1800',
+                calculatedWidth,
+                expectedWidth: (1800 * 0.02861111111111111) + 'px'
+            });
+            
+            // Cleanup
+            document.body.removeChild(testContainer);
+        }
+        
+        // Initialisierung
+        log('Scale Debug Test gestartet');
+    </script>
+</body>
+</html> 

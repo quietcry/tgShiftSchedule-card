@@ -1,9 +1,11 @@
-const Version = '2025.07-0005';
+const Version = '2025.07-0007';
 const CardRegname = 'tgepg-card';
 const CardName = 'TG EPG Card';
 const CardDescription = 'Eine Karte für die EPG-Anzeige';
 const CardFilename = 'tgepg-card.js';
-const DebugMode = 'true,EpgProgramItem'; // Aktiviere Debug für alle Komponenten
+const DebugMode = 'true'; // Aktiviere Debug für alle Komponenten
+const UseDummyData = 'true'; // Verwende Dummy-Daten statt echte EPG-Daten (Build-Variable)
+// Ändern Sie dies zu 'true' für Debug-Builds mit Dummy-Daten
 const showVersion = true;
 
 // EPG-Zeitkonfiguration
@@ -19,6 +21,7 @@ export {
   CardFilename,
   Version,
   DebugMode,
+  UseDummyData,
   showVersion,
   DefaultEpgPastTime,
   DefaultEpgFutureTime,
