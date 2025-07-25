@@ -24,7 +24,7 @@ export class EpgElementBase extends SuperBase {
       --epg-background: #fff;
       --epg-accent: #e8f0fe;
       --epg-text-color: #333;
-      --epg-time-color: #666;
+      --epg-time-color: black;
       --epg-description-color: #666;
       --epg-padding: 4px;
       --epg-radius: 6px;

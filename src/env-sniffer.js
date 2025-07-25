@@ -8,7 +8,7 @@ export class EnvSniffer extends TgCardHelper {
 
   constructor() {
     super();
-    
+
     // Umgebungsinformationen
     this.envSnifferIsDesktop = false;
     this.envSnifferIsMobile = false;
@@ -42,12 +42,10 @@ export class EnvSniffer extends TgCardHelper {
     this.setupResizeObserver();
     this.detectEnvironment();
 
-
     // Löse initiales Event aus, damit die Karte die Umgebung erkennt
     const initialState = this.getEnvironmentState();
     this._debug('EnvSniffer: Initialisiert', this.getEnvironmentState());
     this.dispatchEnvironmentChangeEvent(null, initialState);
-
   }
 
   /**
@@ -73,9 +71,9 @@ export class EnvSniffer extends TgCardHelper {
       this._debug('EnvSniffer: detectEnvironment bereits in Bearbeitung, überspringe');
       return;
     }
-    
+
     this._envSnifferDetectionInProgress = true;
-    
+
     const oldState = this.getEnvironmentState();
 
     // Bildschirm-Größe
@@ -102,7 +100,7 @@ export class EnvSniffer extends TgCardHelper {
     if (this.hasEnvironmentChanged(oldState, newState)) {
       this.dispatchEnvironmentChangeEvent(oldState, newState);
     }
-    
+
     this._envSnifferDetectionInProgress = false;
   }
 
@@ -192,7 +190,7 @@ export class EnvSniffer extends TgCardHelper {
    */
   _updateCardDimensionsWithRetry(retryCount = 0) {
     const maxRetries = 50; // 5 Sekunden (50 * 100ms)
-    
+
     if (!this.envSnifferCardElement) {
       this._debug('EnvSniffer: cardElement nicht verfügbar, warte...', { retryCount });
       if (retryCount < maxRetries) {
@@ -202,15 +200,15 @@ export class EnvSniffer extends TgCardHelper {
     }
 
     const rect = this.envSnifferCardElement.getBoundingClientRect();
-    
+
     // Prüfe ob gültige Dimensionen vorhanden sind
     if (rect.width <= 0 || rect.height <= 0) {
       this._debug('EnvSniffer: Karten-Dimensionen noch 0, warte...', {
         width: rect.width,
         height: rect.height,
-        retryCount
+        retryCount,
       });
-      
+
       if (retryCount < maxRetries) {
         setTimeout(() => this._updateCardDimensionsWithRetry(retryCount + 1), 100);
       } else {
@@ -227,12 +225,12 @@ export class EnvSniffer extends TgCardHelper {
     // Gültige Dimensionen gefunden
     this.envSnifferCardWidth = rect.width;
     this.envSnifferCardHeight = rect.height;
-    
+
     if (retryCount > 0) {
       this._debug('EnvSniffer: Karten-Dimensionen erfolgreich aktualisiert', {
         width: this.envSnifferCardWidth,
         height: this.envSnifferCardHeight,
-        retryCount
+        retryCount,
       });
       // Löse Event aus mit neuen Werten
       this._triggerEnvironmentUpdate();
@@ -245,7 +243,7 @@ export class EnvSniffer extends TgCardHelper {
   _triggerEnvironmentUpdate() {
     const oldState = this.env;
     const newState = this.getEnvironmentState();
-    
+
     if (this.hasEnvironmentChanged(oldState, newState)) {
       this.dispatchEnvironmentChangeEvent(oldState, newState);
     }
@@ -334,7 +332,11 @@ export class EnvSniffer extends TgCardHelper {
       this.envSnifferResizeObserver = new ResizeObserver(this.handleCardResize.bind(this));
       this.envSnifferResizeObserver.observe(this.envSnifferCardElement);
     } else {
-      this._debug('env sniffer ResizeObserver nicht verfügbar', { cardElement: this.envSnifferCardElement, window: window, ResizeObserver: window.ResizeObserver });
+      this._debug('env sniffer ResizeObserver nicht verfügbar', {
+        cardElement: this.envSnifferCardElement,
+        window: window,
+        ResizeObserver: window.ResizeObserver,
+      });
     }
   }
 

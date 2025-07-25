@@ -7,9 +7,9 @@ export class EpgTimeMarker extends EpgElementBase {
   static properties = {
     ...super.properties,
     currentTime: { type: Number },
-    scale: { type: Number },
     minTime: { type: Number },
     earliestProgramStart: { type: Number },
+    latestProgramStop: { type: Number },
     showWidth: { type: Number },
     position: { type: Number },
     showTooltip: { type: Boolean },
@@ -18,14 +18,13 @@ export class EpgTimeMarker extends EpgElementBase {
   constructor() {
     super();
     this.currentTime = Date.now() / 1000;
-    this.scale = 1;
     this.minTime = 0;
     this.earliestProgramStart = 0;
+    this.latestProgramStop = 0;
     this.showWidth = 180;
     this.position = 0;
     this.showTooltip = false;
     this.updateInterval = null;
-    this._scrollHandler = null; // Speichere Referenz auf Scroll-Handler
     this.startTimeUpdate();
   }
 
@@ -40,7 +39,7 @@ export class EpgTimeMarker extends EpgElementBase {
     // Update alle 30 Sekunden
     this.updateInterval = setInterval(() => {
       this.updateCurrentTime();
-    }, 30000);
+    }, 1000);
   }
 
   /**
@@ -80,199 +79,56 @@ export class EpgTimeMarker extends EpgElementBase {
   }
 
   /**
-   * Fügt einen Scroll-Event-Listener zur programBox hinzu
-   */
-  addScrollListener() {
-    const programBox = this.shadowRoot?.host?.parentElement?.querySelector('.programBox');
-    if (programBox) {
-      this._debug('EpgTimeMarker: Füge Scroll-Listener hinzu');
-      this._scrollHandler = () => {
-        this.calculateAndSetPosition();
-      };
-      programBox.addEventListener('scroll', this._scrollHandler);
-    } else {
-      this._debug('EpgTimeMarker: ProgramBox nicht gefunden für Scroll-Listener');
-    }
-  }
-
-  /**
    * Berechnet die Position basierend auf der aktuellen Zeit und den eigenen Properties
    */
   calculatePosition() {
     const now = Date.now() / 1000; // Aktuelle Zeit in Sekunden
-    const positionPixels = (now - this.earliestProgramStart) * this.scale;
 
-    // Berücksichtige die Scroll-Position der programBox
-    const programBox = this.shadowRoot?.host?.parentElement?.querySelector('.programBox');
-    const scrollOffset = programBox ? programBox.scrollLeft : 0;
+    // Hole den aktuellen Scale von der programBox
+    const programBox = this.closest('.programBox');
+    const scale = programBox
+      ? parseFloat(getComputedStyle(programBox).getPropertyValue('--epg-scale')) || 1
+      : 1;
 
-    // Die finale Position ist die berechnete Position minus der Scroll-Position
-    const finalPosition = positionPixels - scrollOffset;
+    // Berechne Position direkt
+    const positionPixels = Math.max(0, (now - this.earliestProgramStart) * scale);
 
-    this._debug('EpgTimeMarker: Position berechnet', {
-      currentTime: new Date(now * 1000).toISOString(),
-      now,
-      earliestProgramStart: this.earliestProgramStart,
-      scale: this.scale,
-      positionPixels,
-      scrollOffset,
-      finalPosition,
-      earliestProgramStartDate: new Date(this.earliestProgramStart * 1000).toISOString(),
-      timeDiff: now - this.earliestProgramStart,
-      timeDiffMinutes: Math.round((now - this.earliestProgramStart) / 60)
-    });
+    // this._debug('EpgTimeMarker: Position berechnet', {
+    //   currentTime: new Date(now * 1000).toISOString(),
+    //   now,
+    //   earliestProgramStart: this.earliestProgramStart,
+    //   scale,
+    //   positionPixels,
+    //   earliestProgramStartDate: new Date(this.earliestProgramStart * 1000).toISOString(),
+    //   timeDiff: now - this.earliestProgramStart,
+    //   timeDiffMinutes: Math.round((now - this.earliestProgramStart) / 60),
+    // });
 
-    return Math.max(0, finalPosition); // Position darf nicht negativ sein
-  }
-
-  /**
-   * Scrollt zur Backview-Position
-   */
-  scrollToBackviewPosition(epgBox) {
-    const programBox = epgBox.shadowRoot?.querySelector('.programBox');
-    if (!programBox) {
-      this._debug('EpgTimeMarker: ProgramBox nicht gefunden für Scroll');
-      return;
-    }
-
-    const now = new Date();
-    const backviewMinutes = epgBox.epgShowPastTime > 0 ? epgBox.epgShowPastTime : 60;
-    const targetTime = new Date(now.getTime() - backviewMinutes * 60 * 1000);
-
-    this._debug('EpgTimeMarker: Scroll zu Backview-Position', {
-      jetzt: now.toISOString(),
-      backviewMinutes,
-      targetTime: targetTime.toISOString(),
-      isFirstLoad: epgBox.isFirstLoad,
-    });
-
-    // Berechne Scroll-Position basierend auf der Zeit
-    const scrollPosition = this.calculateScrollPositionForTime(targetTime, epgBox);
-
-    if (scrollPosition !== null) {
-      programBox.scrollLeft = scrollPosition;
-      this._debug('EpgTimeMarker: ProgramBox gescrollt', {
-        scrollPosition,
-        targetTime: targetTime.toISOString(),
-      });
-    }
-  }
-
-  /**
-   * Berechnet die Scroll-Position basierend auf der Ziel-Zeit
-   */
-  calculateScrollPositionForTime(targetTime, epgBox) {
-    const now = new Date();
-    const pastTime = epgBox.epgPastTime || 30;
-    const showWidth = epgBox.epgShowFutureTime || 180;
-
-    // Berechne die tatsächliche Gesamtbreite basierend auf der Zeit
-    const totalTimeMinutes = pastTime + showWidth;
-    const timeDiffMinutes = (now.getTime() - targetTime.getTime()) / (1000 * 60);
-
-    // Berechne die Position als Prozentsatz der Gesamtzeit
-    const positionPercent = Math.max(0, Math.min(1, timeDiffMinutes / totalTimeMinutes));
-
-    // Berechne die tatsächliche Breite der Program-Items
-    const actualWidth = this.calculateActualProgramWidth(epgBox);
-
-    // Berechne die Scroll-Position basierend auf der tatsächlichen Breite
-    const scrollPosition = positionPercent * actualWidth;
-
-    this._debug('EpgTimeMarker: Scroll-Position berechnet', {
-      targetTime: targetTime.toISOString(),
-      timeDiffMinutes,
-      totalTimeMinutes,
-      positionPercent,
-      scrollPosition,
-      actualWidth,
-      containerWidth: epgBox.containerWidth,
-    });
-
-    return scrollPosition;
-  }
-
-  /**
-   * Prüft und validiert die epgBackview Einstellungen
-   */
-  validateEpgBackview(epgBox) {
-    const backview = epgBox.epgShowPastTime || 0;
-    const pastTime = epgBox.epgPastTime || 30;
-    const showWidth = epgBox.epgShowFutureTime || 180;
-
-    if (backview > pastTime) {
-      this._debug('EpgTimeMarker: Backview-Warnung', {
-        backview,
-        pastTime,
-        showWidth,
-        message: 'Backview ist größer als PastTime - könnte zu Problemen führen',
-      });
-    }
-
-    return {
-      isValid: backview <= pastTime,
-      backview,
-      pastTime,
-      showWidth,
-    };
-  }
-
-  /**
-   * Testet ob der erste Load abgeschlossen ist und führt Time Marker Aktionen durch
-   */
-  testIsFirstLoadCompleteUpdated(epgBox) {
-    this._debug('EpgTimeMarker: testIsFirstLoadCompleteUpdated aufgerufen', {
-      isFirstLoad: epgBox.isFirstLoad,
-      isChannelUpdate: epgBox.isChannelUpdate,
-    });
-
-    // Nur ausführen wenn der erste Load abgeschlossen ist und keine Kanal-Updates mehr laufen
-    if (epgBox.isFirstLoad === 2 && epgBox.isChannelUpdate === 0) {
-      this._debug('EpgTimeMarker: Erster Load abgeschlossen, führe Time Marker Aktionen aus');
-
-      // Validiere Backview-Einstellungen
-      const validation = this.validateEpgBackview(epgBox);
-      if (!validation.isValid) {
-        this._debug('EpgTimeMarker: Backview-Validierung fehlgeschlagen', validation);
-      }
-
-      // Scroll zur Backview-Position
-      this.scrollToBackviewPosition(epgBox);
-
-      // Aktualisiere die Position
-      this.calculateAndSetPosition();
-    }
+    return positionPixels;
   }
 
   disconnectedCallback() {
     super.disconnectedCallback();
     this.stopTimeUpdate();
-
-    // Entferne Scroll-Event-Listener
-    const programBox = this.shadowRoot?.host?.parentElement?.querySelector('.programBox');
-    if (programBox && this._scrollHandler) {
-      programBox.removeEventListener('scroll', this._scrollHandler);
-      this._scrollHandler = null;
-    }
   }
 
   firstUpdated() {
     super.firstUpdated();
     // Initialisiere die Position
     this.calculateAndSetPosition();
-
-    // Füge Scroll-Event-Listener hinzu
-    this.addScrollListener();
   }
 
   updated(changedProperties) {
     super.updated(changedProperties);
 
-    // Wenn sich scale oder earliestProgramStart ändern, berechne die Position neu
-    if (changedProperties.has('scale') || changedProperties.has('earliestProgramStart')) {
+    // Wenn sich earliestProgramStart oder latestProgramStop ändern, berechne die Position neu
+    if (
+      changedProperties.has('earliestProgramStart') ||
+      changedProperties.has('latestProgramStop')
+    ) {
       this._debug('EpgTimeMarker: Properties geändert, berechne Position neu', {
-        scale: this.scale,
         earliestProgramStart: this.earliestProgramStart,
+        latestProgramStop: this.latestProgramStop,
       });
       this.calculateAndSetPosition();
     }

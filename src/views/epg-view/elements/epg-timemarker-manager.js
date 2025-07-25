@@ -20,10 +20,10 @@ export class EpgTimeMarkerManager {
       clearInterval(this.updateInterval);
     }
 
-    // Update alle 30 Sekunden
+    // Update alle 5 Sekunden
     this.updateInterval = setInterval(() => {
       this.updateCurrentTime();
-    }, 30000);
+    }, 5000);
   }
 
   /**

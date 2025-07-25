@@ -1,7 +1,7 @@
 export class TgCardHelper {
   constructor(cardName, debugMode, className) {
-    this.cardName = cardName || this.constructor.cardName || "unknownCard";
-    this.debugMode = debugMode || this.constructor.debugMode || "true";
+    this.cardName = cardName || this.constructor.cardName || 'unknownCard';
+    this.debugMode = debugMode || this.constructor.debugMode || 'true';
     this.className = className || this.constructor.className || null;
 
     // if (this.debugMode) console.debug(`[${this.cardName}] tgCardHelper-Modul wird geladen`);

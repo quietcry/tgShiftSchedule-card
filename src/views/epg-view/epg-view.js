@@ -11,18 +11,14 @@ export class EPGView extends ViewBase {
   static className = 'EPGView';
 
   static properties = {
-    ...ViewBase.properties,
-    _currentTime: { type: Number },
-    _timeWindow: { type: String },
-    _selectedChannel: { type: String },
-    _isDataReady: { type: Boolean },
-    _processedChannels: { type: Array },
-    _lastUpdate: { type: String },
-    _epgData: { type: Object },
+    ...super.properties,
     _dataProvider: { type: Object },
-    _dataLoaded: { type: Boolean },
     _dataFetchStarted: { type: Boolean },
     env: { type: Object },
+    // Timebar-Werte von der epg-box
+    _timeBarEarliestProgramStart: { type: Number },
+    _timeBarLatestProgramStop: { type: Number },
+    _timeBarScale: { type: Number },
   };
 
   static get styles() {
@@ -35,14 +31,24 @@ export class EPGView extends ViewBase {
 
       .gridcontainer {
         display: grid;
-        grid-template-columns: auto 1fr;
+        grid-template-columns: 1fr;
         grid-template-rows: auto 1fr;
         grid-template-areas:
-          'superbutton timeBar'
-          'scrollBox scrollBox';
+          'headline'
+          'scrollBox';
         width: 100%;
         height: 100%;
         overflow: hidden;
+      }
+
+      .headline {
+        grid-area: headline;
+        display: grid;
+        grid-template-columns: auto 1fr;
+        grid-template-rows: auto;
+        grid-template-areas: 'superbutton timeBar';
+        width: 100%;
+        height: auto;
       }
 
       .superbutton {
@@ -51,24 +57,118 @@ export class EPGView extends ViewBase {
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        padding: 8px;
+        padding: 0px;
+        margin: 0px;
         background-color: var(--primary-background-color);
         border-right: 1px solid var(--divider-color);
+        width: var(--epg-channel-width, 180px);
+        min-width: var(--epg-channel-width, 180px);
+        max-width: var(--epg-channel-width, 180px);
       }
 
       .timeBar {
         grid-area: timeBar;
         display: flex;
-        align-items: center;
-        padding: 8px;
+        flex-direction: column;
         background-color: var(--primary-background-color);
         border-bottom: 1px solid var(--divider-color);
         overflow-x: auto;
+        height: 60px;
+        padding: 0px;
+        margin: 0px;
       }
 
       .timeBarContainer {
         display: flex;
+        flex-direction: column;
         min-width: max-content;
+        height: 100%;
+      }
+
+      .timeBarTop {
+        height: 8px;
+        background-color: #34495e;
+        position: relative;
+        border-bottom: 1px solid #2c3e50;
+      }
+
+      .timeBarMiddle {
+        height: 32px;
+        background-color: #ecf0f1;
+        position: relative;
+        display: flex;
+        align-items: center;
+        border-bottom: 1px solid #bdc3c7;
+      }
+
+      .timeBarBottom {
+        height: 20px;
+        background-color: #3498db;
+        position: relative;
+      }
+
+      .timeMarker {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 1px;
+        background-color: #95a5a6;
+        z-index: 1;
+      }
+
+      .timeMarker.hour {
+        width: 2px;
+        background-color: #2c3e50;
+      }
+
+      .timeMarker.quarter {
+        width: 1px;
+        background-color: #7f8c8d;
+      }
+
+      .timeLabel {
+        position: absolute;
+        top: 4px;
+        transform: translateX(-50%);
+        font-size: 11px;
+        color: #2c3e50;
+        font-weight: bold;
+        white-space: nowrap;
+        z-index: 2;
+        background-color: rgba(236, 240, 241, 0.9);
+        padding: 1px 3px;
+        border-radius: 2px;
+      }
+
+      .currentTimeMarker {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background-color: #e74c3c;
+        z-index: 3;
+        box-shadow: 0 0 4px rgba(231, 76, 60, 0.6);
+      }
+
+      .progressSegment {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        background-color: #2980b9;
+        z-index: 1;
+        border-radius: 0 2px 2px 0;
+      }
+
+      .timeBarTop .currentTimeIndicator {
+        position: absolute;
+        top: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 4px;
+        height: 8px;
+        background-color: #ffffff;
+        z-index: 2;
+        border-radius: 0 0 2px 2px;
       }
 
       epg-box {
@@ -131,18 +231,8 @@ export class EPGView extends ViewBase {
     this._debug('EPG-View: Constructor aufgerufen');
     this._dataProvider = new DataProvider();
     this._debug('EPGView-Konstruktor: DataProvider initialisiert');
-    this._epgData = { channels: [] };
     this._debug('EPGView-Konstruktor: Initialisierung abgeschlossen');
-    this._currentTime = Date.now() / 1000;
-    this._timeWindow = 'C';
-    this._selectedChannel = null;
-    this._isDataReady = false;
-    this._processedChannels = [];
-    this._lastUpdate = null;
     this._dataFetchStarted = false;
-    this._channels = [];
-    this._loading = false;
-    this._error = null;
     this._config = null;
   }
 
@@ -180,7 +270,6 @@ export class EPGView extends ViewBase {
               old: this._lastUpdate,
               new: newLastUpdate,
             });
-            this._lastUpdate = newLastUpdate;
             this._dataFetchStarted = false; // Reset flag für neuen Datenabruf
             this._loadData();
           }
@@ -204,6 +293,11 @@ export class EPGView extends ViewBase {
       configKeys: value ? Object.keys(value) : [],
     });
     this._config = value;
+
+    // Aktualisiere CSS-Variable für Channel-Breite
+    if (value?.channelWidth) {
+      this.style.setProperty('--epg-channel-width', `${value.channelWidth}px`);
+    }
   }
 
   get config() {
@@ -236,7 +330,7 @@ export class EPGView extends ViewBase {
 
   async _loadData() {
     this._debug('EPG-View: _loadData wird aufgerufen');
-    
+
     // Hole die EPG-Box
     const epgBox = this.shadowRoot?.querySelector('epg-box');
     if (!epgBox) {
@@ -249,28 +343,28 @@ export class EPGView extends ViewBase {
       this._debug('EPG-View: _loadData: Verwende Dummy-Daten (Build-Variable)', {
         useDummyData: this.useDummyData,
       });
-      
+
       try {
         // Rufe die Dummy-Daten-Generierung im DataManager auf
         const dummyData = epgBox.dataManager.generateDummyData();
-        
+
         if (dummyData && dummyData.length > 0) {
           this._debug('EPG-View: Dummy-Daten erfolgreich generiert', {
             anzahlKanäle: dummyData.length,
             kanäle: dummyData.map(channel => ({
               id: channel.id,
               name: channel.name,
-              anzahlProgramme: channel.programs?.length || 0
-            }))
+              anzahlProgramme: channel.programs?.length || 0,
+            })),
           });
-          
+
           // Füge jeden Kanal als Teil-EPG hinzu
           dummyData.forEach(channelData => {
             epgBox.addTeilEpg(channelData);
           });
-          
+
           this._debug('EPG-View: Dummy-Daten erfolgreich geladen', {
-            anzahlKanäle: dummyData.length
+            anzahlKanäle: dummyData.length,
           });
         } else {
           this._debug('EPG-View: Keine Dummy-Daten generiert');
@@ -388,97 +482,19 @@ export class EPGView extends ViewBase {
 
   firstUpdated() {
     super.firstUpdated();
-    this._debug('EPG-View: firstUpdated - Prüfe auf ausstehende Konfiguration');
+    this._debug('EPG-View: firstUpdated aufgerufen');
 
-    // Prüfe, ob die EPG-Box bereits verfügbar ist
+    // Registriere timebar sofort, ohne setTimeout
     const epgBox = this.shadowRoot?.querySelector('epg-box');
-    this._debug('EPG-View: firstUpdated - EPG-Box Status', {
-      hasShadowRoot: !!this.shadowRoot,
-      hasEpgBox: !!epgBox,
-    });
+    const timeBar = this.shadowRoot?.querySelector('epg-timebar');
 
-    // Wenn die EPG-Box bereits verfügbar ist, starte Datenabruf nur wenn noch nicht gestartet
-    if (epgBox && !this._dataFetchStarted) {
-      this._debug('EPG-View: EPG-Box bereits verfügbar, starte Datenabruf');
-      this._dataFetchStarted = true;
-      this._loadData(); // Verwende _loadData statt _fetchViewData für Entscheidung Dummy/echte Daten
-    }
-  }
-
-  _processChannelData(channel, epgData) {
-    this._debug('Verarbeite Kanal-Daten:', {
-      channel,
-      epgData,
-      response: epgData?.response,
-      epg_data: epgData?.response?.epg_data,
-    });
-
-    // Extrahiere die EPG-Daten aus der Service-Antwort
-    const epgResponse = epgData?.response || [];
-
-    if (!Array.isArray(epgResponse) || epgResponse.length === 0) {
-      this._debug('Keine EPG-Daten für Kanal:', channel.channeldata?.name || channel.name, {
-        kanalId: channel.id,
-        kanalName: channel.channeldata?.name || channel.name,
-        anzahlProgramme: channel.programs ? channel.programs.length : 0,
-      });
-      return {
-        ...channel,
-        programs: [],
-      };
+    if (epgBox && timeBar) {
+      this._debug('EPG-View: timebar wird registriert');
+      epgBox.registerInformMeAtViewChanges(timeBar, timeBar.onTimeBarValuesChanged.bind(timeBar));
     }
 
-    // Verarbeite die EPG-Daten
-    const programs = epgResponse.map(program => ({
-      title: program.title || '',
-      description: program.description || '',
-      start: program.start || '',
-      end: program.end || '',
-      duration: program.duration || 0,
-    }));
-
-    this._debug('Verarbeitete Programme für Kanal:', channel.channeldata?.name || channel.name, {
-      programs,
-      epgResponse,
-    });
-
-    return {
-      ...channel,
-      programs,
-    };
-  }
-
-  _getPrioritizedChannels(channels) {
-    if (!this.config.group_order?.length) return channels;
-
-    const prioritizedChannels = [];
-    const remainingChannels = new Set(channels.map(c => c.id));
-
-    // Extrahiere Kanäle aus group_order in der angegebenen Reihenfolge
-    this.config.group_order.forEach(group => {
-      if (group.channels) {
-        group.channels.forEach(channelConfig => {
-          const regex = new RegExp(channelConfig.name);
-          const matchingChannels = channels.filter(
-            c => regex.test(c.name) && remainingChannels.has(c.id)
-          );
-
-          matchingChannels.forEach(channel => {
-            prioritizedChannels.push(channel);
-            remainingChannels.delete(channel.id);
-          });
-        });
-      }
-    });
-
-    // Füge die übrigen Kanäle hinzu
-    channels.forEach(channel => {
-      if (remainingChannels.has(channel.id)) {
-        prioritizedChannels.push(channel);
-      }
-    });
-
-    return prioritizedChannels;
+    // Lade Daten beim ersten Update
+    this._loadData();
   }
 
   render() {
@@ -488,17 +504,15 @@ export class EPGView extends ViewBase {
       epgShowFutureTime: this.config.epgShowFutureTime,
       configKeys: Object.keys(this.config),
     });
-    // Debug: Überprüfe die Konfigurationswerte
-    this._debug('EPG-View render: Konfigurationswerte', {
-      epgShowPastTime: this.config.epgShowPastTime,
-      epgShowFutureTime: this.config.epgShowFutureTime,
-      configKeys: Object.keys(this.config),
-    });
 
     return html`
       <div class="gridcontainer">
-        <div class="superbutton">${this._renderSuperButton()}</div>
-        <div class="timeBar">${this._renderTimeBar()}</div>
+        <div class="headline">
+          <div class="superbutton">${this._renderSuperButton()}</div>
+          <div class="timeBar">
+            <epg-timebar .scale=${this._timeBarScale}></epg-timebar>
+          </div>
+        </div>
         <epg-box
           .epgPastTime=${this.config.epgPastTime}
           .epgFutureTime=${this.config.epgFutureTime}
@@ -524,89 +538,6 @@ export class EPGView extends ViewBase {
         <ha-icon icon="mdi:refresh"></ha-icon>
       </button>
     `;
-  }
-
-  _renderTimeBar() {
-    const timeSlots = this._generateTimeSlots();
-    return html`
-      <div class="timeBarContainer">
-        ${timeSlots.map(
-          slot => html`
-            <div
-              class="timeSlot ${this._isCurrentTimeSlot(slot, this._currentTime) ? 'current' : ''}"
-              style="width: 120px; min-width: 120px;"
-            >
-              ${this._formatTime(slot)}
-            </div>
-          `
-        )}
-      </div>
-    `;
-  }
-
-  _generateTimeSlots() {
-    const slots = [];
-    const now = new Date();
-
-    // Verwende die konfigurierten Zeitparameter oder Standardwerte
-    const pastTime = this.config.epgPastTime || 30; // Minuten in die Vergangenheit
-    const futureTime = this.config.epgFutureTime || 120; // Minuten in die Zukunft
-
-    // Berechne Start- und Endzeit basierend auf den Parametern
-    const startTime = new Date(now.getTime() - pastTime * 60 * 1000);
-    const endTime = new Date(now.getTime() + futureTime * 60 * 1000);
-
-    // Runde auf volle Stunden für bessere Darstellung
-    startTime.setMinutes(0, 0, 0);
-    endTime.setMinutes(0, 0, 0);
-
-    this._debug('_generateTimeSlots: Zeitparameter', {
-      pastTime,
-      futureTime,
-      startTime: startTime.toISOString(),
-      endTime: endTime.toISOString(),
-      now: now.toISOString(),
-    });
-
-    // Generiere Zeitslots in 30-Minuten-Intervallen
-    const currentSlot = new Date(startTime);
-    while (currentSlot <= endTime) {
-      slots.push(new Date(currentSlot));
-      currentSlot.setMinutes(currentSlot.getMinutes() + 30);
-    }
-
-    this._debug('_generateTimeSlots: Generierte Slots', {
-      anzahlSlots: slots.length,
-      ersteSlot: slots[0]?.toISOString(),
-      letzteSlot: slots[slots.length - 1]?.toISOString(),
-    });
-
-    return slots;
-  }
-
-  _formatTime(date) {
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  }
-
-  _isCurrentTimeSlot(slot, currentTime) {
-    const slotTime = slot.getTime() / 1000;
-    return Math.abs(slotTime - currentTime) < 1800; // 30 Minuten
-  }
-
-  _onChannelSelected(e) {
-    this._selectedChannel = e.detail.channel;
-    this.requestUpdate();
-  }
-
-  _onProgramSelected(e) {
-    // Hier können Sie die Logik für die Programmauswahl implementieren
-  }
-
-  _onProgramBoxScroll(e) {
-    const timeBar = this.shadowRoot?.querySelector('.timeBar');
-    if (timeBar) {
-      timeBar.scrollLeft = e.detail.scrollLeft;
-    }
   }
 
   _handleRefresh() {

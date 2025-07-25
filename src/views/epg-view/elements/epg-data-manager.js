@@ -52,58 +52,58 @@ export class EpgDataManager extends TgCardHelper {
       epgPastTime,
       epgFutureTime,
       epgPastTimeMinutes: this.epgBox.epgPastTime || 30,
-      epgFutureTimeMinutes: this.epgBox.epgFutureTime || 120
+      epgFutureTimeMinutes: this.epgBox.epgFutureTime || 120,
     });
 
-    let programs = Object.values(teilEpg.epg)
+    let programs = Object.values(teilEpg.epg);
     // Sortiere Programme nach Startzeit
     programs.sort((a, b) => a.start - b.start);
-    
+
     this._debug('addTeilEpg() - Programme vor Filterung', {
       anzahlProgramme: programs.length,
-      programme: programs.map(p => ({ title: p.title, start: p.start, stop: p.stop }))
+      programme: programs.map(p => ({ title: p.title, start: p.start, stop: p.stop })),
     });
 
     let bis = 0;
     let von = 0;
     programs.forEach((program, index) => {
-    if (program.stop < epgPastTime ) {
+      if (program.stop < epgPastTime) {
         bis++;
         this._debug('addTeilEpg() - Programm entfernt (zu früh)', {
           title: program.title,
           start: program.start,
           stop: program.stop,
-          epgPastTime
-        });
-      } else {
-        return; // Beende Schleife, da Array sortiert ist
-    }
-    });
-
-    programs.splice(von, bis);
-
-    // Entferne Programme, die komplett außerhalb des sichtbaren Zeitfensters liegen
-    bis = 0;
-    von = programs.length ;
-    [...programs].reverse().forEach((program, index) => {
-        if (program.start > epgFutureTime ) {
-        bis++;
-        this._debug('addTeilEpg() - Programm entfernt (zu spät)', {
-          title: program.title,
-          start: program.start,
-          stop: program.stop,
-          epgFutureTime
+          epgPastTime,
         });
       } else {
         return; // Beende Schleife, da Array sortiert ist
       }
     });
 
-    programs.splice(von-bis, bis);
+    programs.splice(von, bis);
+
+    // Entferne Programme, die komplett außerhalb des sichtbaren Zeitfensters liegen
+    bis = 0;
+    von = programs.length;
+    [...programs].reverse().forEach((program, index) => {
+      if (program.start > epgFutureTime) {
+        bis++;
+        this._debug('addTeilEpg() - Programm entfernt (zu spät)', {
+          title: program.title,
+          start: program.start,
+          stop: program.stop,
+          epgFutureTime,
+        });
+      } else {
+        return; // Beende Schleife, da Array sortiert ist
+      }
+    });
+
+    programs.splice(von - bis, bis);
 
     this._debug('addTeilEpg() - Programme nach Filterung', {
       anzahlProgramme: programs.length,
-      programme: programs.map(p => ({ title: p.title, start: p.start, stop: p.stop }))
+      programme: programs.map(p => ({ title: p.title, start: p.start, stop: p.stop })),
     });
 
     // Füge Gap-Elemente zwischen Programmen ein (für Lücken und Überschneidungen)
@@ -111,18 +111,18 @@ export class EpgDataManager extends TgCardHelper {
 
     this._debug('addTeilEpg() - Programme nach Gap-Einfügung', {
       anzahlProgramme: programs.length,
-      programme: programs.map(p => ({ 
-        title: p.title || p.type, 
-        start: p.start, 
+      programme: programs.map(p => ({
+        title: p.title || p.type,
+        start: p.start,
         stop: p.stop,
-        type: p.type 
-      }))
+        type: p.type,
+      })),
     });
 
     // Entfernt: updateEarliestProgramStart und updateLatestProgramStop werden jetzt vom RenderManager verwaltet
     // if (programs.length > 0) {
     //     this.updateEarliestProgramStart(programs[0].start);
-    //     
+    //
     //     // Aktualisiere auch latestProgramStop
     //     const lastProgram = programs[programs.length - 1];
     //     const lastProgramStop = lastProgram.stop || lastProgram.end;
@@ -131,17 +131,14 @@ export class EpgDataManager extends TgCardHelper {
 
     this._debug('addTeilEpg()', 'Earliest Start und Latest Stop', {
       earliest: this.epgBox.earliestProgramStart,
-      latest: this.epgBox.latestProgramStop
+      latest: this.epgBox.latestProgramStop,
     });
 
-      const channelWithPrograms = {
-        ...teilEpg, // Behalte die komplette ursprüngliche Struktur (channeldata + epg)
-        id: channel.id || channel.channelid || channel.name, // Stelle sicher, dass eine ID vorhanden ist
-        programs: programs, // Füge Programm-Array hinzu
-      };
-
-
-
+    const channelWithPrograms = {
+      ...teilEpg, // Behalte die komplette ursprüngliche Struktur (channeldata + epg)
+      id: channel.id || channel.channelid || channel.name, // Stelle sicher, dass eine ID vorhanden ist
+      programs: programs, // Füge Programm-Array hinzu
+    };
 
     // Erstelle Kanal-Objekt - behalte die komplette ursprüngliche Struktur
     // const channelWithPrograms = {
@@ -194,7 +191,6 @@ export class EpgDataManager extends TgCardHelper {
     // Erhöhe den Update-Counter
     this.epgBox.isChannelUpdate++;
 
-
     // Aktualisiere die Sortierungsstruktur
     if (!this.epgBox._channelOrderInitialized) {
       this.epgBox.channelManager.initializeChannelOrder();
@@ -227,13 +223,7 @@ export class EpgDataManager extends TgCardHelper {
       this.epgBox.channelManager.sortChannelIntoStructure(channelWithPrograms);
     }
 
-    // Aktualisiere den frühesten Programmstart nach dem Hinzufügen neuer Programme
-    // if (channelWithPrograms.programs.length > 0) {
-    //   this.updateEarliestProgramStart(channelWithPrograms.programs[0].start);
-    // }
-
     // Mit repeat-Direktive ist requestUpdate() nicht mehr nötig - Lit macht es automatisch
-    // this.epgBox.requestUpdate();
   }
 
   /**
@@ -338,12 +328,10 @@ export class EpgDataManager extends TgCardHelper {
    * Berechnet den frühesten Programmstart aller Kanäle und aktualisiert earliestProgramStart
    */
   updateEarliestProgramStart(newEarliestStart) {
-    this._debug('updateEarliestProgramStart()', 'Aktualisiere frühesten Programmstart',
-      {
-        newEarliestStart,
-        currentEarliest: this.epgBox.earliestProgramStart
-      }
-    );
+    this._debug('updateEarliestProgramStart()', 'Aktualisiere frühesten Programmstart', {
+      newEarliestStart,
+      currentEarliest: this.epgBox.earliestProgramStart,
+    });
 
     if (newEarliestStart < this.epgBox.earliestProgramStart) {
       this.epgBox.earliestProgramStart = newEarliestStart;
@@ -355,12 +343,10 @@ export class EpgDataManager extends TgCardHelper {
    * Berechnet den spätesten Programmstop aller Kanäle und aktualisiert latestProgramStop
    */
   updateLatestProgramStop(newLatestStop) {
-    this._debug('updateLatestProgramStop()', 'Aktualisiere spätesten Programmstop',
-      {
-        newLatestStop,
-        currentLatest: this.epgBox.latestProgramStop
-      }
-    );
+    this._debug('updateLatestProgramStop()', 'Aktualisiere spätesten Programmstop', {
+      newLatestStop,
+      currentLatest: this.epgBox.latestProgramStop,
+    });
 
     if (newLatestStop > this.epgBox.latestProgramStop) {
       this.epgBox.latestProgramStop = newLatestStop;
@@ -404,7 +390,7 @@ export class EpgDataManager extends TgCardHelper {
       // // Aktualisiere den frühesten Programmstart und spätesten Programmstop
       // if (newPrograms.length > 0) {
       //   this.updateEarliestProgramStart(newPrograms[0].start);
-      //   
+      //
       //   // Aktualisiere auch latestProgramStop
       //   const lastProgram = newPrograms[newPrograms.length - 1];
       //   const lastProgramStop = lastProgram.stop || lastProgram.end;
@@ -600,13 +586,8 @@ export class EpgDataManager extends TgCardHelper {
 
     const now = Math.floor(Date.now() / 1000);
     const baseTime = Math.floor(now / 1800) * 1800; // Runde auf nächste halbe Stunde
-    
-    const channelNames = [
-      'ARD HD',
-      'ZDF HD', 
-      'RTL HD',
-      'ProSieben HD'
-    ];
+
+    const channelNames = ['ARD HD', 'ZDF HD', 'RTL HD', 'ProSieben HD'];
 
     const programTitles = [
       'Tagesschau',
@@ -620,7 +601,7 @@ export class EpgDataManager extends TgCardHelper {
       'Tatort',
       'Polizeiruf 110',
       'RTL Crime',
-      'ProSieben Crime'
+      'ProSieben Crime',
     ];
 
     const dummyData = [];
@@ -653,7 +634,7 @@ export class EpgDataManager extends TgCardHelper {
           stop: endTime,
           end: endTime, // Beide Varianten für Kompatibilität
           description: `Dummy-Programm ${i + 1} für ${channelName}`,
-          category: ['News', 'Sport', 'Krimi'][i % 3]
+          category: ['News', 'Sport', 'Krimi'][i % 3],
         });
       }
 
@@ -663,14 +644,14 @@ export class EpgDataManager extends TgCardHelper {
           id: channelId,
           channelid: channelId,
           name: channelName,
-          logo: null
+          logo: null,
         },
         epg: programs.reduce((acc, program) => {
           acc[program.id] = program;
           return acc;
         }, {}),
         id: channelId,
-        programs: programs
+        programs: programs,
       };
 
       dummyData.push(channelData);
@@ -682,8 +663,8 @@ export class EpgDataManager extends TgCardHelper {
       programmeProKanal: dummyData.map(c => c.programs.length),
       zeitBereich: {
         start: new Date(baseTime * 1000).toISOString(),
-        ende: new Date((baseTime + 24 * 3600) * 1000).toISOString()
-      }
+        ende: new Date((baseTime + 24 * 3600) * 1000).toISOString(),
+      },
     });
 
     // Programme für console.table aufbereiten
@@ -693,7 +674,7 @@ export class EpgDataManager extends TgCardHelper {
         Titel: program.title,
         Start: new Date(program.start * 1000).toLocaleString(),
         Stop: new Date(program.stop * 1000).toLocaleString(),
-        Kategorie: program.category
+        Kategorie: program.category,
       }))
     );
     console.debug('progdebug', 'Dummy-Programme:');
@@ -707,16 +688,16 @@ export class EpgDataManager extends TgCardHelper {
    */
   loadDummyData() {
     this._debug('loadDummyData()', 'Lade Dummy-Daten ins EPG-System');
-    
+
     const dummyData = this.generateDummyData();
-    
+
     // Füge jeden Kanal hinzu
     dummyData.forEach(channelData => {
       this.addTeilEpg(channelData);
     });
 
     this._debug('loadDummyData()', 'Dummy-Daten erfolgreich geladen', {
-      anzahlKanäle: dummyData.length
+      anzahlKanäle: dummyData.length,
     });
   }
 
@@ -735,14 +716,14 @@ export class EpgDataManager extends TgCardHelper {
 
     for (let i = 0; i < programs.length; i++) {
       const currentProgram = programs[i];
-      
+
       // Füge das aktuelle Programm hinzu
       result.push(currentProgram);
 
       // Prüfe, ob es ein nächstes Programm gibt
       if (i < programs.length - 1) {
         const nextProgram = programs[i + 1];
-        
+
         // Berechne die Lücke zwischen den Programmen
         const gapStart = currentProgram.stop;
         const gapEnd = nextProgram.start;
@@ -754,7 +735,7 @@ export class EpgDataManager extends TgCardHelper {
           gapStart: new Date(gapStart * 1000).toISOString(),
           gapEnd: new Date(gapEnd * 1000).toISOString(),
           gapSize: gapSize,
-          gapSizeMinutes: Math.round(gapSize / 60)
+          gapSizeMinutes: Math.round(gapSize / 60),
         });
 
         // Füge Gap ein, wenn Lücke groß genug ist
@@ -764,43 +745,43 @@ export class EpgDataManager extends TgCardHelper {
             type: 'fillergap',
             start: gapStart,
             stop: gapEnd,
-            isGap: true
+            isGap: true,
           };
-          
+
           result.push(gapItem);
-          
+
           this._debug('insertGapsBetweenPrograms() - Gap eingefügt', {
             gapId: gapItem.id,
             gapSize: gapSize,
-            gapSizeMinutes: Math.round(gapSize / 60)
+            gapSizeMinutes: Math.round(gapSize / 60),
           });
         }
         // Prüfe auf Überschneidungen
         else if (gapSize < 0) {
           const overlapSize = Math.abs(gapSize);
-          
+
           this._debug('insertGapsBetweenPrograms() - Überschneidung erkannt', {
             currentProgram: currentProgram.title,
             nextProgram: nextProgram.title,
             overlapSize: overlapSize,
-            overlapSizeMinutes: Math.round(overlapSize / 60)
+            overlapSizeMinutes: Math.round(overlapSize / 60),
           });
 
           // Strategie: Längere Sendung behalten, kürzere kürzen
           const currentDuration = currentProgram.stop - currentProgram.start;
           const nextDuration = nextProgram.stop - nextProgram.start;
-          
+
           if (currentDuration >= nextDuration) {
             // Aktuelle Sendung ist länger - kürze nächste
             nextProgram.start = currentProgram.stop;
             this._debug('insertGapsBetweenPrograms() - Nächste Sendung gekürzt', {
-              newStart: new Date(nextProgram.start * 1000).toISOString()
+              newStart: new Date(nextProgram.start * 1000).toISOString(),
             });
           } else {
             // Nächste Sendung ist länger - kürze aktuelle
             currentProgram.stop = nextProgram.start;
             this._debug('insertGapsBetweenPrograms() - Aktuelle Sendung gekürzt', {
-              newStop: new Date(currentProgram.stop * 1000).toISOString()
+              newStop: new Date(currentProgram.stop * 1000).toISOString(),
             });
           }
         }

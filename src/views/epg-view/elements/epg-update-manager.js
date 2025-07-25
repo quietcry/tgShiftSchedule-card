@@ -5,16 +5,14 @@ import { TgCardHelper } from '../../../tools/tg-card-helper.js';
  * EPG Update Manager
  * Zentrale Verwaltung aller Updates und deren Weitergabe an die entsprechenden Manager
  */
-export class EpgUpdateManager extends TgCardHelper{
+export class EpgUpdateManager extends TgCardHelper {
   static className = 'EpgUpdateManager';
   static cardName = CardName;
   static debugMode = DebugMode;
 
-
   constructor(epgBox) {
     super();
     this.epgBox = epgBox;
-    
 
     // ===== WERT-TRACKING =====
     // Dynamisches Map für die letzten bekannten Werte
@@ -31,72 +29,92 @@ export class EpgUpdateManager extends TgCardHelper{
    * @param {any} newValue - Neuer Wert (optional)
    */
   handleUpdate(changedProperties) {
+    this._debug('handleUpdate!> changedProperties', changedProperties);
 
     const realChanges = this._filterRealChanges(changedProperties);
+    if (realChanges.size === 0) {
+      this._debug('handleUpdate!< Keine echten Änderungen, ignoriere Update');
+      return;
+    }
+
     let exclusive = false;
     let updateNeccessary = false;
     // Verarbeite verschiedene Update-Typen basierend auf den geänderten Properties
-    this._debug('handleUpdate', { realChanges: realChanges});
+    this._debug('handleUpdate!< realChanges', realChanges);
 
     // relevant für scale-Berechnung
-    updateNeccessary = this._isUpdateRelevant(realChanges, ['envSnifferCardWidth'])
+    updateNeccessary = this._isUpdateRelevant(realChanges, ['envSnifferCardWidth']);
     if (!exclusive && updateNeccessary) {
       this._debug('handleUpdate: ENV Update erkannt');
       exclusive = this._triggerScaleCalculation(realChanges);
     }
 
     // scale-NeuBerechnung erkannt
-    updateNeccessary = this._isUpdateRelevant(realChanges, ['scale'])
+    updateNeccessary = this._isUpdateRelevant(realChanges, ['scale']);
     if (!exclusive && updateNeccessary) {
-      this._debug('handleUpdate: Scale! Update erkannt', {scale: this.epgBox.scale, width: this.epgBox.containerWidth, realChanges: realChanges});
+      this._debug('handleUpdate: Scale! Update erkannt', {
+        scale: this.epgBox.scale,
+        width: this.epgBox.containerWidth,
+        realChanges: realChanges,
+      });
       exclusive = this._handleScaleCalculation(realChanges);
     }
 
-
-
-
-    // Filtere nur echte Änderungen heraus
-
-    this._debug('EpgUpdateManager','Update empfangen', {
-      changedProperties,
-      allChangedProperties: Array.from(changedProperties.keys()),
-      realChanges: Array.from(realChanges.keys()),
-    });
-
-    // Nur weiterverarbeiten, wenn es echte Änderungen gibt
-    if (realChanges.size === 0) {
-      this._debug('EpgUpdateManager: Keine echten Änderungen, ignoriere Update');
-      return;
+    // informMeAtViewChanges relevante Änderungen
+    updateNeccessary = this._isUpdateRelevant(realChanges, [
+      'scale',
+      'earliestProgramStart',
+      'latestProgramStop',
+    ]);
+    if (!exclusive && updateNeccessary) {
+      this._debug('handleUpdate!< timebar wird updated', realChanges);
+      exclusive = this._informMeAtViewChanges(realChanges);
     }
 
-    // Verarbeite verschiedene Update-Typen basierend auf den geänderten Properties
-    if (!exclusive && this._isUpdateRelevant(realChanges, ['env'])) {
-      this._debug('EpgUpdateManager: ENV Update erkannt');
-      exclusive = this._handleEnvUpdate(realChanges);
-    }
+    // // Filtere nur echte Änderungen heraus
 
-    if (!exclusive && this._isUpdateRelevant(realChanges, ['epgPastTime', 'epgShowFutureTime'])) {
-      this._debug('EpgUpdateManager: Zeit-relevante Änderung erkannt');
-      exclusive = this._handleTimeUpdate(realChanges);
-    }
+    // this._debug('EpgUpdateManager', 'Update empfangen', {
+    //   changedProperties,
+    //   allChangedProperties: Array.from(changedProperties.keys()),
+    //   realChanges: Array.from(realChanges.keys()),
+    // });
 
-    if (
-      !exclusive &&
-      this._isUpdateRelevant(realChanges, ['showChannelGroups', 'showShortText', 'channelWidth'])
-    ) {
-      this._debug('EpgUpdateManager: Render-relevante Änderung erkannt');
-      this._handleRenderUpdate(realChanges);
-    }
+    // // Nur weiterverarbeiten, wenn es echte Änderungen gibt
+    // if (realChanges.size === 0) {
+    //   this._debug('EpgUpdateManager: Keine echten Änderungen, ignoriere Update');
+    //   return;
+    // }
 
-    // Spezielle Behandlung für env-Änderungen
-    if (realChanges.has('env')) {
-      this._debug('EpgUpdateManager: ENV-Änderung erkannt');
-      this._handleEnvUpdate(realChanges);
-    }
+    // // Verarbeite verschiedene Update-Typen basierend auf den geänderten Properties
+    // if (!exclusive && this._isUpdateRelevant(realChanges, ['env'])) {
+    //   this._debug('EpgUpdateManager: ENV Update erkannt');
+    //   exclusive = this._handleEnvUpdate(realChanges);
+    // }
+
+    // if (!exclusive && this._isUpdateRelevant(realChanges, ['epgPastTime', 'epgShowFutureTime'])) {
+    //   this._debug('EpgUpdateManager: Zeit-relevante Änderung erkannt');
+    //   exclusive = this._handleTimeUpdate(realChanges);
+    // }
+
+    // if (
+    //   !exclusive &&
+    //   this._isUpdateRelevant(realChanges, ['showChannelGroups', 'showShortText', 'channelWidth'])
+    // ) {
+    //   this._debug('EpgUpdateManager: Render-relevante Änderung erkannt');
+    //   this._handleRenderUpdate(realChanges);
+    // }
+
+    // // Spezielle Behandlung für env-Änderungen
+    // if (realChanges.has('env')) {
+    //   this._debug('EpgUpdateManager: ENV-Änderung erkannt');
+    //   this._handleEnvUpdate(realChanges);
+    // }
   }
 
   _filterRealChangesIsSingleValue(value) {
-    return value !== undefined && value !== null && !Array.isArray(value) && typeof value !== 'object';
+    return (
+      value !== undefined && value !== null && !Array.isArray(value) && typeof value !== 'object'
+    );
   }
 
   _filterRealChangesIsChanged(property, newValue) {
@@ -125,7 +143,7 @@ export class EpgUpdateManager extends TgCardHelper{
     const realChanges = new Map();
 
     // Null-Check für undefined oder null
-    if (!changedProperties || !(changedProperties instanceof Map)  ) {
+    if (!changedProperties || !(changedProperties instanceof Map)) {
       this._debug('EpgUpdateManager: changedProperties ist undefined/null oder keine Map');
       return realChanges;
     }
@@ -134,8 +152,7 @@ export class EpgUpdateManager extends TgCardHelper{
         if (this._filterRealChangesIsChanged(property, newValue)) {
           realChanges.set(property, newValue);
         }
-      }
-      else if (newValue instanceof Map) {
+      } else if (newValue instanceof Map) {
         for (const [subProperty, subValue] of newValue) {
           if (this._filterRealChangesIsSingleValue(subValue)) {
             if (this._filterRealChangesIsChanged(subProperty, subValue)) {
@@ -143,8 +160,7 @@ export class EpgUpdateManager extends TgCardHelper{
             }
           }
         }
-      }
-      else if (typeof newValue === 'object' && !Array.isArray(newValue)) {
+      } else if (typeof newValue === 'object' && !Array.isArray(newValue)) {
         // Behandle Objekte analog zu Maps
         for (const [subProperty, subValue] of Object.entries(newValue)) {
           if (this._filterRealChangesIsSingleValue(subValue)) {
@@ -153,12 +169,10 @@ export class EpgUpdateManager extends TgCardHelper{
             }
           }
         }
-      }      
+      }
     }
     return realChanges;
-    }
-
-
+  }
 
   // /**
   //  * Behandelt Property-Änderungen (bereits gefiltert für echte Änderungen)
@@ -287,13 +301,13 @@ export class EpgUpdateManager extends TgCardHelper{
 
   _triggerScaleCalculation(changedProperties) {
     this._debug('EpgUpdateManager: Scale! wird berechnet');
-    const oldscale=this.epgBox.scale;
+    const oldscale = this.epgBox.scale;
     // Berechne neuen Scale
     this.epgBox.scale = this.epgBox.scaleManager.calculateScale();
 
     this._debug('EpgUpdateManager: CSS-Variable --epg-scale gesetzt', {
       scale: this.epgBox.scale,
-      oldscale: oldscale
+      oldscale: oldscale,
     });
     return false;
     // Entferne das Setzen auf programRow, damit die Vererbung funktioniert
@@ -303,7 +317,7 @@ export class EpgUpdateManager extends TgCardHelper{
    */
 
   _handleScaleCalculation(changedProperties) {
-    this._debug('EpgUpdateManager: Verarbeite Scale!-Update' ,{scale: this.epgBox.scale});
+    this._debug('EpgUpdateManager: Verarbeite Scale!-Update', { scale: this.epgBox.scale });
 
     // Setze CSS-Variable für Scale (vermeidet Re-Rendering)
     const programBox = this.epgBox.shadowRoot?.querySelector('.programBox');
@@ -311,12 +325,11 @@ export class EpgUpdateManager extends TgCardHelper{
       programBox.style.setProperty('--epg-scale', this.epgBox.scale);
     }
     // Entferne das Setzen auf programRow, damit die Vererbung funktioniert
-    
+
     this._debug('EpgUpdateManager: scale! CSS-Variable --epg-scale gesetzt', {
       scale: this.epgBox.scale,
-      programBoxCount: programBox ? 1 : 0
+      programBoxCount: programBox ? 1 : 0,
     });
-    
   }
 
   // /**
@@ -397,7 +410,6 @@ export class EpgUpdateManager extends TgCardHelper{
   //   this.epgBox.requestUpdate();
   // }
 
-
   // /**
   //  * Benachrichtigt über neue EPG-Daten
   //  */
@@ -436,4 +448,38 @@ export class EpgUpdateManager extends TgCardHelper{
   //   // Benachrichtige RenderManager
   //   this.epgBox.renderManager.onProgramSelected(program);
   // }
+
+  /**
+   * Behandelt Timebar-Updates
+   */
+  _informMeAtViewChanges(changedProperties) {
+    this._debug('EpgUpdateManager: Verarbeite View-Update', {
+      properties: Array.from(changedProperties.keys()),
+    });
+
+    // Benachrichtige alle registrierten Observer
+    if (this.epgBox.informMeAtViewChanges && this.epgBox.informMeAtViewChanges.length > 0) {
+      this._debug('EpgUpdateManager: Benachrichtige registrierte Observer', {
+        observerCount: this.epgBox.informMeAtViewChanges.length,
+      });
+
+      this.epgBox.informMeAtViewChanges.forEach(observer => {
+        if (observer.callback && typeof observer.callback === 'function') {
+          try {
+            observer.callback(changedProperties);
+            this._debug('EpgUpdateManager: Observer benachrichtigt', {
+              observer: observer.me,
+            });
+          } catch (error) {
+            this._debug('EpgUpdateManager: Fehler beim Benachrichtigen des Observers', {
+              observer: observer.me,
+              error: error.message,
+            });
+          }
+        }
+      });
+    } else {
+      this._debug('EpgUpdateManager: Keine registrierten Observer vorhanden');
+    }
+  }
 }

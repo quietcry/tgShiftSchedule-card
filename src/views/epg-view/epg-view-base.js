@@ -23,7 +23,7 @@ export class EpgViewBase extends ViewBase {
       --epg-active-bg: #e0e0e0;
       --epg-program-bg: white;
       --epg-current-bg: #e8f0fe;
-      --epg-time-color: #666;
+      --epg-time-color: black;
       --epg-description-color: #666;
     }
 
@@ -91,5 +91,5 @@ export class EpgViewBase extends ViewBase {
 }
 
 if (!customElements.get('epg-view-base')) {
-customElements.define('epg-view-base', EpgViewBase);
+  customElements.define('epg-view-base', EpgViewBase);
 }

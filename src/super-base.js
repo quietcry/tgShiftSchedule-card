@@ -54,7 +54,7 @@ export class SuperBase extends LitElement {
     else if (this.cardName) {
       className = this.cardName;
     }
-    this.tgCardHelper.className = className
+    this.tgCardHelper.className = className;
     this.tgCardHelper._debug(message, data);
   }
 }

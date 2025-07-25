@@ -6,7 +6,7 @@ import { TgCardHelper } from '../../../tools/tg-card-helper.js';
  * EPG Render Manager
  * Verwaltet alle render-bezogenen Funktionen für die EPG-Box
  */
-export class EpgRenderManager extends TgCardHelper{
+export class EpgRenderManager extends TgCardHelper {
   static className = 'EpgRenderManager';
 
   constructor(epgBox) {
@@ -149,8 +149,7 @@ export class EpgRenderManager extends TgCardHelper{
    * Rendert eine einzelne Programmzeile
    */
   renderProgramRow(channel, rowIndex = 0) {
-    const programs = channel.programs || []
-
+    const programs = channel.programs || [];
 
     this._debug('EpgRenderManager: Rendere Programmzeile für Kanal', {
       kanal: channel.channeldata?.name || channel.name,
@@ -167,7 +166,7 @@ export class EpgRenderManager extends TgCardHelper{
     // progdebug: Komplette Programmliste für diesen Kanal vor Verarbeitung
     console.debug('progdebug', 'Alle Programme vor Rendern:', {
       kanal: channel.channeldata?.name || channel.name,
-      programme: channel.programs
+      programme: channel.programs,
     });
 
     // progdebug: Zeige alle tatsächlich gerenderten Programme (ohne Gaps)
@@ -178,17 +177,16 @@ export class EpgRenderManager extends TgCardHelper{
           titel: p.title,
           start: new Date(p.start * 1000).toLocaleString(),
           stop: new Date((p.end || p.stop) * 1000).toLocaleString(),
-        }))
+        })),
       });
     }
 
-
     let allElements = [];
-    
+
     if (programs.length > 0) {
       // Startgap: Von earliestProgramStart bis zum ersten Programm (immer einfügen, auch bei 0 Breite)
       const firstProgramStart = programs[0].start;
-      const lastProgramStop = programs[programs.length-1].stop;
+      const lastProgramStop = programs[programs.length - 1].stop;
       // this._debug('updateGapTimeAttributes - gapslength', {
       //   startgap: (firstProgramStart < this.epgBox.earliestProgramStart) ? 'true' : 'false',
       //   endgap: (lastProgramStop > this.epgBox.latestProgramStop) ? 'true' : 'false',
@@ -199,17 +197,39 @@ export class EpgRenderManager extends TgCardHelper{
       // });
 
       if (lastProgramStop > this.epgBox.latestProgramStop) {
+        this._debug('EpgRenderManager: latestProgramStop aktualisiert', {
+          alterWert: this.epgBox.latestProgramStop,
+          neuerWert: lastProgramStop,
+          kanal: channel.channeldata?.name || channel.name,
+        });
         this.epgBox.latestProgramStop = lastProgramStop;
+
+        // Simuliere ein Lit-Update mit den geänderten Properties
+        const changedProperties = new Map();
+        changedProperties.set('latestProgramStop', lastProgramStop);
+        this.epgBox.updated(changedProperties);
+
         // Verzögere die Aktualisierung der Endgaps mit Debouncing
         this.scheduleEndgapUpdate();
       }
 
       if (firstProgramStart < this.epgBox.earliestProgramStart) {
+        this._debug('EpgRenderManager: earliestProgramStart aktualisiert', {
+          alterWert: this.epgBox.earliestProgramStart,
+          neuerWert: firstProgramStart,
+          kanal: channel.channeldata?.name || channel.name,
+        });
         this.epgBox.earliestProgramStart = firstProgramStart;
+
+        // Simuliere ein Lit-Update mit den geänderten Properties
+        const changedProperties = new Map();
+        changedProperties.set('earliestProgramStart', firstProgramStart);
+        this.epgBox.updated(changedProperties);
+
         // Verzögere die Aktualisierung der Startgaps mit Debouncing
         this.scheduleStartgapUpdate();
       }
-      
+
       const startgapItem = {
         start: this.epgBox.earliestProgramStart,
         stop: firstProgramStart,
@@ -235,10 +255,13 @@ export class EpgRenderManager extends TgCardHelper{
       allElements = [nogapItem];
       this._debug('EpgRenderManager: Keine Programme - großes Gap hinzugefügt');
     }
-    
+
     // Debug-Ausgabe nur wenn programBox verfügbar ist
     if (this.epgBox.programBox) {
-      const gapElements = this.epgBox.programBox.querySelectorAll('epg-program-item.type-startgap, epg-program-item.type-noprogram') || [];
+      const gapElements =
+        this.epgBox.programBox.querySelectorAll(
+          'epg-program-item.type-startgap, epg-program-item.type-noprogram'
+        ) || [];
       this._debug('Startgap-Element!');
 
       // Debug-Ausgabe für alle Endgap-Elemente
@@ -248,11 +271,11 @@ export class EpgRenderManager extends TgCardHelper{
           start: element.start,
           stop: element.stop,
           earliestProgramStart: this.epgBox.earliestProgramStart,
-          latestProgramStop: this.epgBox.latestProgramStop
+          latestProgramStop: this.epgBox.latestProgramStop,
         });
       });
     }
-    
+
     return html`
       <div
         class="programRow epg-row-height ${this.epgBox._calculateHeightClasses(
@@ -375,7 +398,10 @@ export class EpgRenderManager extends TgCardHelper{
     }
 
     // Finde alle Endgap- und Noprogram-Elemente in der programBox (rekursiv in allen programRow Elementen)
-    const gapElements = this.epgBox.programBox.querySelectorAll('epg-program-item.type-endgap, epg-program-item.type-noprogram, epg-program-item.type-group') || [];
+    const gapElements =
+      this.epgBox.programBox.querySelectorAll(
+        'epg-program-item.type-endgap, epg-program-item.type-noprogram, epg-program-item.type-group'
+      ) || [];
     this._debug('updateGapTimeAttributes - Endgaps', { elements: gapElements });
 
     gapElements.forEach(element => {
@@ -384,10 +410,8 @@ export class EpgRenderManager extends TgCardHelper{
       element.updateCSSVariables();
     });
 
-
-
     this._debug('updateGapTimeAttributes - endgap-Updates abgeschlossen', {
-      gefundeneElemente: gapElements.length
+      gefundeneElemente: gapElements.length,
     });
   }
   /**
@@ -396,9 +420,13 @@ export class EpgRenderManager extends TgCardHelper{
    */
 
   updateStartgapStarts() {
-    this._debug('updateGapTimeAttributes - startgap', 'Aktualisiere start-Attribute der Startgaps', {
-      earliestProgramStart: this.epgBox.earliestProgramStart,
-    });
+    this._debug(
+      'updateGapTimeAttributes - startgap',
+      'Aktualisiere start-Attribute der Startgaps',
+      {
+        earliestProgramStart: this.epgBox.earliestProgramStart,
+      }
+    );
 
     // Verwende die gespeicherte programBox Referenz
     if (!this.epgBox.programBox) {
@@ -407,7 +435,10 @@ export class EpgRenderManager extends TgCardHelper{
     }
 
     // Finde alle Startgap- und Noprogram-Elemente in der programBox (rekursiv in allen programRow Elementen)
-    const gapElements = this.epgBox.programBox.querySelectorAll('epg-program-item.type-startgap, epg-program-item.type-noprogram, epg-program-item.type-group') || [];
+    const gapElements =
+      this.epgBox.programBox.querySelectorAll(
+        'epg-program-item.type-startgap, epg-program-item.type-noprogram, epg-program-item.type-group'
+      ) || [];
     this._debug('updateGapTimeAttributes - startgap', gapElements.length);
 
     gapElements.forEach(element => {
@@ -417,7 +448,7 @@ export class EpgRenderManager extends TgCardHelper{
     });
 
     this._debug('updateGapTimeAttributes - startgap-Updates abgeschlossen', {
-      gefundeneElemente: gapElements.length
+      gefundeneElemente: gapElements.length,
     });
   }
 

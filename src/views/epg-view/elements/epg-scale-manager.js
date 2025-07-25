@@ -22,14 +22,10 @@ export class EpgScaleManager {
       scale,
       oldScale: oldScale,
       newScale: this.epgBox.scale,
-      
     });
     this.epgBox.updated(new Map([['scale', scale]]));
   }
 
-
-
-  
   /**
    * Validiert die epgShowPastTime Konfiguration
    */

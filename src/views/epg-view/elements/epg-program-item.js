@@ -68,13 +68,13 @@ export class EpgProgramItem extends EpgElementBase {
       cssStart: cssStartBefore,
       cssStop: cssStopBefore,
       cssScale: cssScaleBefore,
-      width: widthBefore
+      width: widthBefore,
     });
 
     // Setze CSS-Variablen für automatische Breitenberechnung
     this.style.setProperty('--start', this.start);
     this.style.setProperty('--stop', this.stop);
-    
+
     // Debug: Werte nach dem Update
     const computedStyleAfter = getComputedStyle(this);
     const cssStartAfter = computedStyleAfter.getPropertyValue('--start');
@@ -91,7 +91,7 @@ export class EpgProgramItem extends EpgElementBase {
       cssStop: cssStopAfter,
       cssScale: cssScaleAfter,
       width: widthAfter,
-      cssCalc: `calc((${cssStopAfter} - ${cssStartAfter}) * ${cssScaleAfter} * 1px)`
+      cssCalc: `calc((${cssStopAfter} - ${cssStartAfter}) * ${cssScaleAfter} * 1px)`,
     });
   }
 
@@ -100,10 +100,7 @@ export class EpgProgramItem extends EpgElementBase {
     this._debug('EpgProgramItem: updated requested', changedProperties);
 
     // Setze nur die CSS-Variablen für die automatische Breitenberechnung
-    if (
-      changedProperties.has('start') ||
-      changedProperties.has('stop')
-    ) {
+    if (changedProperties.has('start') || changedProperties.has('stop')) {
       this.updateCSSVariables();
 
       // CSS-Klassen für Gap-Elemente
@@ -114,16 +111,24 @@ export class EpgProgramItem extends EpgElementBase {
       }
     }
 
-          // Setze CSS-Klassen basierend auf dem type-Wert für querySelector
-      if (changedProperties.has('type')) {
-        // Entferne alle type-spezifischen Klassen
-        this.classList.remove('type-startgap', 'type-endgap', 'type-item', 'type-noprogram', 'type-title', 'type-fillergap', 'type-group');
-        
-        // Füge die entsprechende Klasse hinzu
-        if (this.type) {
-          this.classList.add(`type-${this.type}`);
-        }
+    // Setze CSS-Klassen basierend auf dem type-Wert für querySelector
+    if (changedProperties.has('type')) {
+      // Entferne alle type-spezifischen Klassen
+      this.classList.remove(
+        'type-startgap',
+        'type-endgap',
+        'type-item',
+        'type-noprogram',
+        'type-title',
+        'type-fillergap',
+        'type-group'
+      );
+
+      // Füge die entsprechende Klasse hinzu
+      if (this.type) {
+        this.classList.add(`type-${this.type}`);
       }
+    }
   }
 
   render() {
@@ -252,7 +257,7 @@ export class EpgProgramItem extends EpgElementBase {
         width: calc((var(--stop, 0) - var(--start, 0)) * var(--epg-scale, 1) * 1px);
         min-width: 0;
         /* Zero-width wird über CSS gehandhabt */
-        opacity: calc((var(--stop, 0) - var(--start, 0)) * var(--epg-scale, 1) > 0 ? 1 : 0);
+        opacity: calc((var(--stop, 0) - var(--start, 0)) * var(--epg-scale, 1) > 0 ? 1: 0);
       }
 
       .programSlot {
@@ -365,5 +370,5 @@ export class EpgProgramItem extends EpgElementBase {
 }
 
 if (!customElements.get('epg-program-item')) {
-customElements.define('epg-program-item', EpgProgramItem);
+  customElements.define('epg-program-item', EpgProgramItem);
 }

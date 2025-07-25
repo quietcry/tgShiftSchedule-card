@@ -57,9 +57,12 @@ export class CardImpl extends CardBase {
 
     // Event-Listener für Environment-Requests von der epg-box
     this.addEventListener('request-environment', this._handleEnvironmentRequest.bind(this));
-    
+
     // Event-Listener für Environment Observer Registrierungen
-    this.addEventListener('register-observer-client', this._handleObserverClientRegistration.bind(this));
+    this.addEventListener(
+      'register-observer-client',
+      this._handleObserverClientRegistration.bind(this)
+    );
 
     this._debug('CardImpl-Konstruktor: Initialisierung abgeschlossen');
   }
@@ -70,13 +73,13 @@ export class CardImpl extends CardBase {
   _initEnvSnifferIfNeeded() {
     if (!this._envSniffer) {
       this._debug('CardImpl: Initialisiere EnvSniffer bei Bedarf');
-    this._envSniffer = new EnvSniffer();
-    this._envSniffer.init(this);
-      
+      this._envSniffer = new EnvSniffer();
+      this._envSniffer.init(this);
+
       // Warte kurz und prüfe dann die Werte
       setTimeout(() => {
         if (this._envSniffer && this._envSniffer.env) {
-    this.env = this._envSniffer.env;
+          this.env = this._envSniffer.env;
           this._debug('CardImpl: EnvSniffer initialisiert', {
             env: this.env,
             cardWidth: this.env.cardWidth,
@@ -86,16 +89,16 @@ export class CardImpl extends CardBase {
           this._debug('CardImpl: EnvSniffer initialisiert, aber env noch nicht verfügbar');
         }
       }, 50);
-      
-    this._envSniffer.addEventListener(
-      'environment-changed',
-      this._handleEnvironmentChange.bind(this)
-    );
+
+      this._envSniffer.addEventListener(
+        'environment-changed',
+        this._handleEnvironmentChange.bind(this)
+      );
     }
   }
 
   /**
-   * Behandelt Environment-Requests 
+   * Behandelt Environment-Requests
    */
   _handleEnvironmentRequest(event) {
     this._debug('[_handleEnvironmentRequest()]: Environment-Request erhalten', event);
@@ -105,7 +108,6 @@ export class CardImpl extends CardBase {
 
     // Stößt den EnvSniffer nochmal an
     this._envSniffer.detectEnvironment();
-
   }
 
   /**
@@ -114,12 +116,12 @@ export class CardImpl extends CardBase {
   _handleObserverClientRegistration(event) {
     const client = event.detail;
     this._debug('CardImpl: Environment Observer Registrierung erhalten', {
-      client: client.client.constructor.name
+      client: client.client.constructor.name,
     });
 
     // Registriere den Observer
-    this.registerEnvironmentObserverClient(client) 
-    
+    this.registerEnvironmentObserverClient(client);
+
     // Initialisiere EnvSniffer bei Bedarf
     this._initEnvSnifferIfNeeded();
 
@@ -143,9 +145,9 @@ export class CardImpl extends CardBase {
       this._debug('CardImpl: Max-Versuche erreicht, verwende Fallback-Werte', {
         client: client.client.constructor.name,
         retryCount: client._envRetryCount,
-        elapsedTime: Date.now() - client._envRetryStartTime
+        elapsedTime: Date.now() - client._envRetryStartTime,
       });
-      
+
       // Sende Fallback-Werte
       const fallbackEnv = {
         cardWidth: 1200,
@@ -157,17 +159,17 @@ export class CardImpl extends CardBase {
         isTouchscreen: false,
         screenWidth: 1920,
         screenHeight: 1080,
-        typeOfView: 'tile'
+        typeOfView: 'tile',
       };
-      
+
       client.client.dispatchEvent(
         new CustomEvent('environment-changed', {
           detail: {
             oldState: null,
-            newState: fallbackEnv
+            newState: fallbackEnv,
           },
           bubbles: false,
-          composed: false
+          composed: false,
         })
       );
       return;
@@ -175,7 +177,7 @@ export class CardImpl extends CardBase {
 
     if (!this._envSniffer || !this._envSniffer.env) {
       this._debug('CardImpl: EnvSniffer noch nicht verfügbar, warte...', {
-        retryCount: client._envRetryCount
+        retryCount: client._envRetryCount,
       });
       client._envRetryCount++;
       // Warte kurz und versuche es erneut
@@ -184,22 +186,22 @@ export class CardImpl extends CardBase {
     }
 
     const currentEnv = this._envSniffer.env;
-    
+
     // Debug: Zeige alle verfügbaren Informationen
     this._debug('CardImpl: EnvSniffer Status', {
       hasEnvSniffer: !!this._envSniffer,
       hasEnv: !!currentEnv,
       envKeys: currentEnv ? Object.keys(currentEnv) : [],
       cardWidth: currentEnv?.envSnifferCardWidth,
-      fullEnv: currentEnv
+      fullEnv: currentEnv,
     });
-    
+
     // Prüfe ob cardWidth > 0 ist
     if (!currentEnv.envSnifferCardWidth || currentEnv.envSnifferCardWidth <= 0) {
       this._debug('CardImpl: cardWidth noch 0, warte auf gültige Werte...', {
         cardWidth: currentEnv.cardWidth,
         env: currentEnv,
-        retryCount: client._envRetryCount
+        retryCount: client._envRetryCount,
       });
       client._envRetryCount++;
       // Warte kurz und versuche es erneut
@@ -212,17 +214,17 @@ export class CardImpl extends CardBase {
       client: client.client.constructor.name,
       env: currentEnv,
       retryCount: client._envRetryCount,
-      elapsedTime: Date.now() - client._envRetryStartTime
+      elapsedTime: Date.now() - client._envRetryStartTime,
     });
-    
+
     client.client.dispatchEvent(
       new CustomEvent('environment-changed', {
         detail: {
           oldState: null,
-          newState: currentEnv
+          newState: currentEnv,
         },
         bubbles: false,
-        composed: false
+        composed: false,
       })
     );
   }
@@ -235,7 +237,6 @@ export class CardImpl extends CardBase {
     this._debug('CardImpl: ENV Umgebungsänderung erkannt', { oldState, newState });
     // Benachrichtige alle registrierten Environment Observer
     this._notifyEnvironmentObservers(oldState, newState);
-
   }
   /**
    * Registriert einen Observer für Umgebungsänderungen
@@ -245,7 +246,7 @@ export class CardImpl extends CardBase {
       this._environmentObserverClients.push(client);
       this._debug('CardImpl: Environment Observer registriert', {
         observer: client.constructor.name,
-        totalObservers: this._environmentObserverClients.length
+        totalObservers: this._environmentObserverClients.length,
       });
     }
   }
@@ -259,7 +260,7 @@ export class CardImpl extends CardBase {
       this._environmentObserverClients.splice(index, 1);
       this._debug('CardImpl: Environment Observer entfernt', {
         observer: observer.constructor.name,
-        totalObservers: this._environmentObserverClients.length
+        totalObservers: this._environmentObserverClients.length,
       });
     }
   }
@@ -271,7 +272,7 @@ export class CardImpl extends CardBase {
     this._debug('CardImpl: Benachrichtige Environment Observer', {
       observerCount: this._environmentObserverClients.length,
       oldState,
-      newState
+      newState,
     });
 
     for (const observer of this._environmentObserverClients) {
@@ -282,17 +283,17 @@ export class CardImpl extends CardBase {
             new CustomEvent('environment-changed', {
               detail: {
                 oldState,
-                newState
+                newState,
               },
               bubbles: false,
-              composed: false
+              composed: false,
             })
           );
         }
       } catch (error) {
         this._debug('CardImpl: Fehler beim Benachrichtigen eines Observers', {
           observer: observer.constructor.name,
-          error: error.message
+          error: error.message,
         });
       }
     }
@@ -357,19 +358,19 @@ export class CardImpl extends CardBase {
     this._viewType = 'EPGView';
 
     try {
-    this._view = new EPGView();
+      this._view = new EPGView();
       this._debug('CardImpl: Übergebe Konfiguration an EPG-View', {
-      epgShowPastTime: this.config.epgShowPastTime,
-      epgShowFutureTime: this.config.epgShowFutureTime,
-    });
-    this._view.config = this.config;
+        epgShowPastTime: this.config.epgShowPastTime,
+        epgShowFutureTime: this.config.epgShowFutureTime,
+      });
+      this._view.config = this.config;
       // this._view.env = this.env; // Nicht mehr nötig - Observer-Pattern übernimmt das
-    this._debug('CardImpl setConfig: View initialisiert:', {
-      viewMode: this._viewMode,
-      viewType: this._viewType,
-      config: this.config,
+      this._debug('CardImpl setConfig: View initialisiert:', {
+        viewMode: this._viewMode,
+        viewType: this._viewType,
+        config: this.config,
         // env: this.env, // Nicht mehr nötig
-    });
+      });
     } catch (error) {
       this._debug('CardImpl setConfig: Fehler bei View-Initialisierung:', error);
       throw new Error(`Fehler bei der View-Initialisierung: ${error.message}`);
@@ -401,7 +402,7 @@ export class CardImpl extends CardBase {
     }
 
     try {
-    return this._view;
+      return this._view;
     } catch (error) {
       this._debug('CardImpl render: Fehler beim Rendern der View:', error);
       return html`<div class="error">Fehler beim Rendern: ${error.message}</div>`;
