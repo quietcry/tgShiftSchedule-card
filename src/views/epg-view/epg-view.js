@@ -6,6 +6,7 @@ import { EpgChannelList } from './elements/epg-channel-list.js';
 import { EpgProgramList } from './elements/epg-program-list.js';
 import { EpgBox } from './elements/epg-box.js';
 import { DataProvider } from '../../tools/data-provider.js';
+import { EpgScrollManager } from './elements/epg-scroll-manager.js';
 
 export class EPGView extends ViewBase {
   static className = 'EPGView';
@@ -228,12 +229,17 @@ export class EPGView extends ViewBase {
 
   constructor() {
     super();
-    this._debug('EPG-View: Constructor aufgerufen');
-    this._dataProvider = new DataProvider();
-    this._debug('EPGView-Konstruktor: DataProvider initialisiert');
-    this._debug('EPGView-Konstruktor: Initialisierung abgeschlossen');
-    this._dataFetchStarted = false;
+
+    // Initialisiere Properties
+    this._hass = null;
     this._config = null;
+    this._env = null;
+    this._dataProvider = null;
+    this._lastUpdate = null;
+    this._dataFetchStarted = false;
+
+    // Array für View-Änderungs-Observer
+    // this.informMeAtViewChanges = [];
   }
 
   disconnectedCallback() {
@@ -248,37 +254,66 @@ export class EPGView extends ViewBase {
       const oldLastUpdate = oldState?.attributes?.last_update;
       const newLastUpdate = newState?.attributes?.last_update;
 
+      this._debug('EPGView set hass: Vergleiche last_update', {
+        oldLastUpdate,
+        newLastUpdate,
+        oldHass: !!this._hass,
+        newHass: !!value,
+        entity: this.config?.entity,
+        thisLastUpdate: this._lastUpdate,
+      });
+
       this._hass = value;
       if (this._dataProvider) {
         this._dataProvider.hass = value;
         this._debug('EPGView set hass: DataProvider hass aktualisiert');
+      } else if (this._config) {
+        // Initialisiere DataProvider, wenn config bereits verfügbar ist
+        this._debug('EPGView set hass: Initialisiere DataProvider', {
+          hasHass: !!value,
+          hasConfig: !!this._config,
+          entity: this._config.entity,
+        });
+        this._dataProvider = new DataProvider();
+        this._dataProvider.hass = value;
       }
 
-      // // Bei Dummy-Daten keine hass-Updates verarbeiten
-      // if (this.useDummyData && this.useDummyData.toLowerCase() === 'true') {
-      //   this._debug('EPGView: Dummy-Daten aktiv, überspringe hass-Updates', {
-      //     useDummyData: this.useDummyData,
-      //   });
-      //   return;
-      // }
+      // Nur wenn sich last_update tatsächlich ändert oder beim ersten Mal
+      if (newLastUpdate !== this._lastUpdate || this._lastUpdate === null || this._dataFetchStarted === false) {
+        this._debug('EPGView: last_update Vergleich', {
+          newLastUpdate,
+          thisLastUpdate: this._lastUpdate,
+          hasHass: !!this._hass,
+          hasConfig: !!this.config,
+          entity: this.config?.entity,
+          dataFetchStarted: this._dataFetchStarted,
+        });
 
-      // Nur wenn sich last_update ändert oder hass zum ersten Mal gesetzt wird
-      if (newLastUpdate !== this._lastUpdate || !this._hass) {
-        if (this._hass && this.config.entity) {
-          if (newLastUpdate !== this._lastUpdate) {
-            this._debug('EPGView: last_update hat sich geändert, starte Update', {
+        if (this._hass && this.config?.entity) {
+          this._debug('EPGView: last_update hat sich geändert oder erstmaliger Aufruf, starte Update', {
               old: this._lastUpdate,
               new: newLastUpdate,
             });
-            this._dataFetchStarted = false; // Reset flag für neuen Datenabruf
-            this._loadData();
-          }
+          this._lastUpdate = newLastUpdate; // Aktualisiere sofort
+          // Fange async Fehler ab
+          this._loadData().catch(error => {
+            this._debug('EPGView: Fehler beim Laden der Daten im hass Setter', { error: error.message });
+          });
+        } else {
+          this._debug('EPGView: hass oder entity nicht verfügbar', {
+            hasHass: !!this._hass,
+            hasConfig: !!this.config,
+            entity: this.config?.entity,
+          });
         }
       } else {
         this._debug('EPGView: last_update unverändert, überspringe Update und Rendering', {
           lastUpdate: this._lastUpdate,
+          newLastUpdate: newLastUpdate,
         });
       }
+    } else {
+      this._debug('EPGView set hass: hass unverändert, überspringe');
     }
   }
 
@@ -297,6 +332,17 @@ export class EPGView extends ViewBase {
     // Aktualisiere CSS-Variable für Channel-Breite
     if (value?.channelWidth) {
       this.style.setProperty('--epg-channel-width', `${value.channelWidth}px`);
+    }
+
+    // Initialisiere DataProvider, wenn hass bereits verfügbar ist
+    if (this._hass && value && !this._dataProvider) {
+      this._debug('EPGView set config: Initialisiere DataProvider', {
+        hasHass: !!this._hass,
+        hasConfig: !!value,
+        entity: value.entity,
+      });
+      this._dataProvider = new DataProvider();
+      this._dataProvider.hass = this._hass;
     }
   }
 
@@ -329,53 +375,62 @@ export class EPGView extends ViewBase {
   }
 
   async _loadData() {
+    // Verhindere parallele Aufrufe
+    if (this._dataFetchStarted) {
+      this._debug('EPG-View: _loadData bereits in Bearbeitung, überspringe Aufruf');
+      return;
+    }
+
+    this._dataFetchStarted = true;
     this._debug('EPG-View: _loadData wird aufgerufen');
 
-    // Hole die EPG-Box
-    const epgBox = this.shadowRoot?.querySelector('epg-box');
-    if (!epgBox) {
-      this._debug('EPG-View: _loadData: EPG-Box nicht gefunden, überspringe Datenabruf');
-      return;
-    }
-
-    // Prüfe, ob Dummy-Daten verwendet werden sollen (Build-Variable)
-    if (this.useDummyData && this.useDummyData.toLowerCase() === 'true') {
-      this._debug('EPG-View: _loadData: Verwende Dummy-Daten (Build-Variable)', {
-        useDummyData: this.useDummyData,
-      });
-
-      try {
-        // Rufe die Dummy-Daten-Generierung im DataManager auf
-        const dummyData = epgBox.dataManager.generateDummyData();
-
-        if (dummyData && dummyData.length > 0) {
-          this._debug('EPG-View: Dummy-Daten erfolgreich generiert', {
-            anzahlKanäle: dummyData.length,
-            kanäle: dummyData.map(channel => ({
-              id: channel.id,
-              name: channel.name,
-              anzahlProgramme: channel.programs?.length || 0,
-            })),
-          });
-
-          // Füge jeden Kanal als Teil-EPG hinzu
-          dummyData.forEach(channelData => {
-            epgBox.addTeilEpg(channelData);
-          });
-
-          this._debug('EPG-View: Dummy-Daten erfolgreich geladen', {
-            anzahlKanäle: dummyData.length,
-          });
-        } else {
-          this._debug('EPG-View: Keine Dummy-Daten generiert');
-        }
-      } catch (error) {
-        this._debug('EPG-View: Fehler beim Laden der Dummy-Daten', { error: error.message });
+    try {
+      // Hole die EPG-Box
+      const epgBox = this.shadowRoot?.querySelector('epg-box');
+      if (!epgBox) {
+        this._debug('EPG-View: _loadData: EPG-Box nicht gefunden, überspringe Datenabruf');
+        return;
       }
-      return;
-    }
+      this._debug('EPG-View: _loadData: Datenabruf wird gestartet');
 
-    // Normale EPG-Daten laden
+      // Prüfe, ob Dummy-Daten verwendet werden sollen (Build-Variable)
+      if (this.useDummyData && this.useDummyData.toLowerCase() === 'true') {
+        this._debug('EPG-View: _loadData: Verwende Dummy-Daten (Build-Variable)', {
+          useDummyData: this.useDummyData,
+        });
+
+        try {
+          // Rufe die Dummy-Daten-Generierung im DataManager auf
+          const dummyData = epgBox.dataManager.generateDummyData();
+
+          if (dummyData && dummyData.length > 0) {
+            this._debug('EPG-View: Dummy-Daten erfolgreich generiert', {
+              anzahlKanäle: dummyData.length,
+              kanäle: dummyData.map(channel => ({
+                id: channel.id,
+                name: channel.name,
+                anzahlProgramme: channel.programs?.length || 0,
+              })),
+            });
+
+            // Füge jeden Kanal als Teil-EPG hinzu
+            dummyData.forEach(channelData => {
+              epgBox.addTeilEpg(channelData);
+            });
+
+            this._debug('EPG-View: Dummy-Daten erfolgreich geladen', {
+              anzahlKanäle: dummyData.length,
+            });
+          } else {
+            this._debug('EPG-View: Keine Dummy-Daten generiert');
+          }
+        } catch (error) {
+          this._debug('EPG-View: Fehler beim Laden der Dummy-Daten', { error: error.message });
+        }
+        return;
+      }
+
+      // Normale EPG-Daten laden
     if (!this._dataProvider || !this.config.entity) {
       this._debug('EPG-View: _loadData: Übersprungen - dataProvider oder entity fehlt', {
         dataProvider: !!this._dataProvider,
@@ -385,8 +440,11 @@ export class EPGView extends ViewBase {
     }
 
     // Starte den Datenabruf direkt
-    this._debug('EPG-View: Starte Datenabruf für echte EPG-Daten');
+      this._debug('EPG-View: Starte Datenabruf für echte EPG-Daten');
     await this._fetchViewData(this.config);
+    } finally {
+      this._dataFetchStarted = false;
+    }
   }
 
   async _fetchViewData(config) {
@@ -471,31 +529,175 @@ export class EPGView extends ViewBase {
   }
 
   _onEpgBoxReady() {
-    this._debug('EPG-View: EPG-Box ist bereit, starte Datenabruf');
-    if (!this._dataFetchStarted) {
-      this._dataFetchStarted = true;
-      this._loadData(); // Verwende _loadData statt _fetchViewData für Entscheidung Dummy/echte Daten
-    } else {
-      this._debug('EPG-View: Datenabruf bereits gestartet, überspringe');
-    }
+    this._debug('EPG-View: _onEpgBoxReady aufgerufen');
+    this._loadData();
+
+    // Setup Scroll-Synchronisation
+    this._setupScrollSync();
   }
+
+  // _onRegisterMeForChanges(event) {
+  //   this._debug('EPG-View: Registrierungsanfrage empfangen', {
+  //     component: event.target,
+  //     detail: event.detail,
+  //   });
+
+  //   const { component, callback, eventType = "" } = event.detail;
+
+  //   if (component && typeof callback === 'function') {
+  //     this.registerMeForChanges(component, eventType, callback);
+  //     this._debug('EPG-View: Komponente erfolgreich registriert', {
+  //       component: component.tagName || component.constructor.name,
+  //       eventType: eventType,
+  //     });
+  //   } else {
+  //     this._debug('EPG-View: Registrierung fehlgeschlagen', {
+  //       componentExists: !!component,
+  //       hasCallback: typeof callback === 'function',
+  //     });
+  //   }
+  // }
 
   firstUpdated() {
-    super.firstUpdated();
-    this._debug('EPG-View: firstUpdated aufgerufen');
+    this._debug('EPG-View: firstUpdated');
 
-    // Registriere timebar sofort, ohne setTimeout
-    const epgBox = this.shadowRoot?.querySelector('epg-box');
-    const timeBar = this.shadowRoot?.querySelector('epg-timebar');
-
-    if (epgBox && timeBar) {
-      this._debug('EPG-View: timebar wird registriert');
-      epgBox.registerInformMeAtViewChanges(timeBar, timeBar.onTimeBarValuesChanged.bind(timeBar));
+    // Initialisiere DataProvider falls noch nicht geschehen
+    if (!this._dataProvider) {
+      this._dataProvider = new DataProvider(this._hass);
     }
 
-    // Lade Daten beim ersten Update
-    this._loadData();
+    // Registriere Event-Listener für automatische Registrierung
+    // this.addEventListener('registerMeForChanges', this._onRegisterMeForChanges.bind(this));
+
+    // Prüfe ob epgBox bereits vorhanden ist
+    const epgBox = this.shadowRoot.querySelector('epg-box');
+    if (epgBox) {
+      this._debug('EPG-View: epgBox bereits vorhanden, starte Datenladung');
+      this._loadData();
+    } else {
+      this._debug('EPG-View: epgBox noch nicht vorhanden, warte auf _onEpgBoxReady');
+    }
   }
+
+  /**
+   * Richtet die Scroll-Synchronisation zwischen TimeBar und ProgramBox ein
+   */
+  _setupScrollSync() {
+    this._debug('EPG-View: Setup Scroll-Synchronisation');
+
+    // Finde die benötigten Elemente
+    const epgBox = this.shadowRoot.querySelector('epg-box');
+    const timeBar = this.shadowRoot.querySelector('.timeBar');
+
+    if (!epgBox || !timeBar) {
+      this._debug('EPG-View: Scroll-Sync Setup übersprungen - Elemente nicht gefunden', {
+        epgBoxFound: !!epgBox,
+        timeBarFound: !!timeBar,
+      });
+      return;
+    }
+
+    // Richte Scroll-Synchronisation zwischen ProgramBox und TimeBar ein
+    const scrollManager = new EpgScrollManager();
+    scrollManager.setupScrollSync(epgBox, timeBar);
+
+    this._debug('EPG-View: Scroll-Synchronisation eingerichtet');
+  }
+
+  // /**
+  //  * Registriert einen Observer für View-Änderungen
+  //  * @param {Object} me - Das Objekt, das über Änderungen informiert werden soll
+  //  * @param {string|Array} eventType - Event-Typ als String oder Array von Strings
+  //  * @param {Function} callback - Callback-Funktion, die bei Änderungen aufgerufen wird
+  //  */
+  // registerMeForChanges(me, eventType = "", callback = null) {
+  //   this._debug('EPG-View: registerMeForChanges() Anfrage', {
+  //     me,
+  //     newEventType: eventType,
+  //   });
+
+  //   // Normalisiere die neuen EventTypes
+  //   const eventTypes = Array.isArray(eventType)
+  //     ? eventType.map(e => e.toLowerCase()).sort()
+  //     : typeof eventType === 'string' ? eventType.split(',').map(e => e.trim().toLowerCase()).filter(e => e.length > 0).sort() : [];
+
+  //   // Prüfe ob bereits ein Observer für denselben me existiert
+  //   const existingMeInformer = this.informMeAtViewChanges.find(informer => informer.me === me);
+
+  //   if (existingMeInformer) {
+  //     // Normalisiere die bestehenden eventTypes
+  //     const existingEventTypes = Array.isArray(existingMeInformer.eventType)
+  //       ? existingMeInformer.eventType.map(e => e.toLowerCase()).sort()
+  //       : typeof existingMeInformer.eventType === 'string'
+  //         ? existingMeInformer.eventType.split(',').map(e => e.trim().toLowerCase()).filter(e => e.length > 0).sort()
+  //         : [];
+
+  //     // Finde nur die wirklich neuen EventTypes
+  //     const newEventTypes = eventTypes.filter(newType => !existingEventTypes.includes(newType));
+
+  //     if (newEventTypes.length === 0) {
+  //       this._debug('EPG-View: registerMeForChanges() Alle EventTypes bereits vorhanden', {
+  //         me,
+  //         requestedEventTypes: eventTypes,
+  //         existingEventTypes,
+  //       });
+  //       return false;
+  //     } else {
+  //       // Füge nur die neuen EventTypes hinzu
+  //       const combinedEventTypes = [...existingEventTypes, ...newEventTypes].sort();
+  //       existingMeInformer.eventType = combinedEventTypes;
+
+  //       this._debug('EPG-View: registerMeForChanges() Neue EventTypes hinzugefügt', {
+  //         me,
+  //         newEventTypes,
+  //         existingEventTypes,
+  //         combinedEventTypes,
+  //       });
+  //       return true;
+  //     }
+  //   }
+
+  //   // Füge neuen Observer hinzu
+  //   this.informMeAtViewChanges.push({
+  //     me,
+  //     eventType: eventTypes,
+  //     callback,
+  //   });
+
+  //   this._debug('EPG-View: registerMeForChanges() Neuer Informer registriert', {
+  //     me,
+  //     eventTypes,
+  //     totalObservers: this.informMeAtViewChanges.length,
+  //   });
+
+  //   return true;
+  // }
+
+  // /**
+  //  * Benachrichtigt alle registrierten Observer über Property-Änderungen
+  //  * @param {Map} changedProperties - Geänderte Properties
+  //  */
+  // _informMeAtViewChanges(changedProperties) {
+  //   this._debug('EPG-View: Benachrichtige View-Änderungs-Observer', {
+  //     changedProperties: Array.from(changedProperties.keys()),
+  //     observerCount: this.informMeAtViewChanges.length,
+  //   });
+
+  //   if (this.informMeAtViewChanges && this.informMeAtViewChanges.length > 0) {
+  //     this.informMeAtViewChanges.forEach(observer => {
+  //       if (observer.callback && typeof observer.callback === 'function') {
+  //         try {
+  //           observer.callback(changedProperties);
+  //         } catch (error) {
+  //           this._debug('EPG-View: Fehler beim Aufrufen des Observer-Callbacks', {
+  //             observer: observer.me,
+  //             error: error.message,
+  //           });
+  //         }
+  //       }
+  //     });
+  //   }
+  // }
 
   render() {
     // Debug: Überprüfe die Konfigurationswerte
@@ -508,7 +710,7 @@ export class EPGView extends ViewBase {
     return html`
       <div class="gridcontainer">
         <div class="headline">
-          <div class="superbutton">${this._renderSuperButton()}</div>
+        <div class="superbutton">${this._renderSuperButton()}</div>
           <div class="timeBar">
             <epg-timebar .scale=${this._timeBarScale}></epg-timebar>
           </div>
@@ -541,7 +743,10 @@ export class EPGView extends ViewBase {
   }
 
   _handleRefresh() {
-    this._loadData();
+    // Fange async Fehler ab
+    this._loadData().catch(error => {
+      this._debug('EPG-View: Fehler beim Laden der Daten im Refresh', { error: error.message });
+    });
   }
 
   _onEpgFirstLoadComplete(e) {
@@ -575,5 +780,5 @@ export class EPGView extends ViewBase {
 }
 
 if (!customElements.get('epg-view')) {
-  customElements.define('epg-view', EPGView);
+customElements.define('epg-view', EPGView);
 }

@@ -55,6 +55,15 @@ export class CardImpl extends CardBase {
     this._envSniffer = null;
     this.env = null;
 
+    // Array für Änderungs-Observer
+    this.informAtChangesClients = [];
+
+    // Eigene Verwaltung der registrierten EventTypes
+    this._registeredEventTypes = new Set();
+
+    // Registriere Event-Listener für automatische Registrierung
+    this.addEventListener('registerMeForChanges', this._onRegisterMeForChanges.bind(this));
+
     // Event-Listener für Environment-Requests von der epg-box
     this.addEventListener('request-environment', this._handleEnvironmentRequest.bind(this));
 
@@ -73,8 +82,8 @@ export class CardImpl extends CardBase {
   _initEnvSnifferIfNeeded() {
     if (!this._envSniffer) {
       this._debug('CardImpl: Initialisiere EnvSniffer bei Bedarf');
-      this._envSniffer = new EnvSniffer();
-      this._envSniffer.init(this);
+    this._envSniffer = new EnvSniffer();
+    this._envSniffer.init(this);
 
       // Warte kurz und prüfe dann die Werte
       setTimeout(() => {
@@ -90,10 +99,10 @@ export class CardImpl extends CardBase {
         }
       }, 50);
 
-      this._envSniffer.addEventListener(
-        'environment-changed',
-        this._handleEnvironmentChange.bind(this)
-      );
+    // this._envSniffer.addEventListener(
+    //   'environment-changed',
+    //   this._handleEnvironmentChange.bind(this)
+    // );
     }
   }
 
@@ -109,6 +118,149 @@ export class CardImpl extends CardBase {
     // Stößt den EnvSniffer nochmal an
     this._envSniffer.detectEnvironment();
   }
+
+  _onRegisterMeForChanges(event) {
+    this._debug('EPG-Card: Registrierungsanfrage empfangen', {
+      component: event.target,
+      detail: event.detail,
+    });
+
+    const { component, callback, eventType = "", immediately = false } = event.detail;
+
+    if (component && typeof callback === 'function') {
+      this.registerInformAtChangesClients(component, eventType, immediately, callback);
+      this._debug('EPG-Card: Komponente erfolgreich registriert', {
+        component: component.tagName || component.constructor.name,
+        eventType: eventType,
+      });
+    } else {
+      this._debug('EPG-Card: Registrierung fehlgeschlagen', {
+        componentExists: !!component,
+        hasCallback: typeof callback === 'function',
+      });
+    }
+  }
+
+  informClientsAtChanges(eventType = "", data = {}) {
+    this._debug('EPG-Card: informClientsAtChanges() Anfrage', {
+      eventType: eventType,
+      data: data,
+    });
+
+    // Sichere Behandlung von changedProperties, falls vorhanden
+    if (data.changedProperties) {
+      if (data.changedProperties instanceof Map) {
+        data.changedPropertiesKeys = Array.from(data.changedProperties.keys());
+      } else {
+        data.changedPropertiesKeys = Object.keys(data.changedProperties || {});
+      }
+    }
+
+    this.informAtChangesClients.forEach(client => {
+      if (client.eventType.includes(eventType)) {
+        try {
+          client.callback(data);
+        } catch (error) {
+          this._debug('EPG-Card: Fehler beim Benachrichtigen des Clients', {
+            client: client.me?.constructor?.name || 'Unknown',
+            eventType: eventType,
+            error: error.message,
+          });
+        }
+      }
+    });
+  }
+
+  /**
+   * Registriert einen Observer für View-Änderungen
+   * @param {Object} me - Das Objekt, das über Änderungen informiert werden soll
+   * @param {string|Array} eventType - Event-Typ als String oder Array von Strings
+   * @param {Function} callback - Callback-Funktion, die bei Änderungen aufgerufen wird
+   */
+  registerInformAtChangesClients(me, eventType = "", immediately = false, callback = null) {
+    this._debug('EPG-Card: registerInformAtChangesClients() Anfrage', {
+      me,
+      newEventType: eventType,
+    });
+
+    // Normalisiere die neuen EventTypes
+    const eventTypes = Array.isArray(eventType)
+      ? eventType.map(e => e.toLowerCase()).sort()
+      : typeof eventType === 'string' ? eventType.split(',').map(e => e.trim().toLowerCase()).filter(e => e.length > 0).sort() : [];
+
+    // Prüfe ob bereits ein Observer für denselben me existiert
+    const existingMeInformer = this.informAtChangesClients.find(informer => informer.me === me);
+    let existingEventTypes = [];
+    if (existingMeInformer) {
+      // Normalisiere die bestehenden eventTypes
+      existingEventTypes = Array.isArray(existingMeInformer.eventType)
+        ? existingMeInformer.eventType.map(e => e.toLowerCase()).sort()
+        : typeof existingMeInformer.eventType === 'string'
+          ? existingMeInformer.eventType.split(',').map(e => e.trim().toLowerCase()).filter(e => e.length > 0).sort()
+          : [];
+      }
+    // Finde nur die wirklich neuen EventTypes
+    const newEventTypes = eventTypes.filter(newType => !existingEventTypes.includes(newType));
+    if (existingMeInformer && newEventTypes.length === 0) {
+      this._debug('EPG-Card: registerInformAtChangesClients() Client war bereits mit allen Typen registriert', {
+        me,
+        requestedEventTypes: eventTypes,
+        existingEventTypes,
+      });
+      return false;
+      }
+
+    if (existingMeInformer) {
+        // Füge nur die neuen EventTypes hinzu
+        const combinedEventTypes = [...existingEventTypes, ...newEventTypes].sort();
+        existingMeInformer.eventType = combinedEventTypes;
+        this._debug('EPG-Card: registerInformAtChangesClients() Neue EventTypes hinzugefügt', {
+          me,
+          newEventTypes,
+          existingEventTypes,
+          combinedEventTypes,
+        });
+      } else {
+      // Füge neuen Client hinzu
+      this.informAtChangesClients.push({
+        me,
+        eventType: newEventTypes,
+        callback,
+      });
+      this._debug('EPG-Card: registerInformAtChangesClients() Neuer Informer registriert', {
+        me,
+        newEventTypes,
+        totalObservers: this.informAtChangesClients.length,
+      });
+    }
+    newEventTypes.forEach(eventType => {
+      // Prüfe ob bereits ein Listener für diesen EventType existiert
+      if (!this._registeredEventTypes.has(eventType)) {
+        this._debug('CardImpl: Füge Listener für EventType hinzu', { eventType });
+        this.addEventListener(eventType + '-event', this._notifyClientsAtChanges.bind(this));
+        this._registeredEventTypes.add(eventType);
+      } else {
+        this._debug('CardImpl: Listener für EventType bereits vorhanden', { eventType });
+      }
+
+      switch (eventType) {
+        case "envchanges":
+          this._initEnvSnifferIfNeeded();
+          if (immediately) {
+            // Stößt den EnvSniffer nochmal an
+            this._envSniffer.detectEnvironment();
+          }
+          break;
+        case "viewChanges":
+          break;
+      }
+    })
+
+    return true;
+
+
+  }
+
 
   /**
    * Behandelt Environment Observer Registrierungen via Events
@@ -163,7 +315,7 @@ export class CardImpl extends CardBase {
       };
 
       client.client.dispatchEvent(
-        new CustomEvent('environment-changed', {
+        new CustomEvent('envchanges-event', {
           detail: {
             oldState: null,
             newState: fallbackEnv,
@@ -218,7 +370,7 @@ export class CardImpl extends CardBase {
     });
 
     client.client.dispatchEvent(
-      new CustomEvent('environment-changed', {
+      new CustomEvent('envchanges-event', {
         detail: {
           oldState: null,
           newState: currentEnv,
@@ -229,15 +381,63 @@ export class CardImpl extends CardBase {
     );
   }
 
+
+  _notifyClientsAtChanges(event) {
+    this._debug('EPG-Card: notifyClientsAtChanges() Anfrage', {
+      event
+    });
+    // Sichere Extraktion des EventTypes (entferne '-event' Suffix)
+    const eventType = event.type.replace('-event', '');
+    const data = {
+      [eventType]: event.detail,
+    };
+
+    this._debug('EPG-Card: EventType extrahiert', {
+      originalEventType: event.type,
+      extractedEventType: eventType,
+      data: data,
+      clients: this.informAtChangesClients,
+    });
+
+    this.informAtChangesClients.forEach(client => {
+        // Prüfe ob client.me auf ein existierendes DOM-Element verweist
+        if (eventType &&
+            client.eventType.includes(eventType) &&
+            (client.me && (client.me instanceof Element || client.me.nodeType)) ) {
+          // Zusätzliche Prüfung: Ist das Element noch im DOM?
+          if (document.contains(client.me) || client.me.isConnected) {
+            // Client benachrichtigen
+            if (client.callback && typeof client.callback === 'function') {
+              try {
+                this._debug('EPG-Card: notifyClientsAtChanges() Client benachrichtigen', {
+                  client: client.me.constructor.name,
+                  eventType: eventType,
+                  data: data,
+                });
+                client.callback(data);
+              } catch (error) {
+                console.error('notifyClientsAtChanges Fehler beim Benachrichtigen des Clients:', error);
+              }
+            }
+          }
+        }
+      });
+  }
   /**
    * Behandelt Umgebungsänderungen
    */
-  _handleEnvironmentChange(event) {
-    const { oldState, newState } = event.detail;
-    this._debug('CardImpl: ENV Umgebungsänderung erkannt', { oldState, newState });
-    // Benachrichtige alle registrierten Environment Observer
-    this._notifyEnvironmentObservers(oldState, newState);
-  }
+  // _handleEnvironmentChange(event) {
+  //   const { oldState, newState } = event.detail;
+  //   const data = {
+  //     "envchanges": {
+  //     oldState,
+  //     newState,
+  //     }
+  //   };
+  //   this._debug('CardImpl: ENV Umgebungsänderung erkannt', { oldState, newState });
+  //   // Benachrichtige alle registrierten Environment Observer
+  //   this._notifyClientsAtChanges("envchanges", data);
+  // }
   /**
    * Registriert einen Observer für Umgebungsänderungen
    */
@@ -280,7 +480,7 @@ export class CardImpl extends CardBase {
         if (observer) {
           // Dispatch Event an den Observer
           observer.dispatchEvent(
-            new CustomEvent('environment-changed', {
+            new CustomEvent('envchanges-event', {
               detail: {
                 oldState,
                 newState,
@@ -358,19 +558,26 @@ export class CardImpl extends CardBase {
     this._viewType = 'EPGView';
 
     try {
-      this._view = new EPGView();
+    this._view = new EPGView();
       this._debug('CardImpl: Übergebe Konfiguration an EPG-View', {
-        epgShowPastTime: this.config.epgShowPastTime,
-        epgShowFutureTime: this.config.epgShowFutureTime,
-      });
-      this._view.config = this.config;
+      epgShowPastTime: this.config.epgShowPastTime,
+      epgShowFutureTime: this.config.epgShowFutureTime,
+    });
+    this._view.config = this.config;
       // this._view.env = this.env; // Nicht mehr nötig - Observer-Pattern übernimmt das
-      this._debug('CardImpl setConfig: View initialisiert:', {
-        viewMode: this._viewMode,
-        viewType: this._viewType,
-        config: this.config,
+
+      // Übergebe hass an die View, falls es bereits gesetzt wurde
+      if (this._hass) {
+        this._debug('CardImpl setConfig: Übergebe gespeicherten hass an EPG-View');
+        this._view.hass = this._hass;
+      }
+
+    this._debug('CardImpl setConfig: View initialisiert:', {
+      viewMode: this._viewMode,
+      viewType: this._viewType,
+      config: this.config,
         // env: this.env, // Nicht mehr nötig
-      });
+    });
     } catch (error) {
       this._debug('CardImpl setConfig: Fehler bei View-Initialisierung:', error);
       throw new Error(`Fehler bei der View-Initialisierung: ${error.message}`);
@@ -379,8 +586,11 @@ export class CardImpl extends CardBase {
 
   set hass(hass) {
     this._debug('CardImpl set hass wird aufgerufen');
+    this._hass = hass;
     if (this._view) {
       this._view.hass = hass;
+    } else {
+      this._debug('CardImpl set hass: View noch nicht initialisiert, speichere hass für später');
     }
   }
 
@@ -402,7 +612,7 @@ export class CardImpl extends CardBase {
     }
 
     try {
-      return this._view;
+    return this._view;
     } catch (error) {
       this._debug('CardImpl render: Fehler beim Rendern der View:', error);
       return html`<div class="error">Fehler beim Rendern: ${error.message}</div>`;

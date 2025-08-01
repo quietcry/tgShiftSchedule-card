@@ -34,19 +34,19 @@ export class Card extends CardImpl {
 
 // Registriere die Karte in der UI
 if (window.customCards) {
-  window.customCards.push({
-    type: CardRegname,
-    name: CardName,
-    description: CardDescription,
-    preview: true,
-  });
+window.customCards.push({
+  type: CardRegname,
+  name: CardName,
+  description: CardDescription,
+  preview: true,
+});
   console.log(`[${CardName}] Karte in customCards registriert`);
 }
 
 // Registriere die Karte als Custom Element
 if (!customElements.get(CardRegname)) {
   try {
-    customElements.define(CardRegname, Card);
+customElements.define(CardRegname, Card);
     console.log(`[${CardName}] Custom Element erfolgreich registriert`);
   } catch (error) {
     console.error(`[${CardName}] Fehler bei der Custom Element-Registrierung:`, error);

@@ -113,6 +113,25 @@ export class EpgTimebar extends EpgElementBase {
       latestProgramStop: this.latestProgramStop,
       scale: this.scale,
     });
+
+    // Informiere den Time Marker beim ersten Rendering
+    this._informTimeMarker();
+
+    // Registriere mich automatisch für View-Änderungen
+    this.dispatchEvent(
+      new CustomEvent('registerMeForChanges', {
+        bubbles: true,
+        composed: true,
+        detail: {
+          component: this,
+          callback: this._handleChangeNotifys.bind(this),
+          eventType: "progScrollX,envChanges",
+          immediately: true,
+        },
+      })
+    );
+
+    this._debug('EpgTimebar: registerMeForChanges Event ausgelöst');
   }
 
   updated(changedProperties) {
@@ -134,41 +153,70 @@ export class EpgTimebar extends EpgElementBase {
   }
 
   /**
-   * Callback für Änderungen in der epg-box (über registerInformMeAtViewChanges)
-   * @param {Object} changedProperties - Geänderte Properties
+   * Callback für Änderungen in der epg-box (über registerMeForChanges)
+   * @param {Object} eventdata - Event-Daten mit verschiedenen EventTypes
    */
-  onTimeBarValuesChanged(changedProperties) {
-    this._debug('EpgTimebar: Werte-Änderungen von epg-box empfangen', {
-      changedProperties: Array.from(changedProperties.keys()),
-      currentValues: {
-        earliestProgramStart: this.earliestProgramStart,
-        latestProgramStop: this.latestProgramStop,
-        scale: this.scale,
-      },
-    });
+  _handleChangeNotifys(eventdata) {
+    this._debug('EpgTimebar: Werte-Änderungen von epg-box empfangen')
 
-    // Setze die Werte direkt, da sie keine Lit-Properties mehr sind
-    let updated = false;
+    // Durchlaufe alle Keys in eventdata
+    for (const eventType of Object.keys(eventdata)) {
+      if (eventType === "viewChanges") {
+        const changedProperties = eventdata[eventType];
+        this._debug('EpgTimebar: View-Änderungen empfangen', {
+          changedProperties: Object.keys(changedProperties || {}),
+          currentValues: {
+            earliestProgramStart: this.earliestProgramStart,
+            latestProgramStop: this.latestProgramStop,
+            scale: this.scale,
+          },
+        });
 
-    // Schleife über alle relevanten Properties
-    for (const prop of this.propsNumbers) {
-      if (
-        changedProperties.has(prop) &&
-        changedProperties.get(prop) !== undefined &&
-        changedProperties.get(prop) !== null
-      ) {
-        const newValue = changedProperties.get(prop);
-        if (this[prop] !== newValue) {
-          this[prop] = newValue;
-          updated = true;
+        // Setze die Werte direkt, da sie keine Lit-Properties mehr sind
+        let updated = false;
+
+        // Schleife über alle relevanten Properties
+        for (const prop of this.propsNumbers) {
+          if (changedProperties.hasOwnProperty(prop) &&
+              changedProperties[prop] !== undefined &&
+              changedProperties[prop] !== null) {
+            const newValue = changedProperties[prop];
+            if (this[prop] !== newValue) {
+              this[prop] = newValue;
+              updated = true;
+            }
+          }
+        }
+
+        // Trigger Update nur wenn sich Werte geändert haben
+        if (updated) {
+          this._debug('EpgTimebar: Timebar-relevante Änderungen erkannt, aktualisiere Rendering');
+
+          // Informiere den Time Marker über die Änderungen
+          this._informTimeMarker();
+
+          this.requestUpdate();
         }
       }
+      // Hier können weitere EventTypes hinzugefügt werden
+      // else if (eventType === "envChanges") {
+      //   // Verarbeitung für Environment-Änderungen
+      // }
     }
+  }
 
-    // Trigger Update nur wenn sich Werte geändert haben
-    if (updated) {
-      this._debug('EpgTimebar: Timebar-relevante Änderungen erkannt, aktualisiere Rendering');
-      this.requestUpdate();
+  /**
+   * Informiert den Time Marker über Änderungen der relevanten Properties
+   */
+  _informTimeMarker() {
+    // Finde den Time Marker in der Shadow DOM
+    const timeMarker = this.shadowRoot?.querySelector('epg-time-marker');
+    if (timeMarker && timeMarker.updateTimeMarkerValues) {
+      timeMarker.updateTimeMarkerValues(
+        this.earliestProgramStart,
+        this.latestProgramStop,
+        this.scale
+      );
     }
   }
 
@@ -378,20 +426,6 @@ export class EpgTimebar extends EpgElementBase {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   }
 
-  _calculateNowMarkerPosition() {
-    if (!this.earliestProgramStart || !this.latestProgramStop || !this.currentTime) {
-      return -100; // Außerhalb des sichtbaren Bereichs
-    }
-
-    if (this.currentTime < this.earliestProgramStart || this.currentTime > this.latestProgramStop) {
-      return -100; // Außerhalb des sichtbaren Bereichs
-    }
-
-    const totalDuration = this.latestProgramStop - this.earliestProgramStart;
-    const currentPosition = this.currentTime - this.earliestProgramStart;
-    return (currentPosition / totalDuration) * 100;
-  }
-
   render() {
     let allFine = true;
     for (const prop of this.propsNumbers) {
@@ -404,22 +438,20 @@ export class EpgTimebar extends EpgElementBase {
       return html`<div class="timebar">Loading...</div>`;
     }
 
-    const nowMarkerPosition = this._calculateNowMarkerPosition();
-
-    //   <epg-timemarker
-    //   .earliestProgramStart=${this.earliestProgramStart}
-    //   .latestProgramStop=${this.latestProgramStop}
-    //   .currentTime=${this.currentTime}
-    //   .scale=${this.scale}
-    //   style="left: ${nowMarkerPosition}%"
-    // ></epg-timemarker>
 
     return html`
-      <div class="timebar" style="--epg-scale: ${this.scale}">${this._createTimeSlots()}</div>
+      <div class="timebar" style="--epg-scale: ${this.scale}">
+        ${this._createTimeSlots()}
+        <epg-time-marker
+          .earliestProgramStart=${this.earliestProgramStart}
+          .latestProgramStop=${this.latestProgramStop}
+          .scale=${this.scale}
+        ></epg-time-marker>
+      </div>
     `;
   }
 }
 
 if (!customElements.get('epg-timebar')) {
-  customElements.define('epg-timebar', EpgTimebar);
+customElements.define('epg-timebar', EpgTimebar);
 }

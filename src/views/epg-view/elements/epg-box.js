@@ -10,7 +10,6 @@ import { EpgChannelManager } from './epg-channel-manager.js';
 import { EpgDataManager } from './epg-data-manager.js';
 import { EpgRenderManager } from './epg-render-manager.js';
 import { EpgUpdateManager } from './epg-update-manager.js';
-import { EpgTimeMarkerManager } from './epg-timemarker-manager.js';
 
 export class EpgBox extends EpgElementBase {
   static className = 'EpgBox';
@@ -108,37 +107,6 @@ export class EpgBox extends EpgElementBase {
     this.dataManager = new EpgDataManager(this);
     this.renderManager = new EpgRenderManager(this);
 
-    this.informMeAtViewChanges = [];
-  }
-
-  /**
-   * Registriert einen Observer für bestimmte Property-Änderungen
-   * @param {string} me - referenz or string to me
-   * @param {Function} callback - Callback-Funktion, die bei Änderungen aufgerufen wird
-   */
-  registerInformMeAtViewChanges(me, callback = null) {
-    // Prüfe ob der Observer bereits registriert ist
-    const existingInformer = this.informMeAtViewChanges.find(informer => informer.me === me);
-
-    if (existingInformer) {
-      this._debug('EpgBox: Informer bereits registriert', {
-        me,
-      });
-      return false;
-    }
-
-    // Füge neuen Observer hinzu
-    this.informMeAtViewChanges.push({
-      me,
-      callback,
-    });
-
-    this._debug('EpgBox:Informer registriert', {
-      me,
-      totalObservers: this.informMeAtViewChanges.length,
-    });
-
-    return true;
   }
 
   /**
@@ -151,59 +119,47 @@ export class EpgBox extends EpgElementBase {
 
   updated(changedProperties) {
     // Ignoriere leere Property-Änderungen
-
     if (changedProperties.size === 0) {
       return;
     }
-
-    // Debug: Zeige alle geänderten Properties mit ihren Werten
-    const changedPropsWithValues = {};
-    changedProperties.forEach((value, key) => {
-      changedPropsWithValues[key] = value;
-    });
-
-    // Prüfe speziell die Zeit-Properties
-    const timePropsChanged =
-      changedProperties.has('earliestProgramStart') || changedProperties.has('latestProgramStop');
-
-    this._debug('updated requested >>', {
-      changedProperties: changedPropsWithValues,
-      earliestProgramStart: this.earliestProgramStart,
-      latestProgramStop: this.latestProgramStop,
-      timePropsChanged,
-      hasEarliest: changedProperties.has('earliestProgramStart'),
-      hasLatest: changedProperties.has('latestProgramStop'),
-    });
 
     this.updateManager.handleUpdate(changedProperties);
 
     // ===== REPEAT-DIREKTIVE OPTIMIERUNGEN =====
 
     if (changedProperties.has('channelOrder')) {
-      this._debug('channelOrder geändert');
       this._channelOrderInitialized = false;
-      // this.channelManager.initializeChannelOrder();
-      // Mit repeat-Direktive ist requestUpdate() nicht mehr nötig
     }
 
     // Aktualisiere das flache Array, wenn sich _sortedChannels ändert
     if (changedProperties.has('_sortedChannels')) {
-      this._debug('_sortedChannels geändert - aktualisiere flaches Array');
-      // this.channelManager.updateFlatChannels();
       // Mit repeat-Direktive ist requestUpdate() nicht mehr nötig
     }
 
     // ===== ZEIT-UPDATES (über DataManager) =====
     if (this._isTimeRelevant(changedProperties)) {
-      this._debug('EpgBox: Zeit-relevante Änderung erkannt, leite an DataManager weiter');
       // this.dataManager.updateTimeParameters();
     }
 
     // ===== KANAL-UPDATES (über DataManager) =====
     if (this._isChannelRelevant(changedProperties)) {
-      this._debug('EpgBox: Kanal-relevante Änderung erkannt');
       // Mit repeat-Direktive werden Kanal-Updates automatisch gehandhabt
     }
+
+    // ===== SCROLLING NACH PROGRAMM-ÄNDERUNGEN =====
+    if (changedProperties.has('_sortedChannels') || changedProperties.has('earliestProgramStart') || changedProperties.has('latestProgramStop')) {
+      this._debug('EpgBox: Scrolling-Trigger erkannt', {
+        hasSortedChannels: changedProperties.has('_sortedChannels'),
+        hasEarliestProgramStart: changedProperties.has('earliestProgramStart'),
+        hasLatestProgramStop: changedProperties.has('latestProgramStop'),
+        earliestProgramStart: this.earliestProgramStart,
+        latestProgramStop: this.latestProgramStop,
+        sortedChannelsLength: this._sortedChannels?.length,
+      });
+
+      // Führe Scrolling nach Programm-Änderungen aus
+      this.renderManager.scrollProgramBox();
+      }
 
     // Prüfe epgBackview Validierung
     if (
@@ -269,23 +225,23 @@ export class EpgBox extends EpgElementBase {
       });
 
       // Sende Event, dass der erste Load abgeschlossen ist
-      this.dispatchEvent(
+    this.dispatchEvent(
         new CustomEvent('epg-first-load-complete', {
           detail: {
             isFirstLoad: this.isFirstLoad,
             isChannelUpdate: this.isChannelUpdate,
             channelCount: this._sortedChannels.length,
           },
-          bubbles: true,
-          composed: true,
-        })
-      );
+        bubbles: true,
+        composed: true,
+      })
+    );
     }
 
-    // // Scroll ProgramBox wenn isFirstLoad < 2
-    // if (this.isFirstLoad < 2) {
-    //   this.scrollManager.scrollToBackviewPosition();
-    // }
+    this._debug('EpgBox: testIsFirstLoadCompleteUpdated - Status', {
+      isFirstLoad: this.isFirstLoad,
+      isChannelUpdate: this.isChannelUpdate,
+    });
   }
 
   firstUpdated() {
@@ -300,28 +256,50 @@ export class EpgBox extends EpgElementBase {
       channelBox: !!this.channelBox,
     });
 
+    // Berechne Scale beim ersten Laden
+    this.scaleManager.calculateScale();
+    this._debug('EpgBox: Scale beim ersten Laden berechnet', {
+      scale: this.scale,
+      containerWidth: this.containerWidth,
+      channelWidth: this.channelWidth,
+    });
+
     // DEBUG: Dummy-Daten werden jetzt über EPGView._loadData() geladen
     // this._loadDummyDataForDebug();
 
     // Einrichten der Scroll-Synchronisation
-    // this.scrollManager.setupScrollSync();
+    this.scrollManager.setupScrollSync();
 
     // Registriere bei CardImpl für Umgebungsänderungen
     // this._registerForEnvironmentUpdates();
 
     // Event-Listener für Environment-Änderungen
-    this.addEventListener('environment-changed', this._handleEnvironmentChanged.bind(this));
+    // this.addEventListener('environment-changed', this._handleEnvironmentChanged.bind(this));
 
     // Registriere als Environment Observer bei CardImpl
+    // Registriere mich automatisch für View-Änderungen
     this.dispatchEvent(
-      new CustomEvent('register-observer-client', {
+      new CustomEvent('registerMeForChanges', {
         bubbles: true,
         composed: true,
         detail: {
-          client: this,
+          component: this,
+          callback: this._handleChangeNotifys.bind(this),
+          eventType: "envChanges",
+          immediately: true,
         },
       })
     );
+
+    // this.dispatchEvent(
+    //   new CustomEvent('register-observer-client', {
+    //     bubbles: true,
+    //     composed: true,
+    //     detail: {
+    //       client: this,
+    //     },
+    //   })
+    // );
 
     // // Prüfe, ob env bereits gesetzt ist, falls nicht, stößt den EnvSniffer an
     // if (!this.env || !this.env.cardWidth) {
@@ -346,50 +324,61 @@ export class EpgBox extends EpgElementBase {
   /**
    * Behandelt Environment-Änderungen über Events
    */
-  _handleEnvironmentChanged(event) {
-    const { oldState, newState } = event.detail;
-    this._debug('_handleEnvironmentChanged(): Environment-Änderung/Update empfangen', {
-      oldState,
-      newState,
-      newStateKeys: newState ? Object.keys(newState) : [],
-      currentEnvSnifferCardWidth: this.envSnifferCardWidth,
-      newCardWidth: newState?.envSnifferCardWidth,
-    });
+  _handleChangeNotifys(eventdata) {
+    this._debug('_handleEnvironmentChanged(): Environment-Änderung/Update empfangen')
 
-    // Aktualisiere Environment-Properties dynamisch
-    if (newState) {
-      const oldCardWidth = this.envSnifferCardWidth;
+    // Durchlaufe alle Keys in eventdata
+    for (const eventType of Object.keys(eventdata)) {
+      if (eventType === "envchanges") {
+        const { oldState, newState } = eventdata[eventType];
+        this._debug('_handleEnvironmentChanged(): Environment-Änderung/Update empfangen', {
+          oldState,
+          newState,
+          newStateKeys: newState ? Object.keys(newState) : [],
+          currentEnvSnifferCardWidth: this.envSnifferCardWidth,
+          newCardWidth: newState?.envSnifferCardWidth,
+        });
 
-      // Durchlaufe alle Keys von newState und aktualisiere entsprechende Properties
-      for (const [key, value] of Object.entries(newState)) {
-        if (this.hasOwnProperty(key)) {
-          this[key] = value;
+        // Aktualisiere Environment-Properties dynamisch
+        if (newState) {
+          const oldCardWidth = this.envSnifferCardWidth;
+
+          // Durchlaufe alle Keys von newState und aktualisiere entsprechende Properties
+          for (const [key, value] of Object.entries(newState)) {
+            if (this.hasOwnProperty(key)) {
+              this[key] = value;
+            }
+          }
+
+          this._debug('_handleEnvironmentChanged(): Properties aktualisiert', {
+            oldCardWidth,
+            newCardWidth: this.envSnifferCardWidth,
+            cardHeight: this.envSnifferCardHeight,
+            updatedKeys: Object.keys(newState),
+          });
         }
+
+        // Benachrichtige UpdateManager über env-Änderung
+        this.updateManager.handleUpdate(new Map([['env', newState]]));
       }
-
-      this._debug('_handleEnvironmentChanged(): Properties aktualisiert', {
-        oldCardWidth,
-        newCardWidth: this.envSnifferCardWidth,
-        cardHeight: this.envSnifferCardHeight,
-        updatedKeys: Object.keys(newState),
-      });
+      // Hier können weitere EventTypes hinzugefügt werden
+      // else if (eventType === "viewChanges") {
+      //   // Verarbeitung für viewChanges
+      // }
     }
-
-    // Benachrichtige UpdateManager über env-Änderung
-    this.updateManager.handleUpdate(new Map([['env', newState]]));
   }
 
   static styles = [
     super.styles,
     css`
-      :host {
+    :host {
         display: flex;
         flex-direction: row;
-        width: 100%;
+      width: 100%;
         height: auto; /* Automatische Höhe basierend auf Inhalt */
         overflow: hidden; /* Versteckt Overflow, damit ProgramBox scrollen kann */
-        position: relative;
-      }
+      position: relative;
+    }
 
       .timeBar {
         width: 100%;
@@ -397,39 +386,39 @@ export class EpgBox extends EpgElementBase {
         flex-shrink: 0;
       }
 
-      .channelBox {
+    .channelBox {
         border-right: 1px solid var(--epg-border-color);
-        margin: 0; /* Keine äußeren Abstände */
-        padding: 0; /* Keine inneren Abstände */
-        display: flex;
-        flex-direction: column;
-        flex-shrink: 0;
+      margin: 0; /* Keine äußeren Abstände */
+      padding: 0; /* Keine inneren Abstände */
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
         /* Die Breite wird dynamisch über einen Inline-Style gesetzt */
         align-items: stretch; /* Verhindert Verteilung über Höhe */
         justify-content: flex-start; /* Startet oben */
         height: fit-content; /* Höhe passt sich an Inhalt an */
         max-height: none; /* Keine Höhenbegrenzung */
-      }
+    }
 
-      .programBox {
-        flex: 1;
-        overflow-x: auto;
+    .programBox {
+      flex: 1;
+      overflow-x: auto;
         overflow-y: auto;
-        margin: 0; /* Keine äußeren Abstände */
-        padding: 0; /* Keine inneren Abstände */
-        display: flex;
-        flex-direction: column;
+      margin: 0; /* Keine äußeren Abstände */
+      padding: 0; /* Keine inneren Abstände */
+      display: flex;
+      flex-direction: column;
         height: 100%; /* Feste Höhe für Scrollbalken */
         min-width: 0; /* Erlaubt Schrumpfen */
         position: relative; /* Für absolute Positionierung des TimeMarkers */
-      }
+    }
 
-      .programRow {
-        display: flex;
+    .programRow {
+      display: flex;
         border-bottom: none; /* Kein Border */
-        margin: 0; /* Keine äußeren Abstände */
-        padding: 0; /* Keine inneren Abstände */
-        flex-shrink: 0;
+      margin: 0; /* Keine äußeren Abstände */
+      padding: 0; /* Keine inneren Abstände */
+      flex-shrink: 0;
         flex-grow: 0; /* Verhindert Wachsen */
         /* Höhenklassen werden über epg-row-height angewendet */
         height: calc(
@@ -471,20 +460,20 @@ export class EpgBox extends EpgElementBase {
       epg-program-item:hover {
         background-color: var(--epg-hover-bg) !important;
         color: var(--epg-text-color) !important;
-      }
+    }
 
-      .channelGroup {
+    .channelGroup {
         padding: 4px var(--epg-padding);
         background-color: var(--epg-header-bg);
         color: var(--epg-text-color);
-        font-weight: bold;
-        display: flex;
-        align-items: center;
-        margin: 0; /* Keine äußeren Abstände */
-        flex-shrink: 0; /* Verhindert Schrumpfen */
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      margin: 0; /* Keine äußeren Abstände */
+      flex-shrink: 0; /* Verhindert Schrumpfen */
         height: var(--epg-row-height);
         box-sizing: border-box;
-      }
+    }
 
       /* Gruppen-Header Styles */
       .group-header {
@@ -529,14 +518,14 @@ export class EpgBox extends EpgElementBase {
         color: var(--epg-text-color) !important;
       }
 
-      .channelRow {
+    .channelRow {
         padding: 0; /* Kein Padding */
         border: none; /* Kein Border auf der Row selbst */
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        margin: 0; /* Keine äußeren Abstände */
-        flex-shrink: 0; /* Verhindert Schrumpfen */
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      margin: 0; /* Keine äußeren Abstände */
+      flex-shrink: 0; /* Verhindert Schrumpfen */
         flex-grow: 0; /* Verhindert Wachsen */
         /* Höhenklassen werden über epg-row-height angewendet */
         height: calc(
@@ -590,45 +579,45 @@ export class EpgBox extends EpgElementBase {
       .channelRow.selected .channelRowContent {
         background-color: var(--epg-accent);
         color: var(--epg-text-color);
-      }
+    }
 
-      .programSlot {
+    .programSlot {
         padding: var(--epg-padding);
         border: 1px solid var(--epg-border-color);
-        margin: 4px;
-        cursor: pointer;
-        transition: background-color 0.2s ease;
-      }
+      margin: 4px;
+      cursor: pointer;
+      transition: background-color 0.2s ease;
+    }
 
-      .programSlot:hover {
+    .programSlot:hover {
         background-color: var(--epg-hover-bg);
-      }
+    }
 
-      .programSlot.current {
+    .programSlot.current {
         background-color: var(--epg-accent);
         color: var(--epg-text-color);
-      }
+    }
 
-      .programTitle {
-        font-weight: bold;
-        margin-bottom: 4px;
-      }
+    .programTitle {
+      font-weight: bold;
+      margin-bottom: 4px;
+    }
 
-      .programTime {
-        font-size: 0.8em;
+    .programTime {
+      font-size: 0.8em;
         color: var(--epg-time-color);
-      }
+    }
 
-      .programDescription {
-        font-size: 0.8em;
+    .programDescription {
+      font-size: 0.8em;
         color: var(--epg-description-color);
-        margin-top: 4px;
-      }
+      margin-top: 4px;
+    }
 
-      .loading {
-        display: flex;
+    .loading {
+      display: flex;
         justify-content: center;
-        align-items: center;
+      align-items: center;
         height: 200px;
         color: var(--epg-text-color);
       }
@@ -685,7 +674,6 @@ export class EpgBox extends EpgElementBase {
     }
 
     // Verwende die optimierte renderWithRepeat-Methode
-    this._debug('EpgBox: Render mit repeat-Direktive gestartet');
     return this.renderWithRepeat();
   }
 
@@ -694,8 +682,6 @@ export class EpgBox extends EpgElementBase {
    * Diese Version würde automatisch alle DOM-Updates handhaben
    */
   renderWithRepeat() {
-    this._debug('EpgBox: Render mit repeat-Direktive');
-
     return html`
       <!-- Channel-Box -->
       <div
@@ -973,6 +959,12 @@ export class EpgBox extends EpgElementBase {
   }
 
   addTeilEpg(teilEpg) {
+    // Setze isFirstLoad auf 1 beim ersten Teil-EPG
+    if (this.isFirstLoad === 0) {
+      this.isFirstLoad = 1;
+      this._debug('EpgBox: isFirstLoad auf 1 gesetzt - erstes Teil-EPG geladen');
+    }
+
     this.dataManager.addTeilEpg(teilEpg);
   }
 
@@ -1266,68 +1258,6 @@ export class EpgBox extends EpgElementBase {
   //     this._debug('EpgBox: Fehler beim Laden der Dummy-Daten', { error: error.message });
   //   }
   // }
-
-  /**
-   * Registriert einen Observer für bestimmte Property-Änderungen
-   * @param {string} propertyName - Name der Property (z.B. 'scale', 'earliestProgramStart', 'latestProgramStop')
-   * @param {Function} callback - Callback-Funktion, die bei Änderungen aufgerufen wird
-   * @param {Object} context - Kontext-Objekt (z.B. die epg-view)
-   */
-  registerViewObserver(propertyName, callback, context) {
-    // Prüfe ob der Observer bereits registriert ist
-    const existingObserver = this.informMeAtViewChanges.find(
-      observer => observer.propertyName === propertyName && observer.context === context
-    );
-
-    if (existingObserver) {
-      this._debug('EpgBox: Observer bereits registriert', {
-        propertyName,
-        context: context?.constructor?.name || 'unknown',
-      });
-      return false;
-    }
-
-    // Füge neuen Observer hinzu
-    this.informMeAtViewChanges.push({
-      propertyName,
-      callback,
-      context,
-    });
-
-    this._debug('EpgBox: Observer registriert', {
-      propertyName,
-      context: context?.constructor?.name || 'unknown',
-      totalObservers: this.informMeAtViewChanges.length,
-    });
-
-    return true;
-  }
-
-  /**
-   * Entfernt einen Observer für bestimmte Property-Änderungen
-   * @param {string} propertyName - Name der Property
-   * @param {Object} context - Kontext-Objekt
-   */
-  unregisterViewObserver(propertyName, context) {
-    const initialLength = this.informMeAtViewChanges.length;
-
-    this.informMeAtViewChanges = this.informMeAtViewChanges.filter(
-      observer => !(observer.propertyName === propertyName && observer.context === context)
-    );
-
-    const removedCount = initialLength - this.informMeAtViewChanges.length;
-
-    if (removedCount > 0) {
-      this._debug('EpgBox: Observer entfernt', {
-        propertyName,
-        context: context?.constructor?.name || 'unknown',
-        removedCount,
-        remainingObservers: this.informMeAtViewChanges.length,
-      });
-    }
-
-    return removedCount > 0;
-  }
 }
 
 customElements.define('epg-box', EpgBox);

@@ -281,7 +281,7 @@ export class EnvSniffer extends TgCardHelper {
     // Aktualisiere die öffentliche env-Property
     this.env = newState;
 
-    const event = new CustomEvent('environment-changed', {
+    const event = new CustomEvent('envchanges-event', {
       detail: {
         oldState,
         newState,

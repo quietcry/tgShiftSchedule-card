@@ -80,4 +80,4 @@ export default {
     topLevelAwait: true
   },
   devtool: 'source-map'
-}; 
+};

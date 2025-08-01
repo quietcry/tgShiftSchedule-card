@@ -317,7 +317,7 @@ export class EpgUpdateManager extends TgCardHelper {
    */
 
   _handleScaleCalculation(changedProperties) {
-    this._debug('EpgUpdateManager: Verarbeite Scale!-Update', { scale: this.epgBox.scale });
+    this._debug('czEpgUpdateManager: Verarbeite Scale!-Update', { scale: this.epgBox.scale });
 
     // Setze CSS-Variable für Scale (vermeidet Re-Rendering)
     const programBox = this.epgBox.shadowRoot?.querySelector('.programBox');
@@ -457,29 +457,19 @@ export class EpgUpdateManager extends TgCardHelper {
       properties: Array.from(changedProperties.keys()),
     });
 
-    // Benachrichtige alle registrierten Observer
-    if (this.epgBox.informMeAtViewChanges && this.epgBox.informMeAtViewChanges.length > 0) {
-      this._debug('EpgUpdateManager: Benachrichtige registrierte Observer', {
-        observerCount: this.epgBox.informMeAtViewChanges.length,
-      });
+    // Sende Event an die epg-view für View-Änderungen
+    this.epgBox.dispatchEvent(
+      new CustomEvent('view-changes', {
+        bubbles: true,
+        composed: true,
+        detail: {
+          changedProperties: changedProperties,
+        },
+      })
+    );
 
-      this.epgBox.informMeAtViewChanges.forEach(observer => {
-        if (observer.callback && typeof observer.callback === 'function') {
-          try {
-            observer.callback(changedProperties);
-            this._debug('EpgUpdateManager: Observer benachrichtigt', {
-              observer: observer.me,
-            });
-          } catch (error) {
-            this._debug('EpgUpdateManager: Fehler beim Benachrichtigen des Observers', {
-              observer: observer.me,
-              error: error.message,
-            });
-          }
-        }
-      });
-    } else {
-      this._debug('EpgUpdateManager: Keine registrierten Observer vorhanden');
-    }
+    this._debug('EpgUpdateManager: View-Update Event gesendet', {
+      properties: Array.from(changedProperties.keys()),
+    });
   }
 }

@@ -30,7 +30,7 @@ class MockEpgBox {
     this._flatChannels = [];
     this.isChannelUpdate = 0;
     this._channelOrderInitialized = false;
-    
+
     // Mock Channel Manager
     this.channelManager = {
       initializeChannelOrder() {
@@ -60,10 +60,10 @@ class MockEpgDataManager extends MockTgCardHelper {
 
     const now = Math.floor(Date.now() / 1000);
     const baseTime = Math.floor(now / 1800) * 1800; // Runde auf nächste halbe Stunde
-    
+
     const channelNames = [
       'ARD HD',
-      'ZDF HD', 
+      'ZDF HD',
       'RTL HD',
       'ProSieben HD'
     ];
@@ -87,20 +87,20 @@ class MockEpgDataManager extends MockTgCardHelper {
 
     channelNames.forEach((channelName, channelIndex) => {
       const channelId = `DUMMY-CHANNEL-${channelIndex + 1}`;
-      
+
       // Erstelle 3 Programme pro Kanal mit unterschiedlichen Startzeiten
       const programs = [];
-      
+
       for (let i = 0; i < 3; i++) {
         // Dynamische Startzeit: Basis + Offset (Vielfache von 30 Minuten)
         const startOffset = (channelIndex * 2 + i * 3) * 1800; // 30 Minuten = 1800 Sekunden
         const duration = (2 + i) * 1800; // 1-3 Stunden
-        
+
         const startTime = baseTime + startOffset;
         const endTime = startTime + duration;
-        
+
         const programIndex = (channelIndex * 3 + i) % programTitles.length;
-        
+
         programs.push({
           id: `${channelId}-PROG-${i + 1}`,
           title: `${programTitles[programIndex]} ${i + 1}`,
@@ -156,12 +156,12 @@ console.log('\n=== Generierte Dummy-Daten ===');
 dummyData.forEach((channel, index) => {
   console.log(`\nKanal ${index + 1}: ${channel.channeldata.name} (${channel.id})`);
   console.log('Programme:');
-  
+
   channel.programs.forEach((program, progIndex) => {
     const startTime = new Date(program.start * 1000);
     const endTime = new Date(program.stop * 1000);
     const duration = (program.stop - program.start) / 3600; // Stunden
-    
+
     console.log(`  ${progIndex + 1}. ${program.title}`);
     console.log(`     Start: ${startTime.toISOString()}`);
     console.log(`     Ende:  ${endTime.toISOString()}`);
@@ -170,4 +170,4 @@ dummyData.forEach((channel, index) => {
   });
 });
 
-console.log('\n=== Test abgeschlossen ==='); 
+console.log('\n=== Test abgeschlossen ===');

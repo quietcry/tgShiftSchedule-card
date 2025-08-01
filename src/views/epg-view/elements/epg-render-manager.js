@@ -120,28 +120,25 @@ export class EpgRenderManager extends TgCardHelper {
         ></epg-program-item>
       `;
     } else {
-      // Normales Programm-Item
-      return html`
-        <epg-program-item
-          .start=${program.start || 0}
-          .stop=${program.end || program.stop || 0}
-          .duration=${program.duration || 0}
-          .title=${program.title || ''}
-          .description=${program.description || ''}
-          .shortText=${program.shorttext || ''}
-          .isCurrent=${this.epgBox.dataManager.isCurrentTimeSlot(
-            program,
-            Math.floor(Date.now() / 1000)
-          )}
-          .showTime=${this.epgBox.showTime}
-          .showDuration=${this.epgBox.showDuration}
-          .showDescription=${this.epgBox.showDescription}
-          .showShortText=${this.epgBox.showShortText}
-          .id=${channelId + '_' + program.id || ''}
+      // Normales Programm-Item - verwende bereits berechnete isCurrent Property
+    return html`
+      <epg-program-item
+        .start=${program.start || 0}
+        .stop=${program.end || program.stop || 0}
+        .duration=${program.duration || 0}
+        .title=${program.title || ''}
+        .description=${program.description || ''}
+        .shortText=${program.shorttext || ''}
+          .isCurrent=${program.isCurrent || false}
+        .showTime=${this.epgBox.showTime}
+        .showDuration=${this.epgBox.showDuration}
+        .showDescription=${this.epgBox.showDescription}
+        .showShortText=${this.epgBox.showShortText}
+        .id=${channelId + '_' + program.id || ''}
           .type=${'item'}
-          @program-selected=${e => this.epgBox._onProgramSelected(e.detail)}
-        ></epg-program-item>
-      `;
+        @program-selected=${e => this.epgBox._onProgramSelected(e.detail)}
+      ></epg-program-item>
+    `;
     }
   }
 
@@ -151,35 +148,12 @@ export class EpgRenderManager extends TgCardHelper {
   renderProgramRow(channel, rowIndex = 0) {
     const programs = channel.programs || [];
 
-    this._debug('EpgRenderManager: Rendere Programmzeile für Kanal', {
-      kanal: channel.channeldata?.name || channel.name,
-      kanalId: channel.id,
-      anzahlProgramme: programs.length,
-      prog: programs[0],
-      programme: programs.map(p => ({
-        title: p.title,
-        start: new Date(p.start * 1000).toISOString(),
-        end: new Date((p.end || p.stop) * 1000).toISOString(),
-      })),
-    });
-
-    // progdebug: Komplette Programmliste für diesen Kanal vor Verarbeitung
-    console.debug('progdebug', 'Alle Programme vor Rendern:', {
-      kanal: channel.channeldata?.name || channel.name,
-      programme: channel.programs,
-    });
-
-    // progdebug: Zeige alle tatsächlich gerenderten Programme (ohne Gaps)
-    if (programs.length > 0) {
-      console.debug('progdebug', {
-        kanal: channel.channeldata?.name || channel.name,
-        programme: programs.map(p => ({
-          titel: p.title,
-          start: new Date(p.start * 1000).toLocaleString(),
-          stop: new Date((p.end || p.stop) * 1000).toLocaleString(),
-        })),
-      });
-    }
+    // Debug komplett ausgeschaltet für Performance
+    // this._debug('EpgRenderManager: Rendere Programmzeile für Kanal', {
+    //   kanal: channel.channeldata?.name || channel.name,
+    //   kanalId: channel.id,
+    //   anzahlProgramme: programs.length,
+    // });
 
     let allElements = [];
 
@@ -187,15 +161,8 @@ export class EpgRenderManager extends TgCardHelper {
       // Startgap: Von earliestProgramStart bis zum ersten Programm (immer einfügen, auch bei 0 Breite)
       const firstProgramStart = programs[0].start;
       const lastProgramStop = programs[programs.length - 1].stop;
-      // this._debug('updateGapTimeAttributes - gapslength', {
-      //   startgap: (firstProgramStart < this.epgBox.earliestProgramStart) ? 'true' : 'false',
-      //   endgap: (lastProgramStop > this.epgBox.latestProgramStop) ? 'true' : 'false',
-      //   firstProgramStart: new Date(firstProgramStart * 1000).toISOString(),
-      //   lastProgramStop: new Date(lastProgramStop * 1000).toISOString(),
-      //   earliestProgramStart: new Date(this.epgBox.earliestProgramStart * 1000).toISOString(),
-      //   latestProgramStop: new Date(this.epgBox.latestProgramStop * 1000).toISOString(),
-      // });
 
+      // Aktualisiere latestProgramStop wenn nötig
       if (lastProgramStop > this.epgBox.latestProgramStop) {
         this._debug('EpgRenderManager: latestProgramStop aktualisiert', {
           alterWert: this.epgBox.latestProgramStop,
@@ -213,11 +180,12 @@ export class EpgRenderManager extends TgCardHelper {
         this.scheduleEndgapUpdate();
       }
 
+      // Aktualisiere earliestProgramStart wenn nötig
       if (firstProgramStart < this.epgBox.earliestProgramStart) {
         this._debug('EpgRenderManager: earliestProgramStart aktualisiert', {
           alterWert: this.epgBox.earliestProgramStart,
           neuerWert: firstProgramStart,
-          kanal: channel.channeldata?.name || channel.name,
+      kanal: channel.channeldata?.name || channel.name,
         });
         this.epgBox.earliestProgramStart = firstProgramStart;
 
@@ -256,26 +224,6 @@ export class EpgRenderManager extends TgCardHelper {
       this._debug('EpgRenderManager: Keine Programme - großes Gap hinzugefügt');
     }
 
-    // Debug-Ausgabe nur wenn programBox verfügbar ist
-    if (this.epgBox.programBox) {
-      const gapElements =
-        this.epgBox.programBox.querySelectorAll(
-          'epg-program-item.type-startgap, epg-program-item.type-noprogram'
-        ) || [];
-      this._debug('Startgap-Element!');
-
-      // Debug-Ausgabe für alle Endgap-Elemente
-      gapElements.forEach(element => {
-        this._debug('Startgap-Element', {
-          id: element.id,
-          start: element.start,
-          stop: element.stop,
-          earliestProgramStart: this.epgBox.earliestProgramStart,
-          latestProgramStop: this.epgBox.latestProgramStop,
-        });
-      });
-    }
-
     return html`
       <div
         class="programRow epg-row-height ${this.epgBox._calculateHeightClasses(
@@ -296,6 +244,67 @@ export class EpgRenderManager extends TgCardHelper {
           : html` <div class="noPrograms">Keine Programme verfügbar</div> `}
       </div>
     `;
+  }
+
+  /**
+   * Berechnet die Scroll-Position für die Programmbox
+   * Formel: ((now - epgShowPastTime) - earliestProgramStart) * scale
+   */
+  calculateScrollPosition() {
+    const now = Math.floor(Date.now() / 1000);
+    const pastTime = this.epgBox.epgShowPastTime || 30; // Minuten in die Vergangenheit
+    const pastTimeSeconds = pastTime * 60;
+
+    // Hole scale aus CSS-Properties oder verwende this.epgBox.scale
+    let scale = this.epgBox.scale;
+    if (!scale && this.epgBox.programBox) {
+      const computedStyle = getComputedStyle(this.epgBox.programBox);
+      const cssScale = computedStyle.getPropertyValue('--epg-scale');
+      scale = parseFloat(cssScale) || 1;
+    }
+
+    const scrollPosition = ((now - pastTimeSeconds) - this.epgBox.earliestProgramStart) * scale;
+
+    this._debug('EpgRenderManager: Berechne Scroll-Position', {
+      now: new Date(now * 1000).toISOString(),
+      nowLocal: new Date(now * 1000).toLocaleString(),
+      pastTimeMinutes: pastTime,
+      pastTimeSeconds: pastTimeSeconds,
+      earliestProgramStart: new Date(this.epgBox.earliestProgramStart * 1000).toISOString(),
+      earliestProgramStartLocal: new Date(this.epgBox.earliestProgramStart * 1000).toLocaleString(),
+      scale: scale,
+      cssScale: this.epgBox.programBox ? getComputedStyle(this.epgBox.programBox).getPropertyValue('--epg-scale') : 'nicht verfügbar',
+      scrollPosition: scrollPosition,
+      calculation: `((${now} - ${pastTimeSeconds}) - ${this.epgBox.earliestProgramStart}) * ${scale} = ${scrollPosition}`,
+    });
+
+    return Math.max(0, scrollPosition); // Nicht negativ
+  }
+
+  /**
+   * Führt das Scrolling in der Programmbox aus
+   */
+  scrollProgramBox() {
+    this._debug('EpgRenderManager: scrollProgramBox aufgerufen');
+
+    if (!this.epgBox.programBox) {
+      this._debug('EpgRenderManager: ProgramBox nicht gefunden für Scrolling');
+      return;
+    }
+
+    const scrollPosition = this.calculateScrollPosition();
+
+    this._debug('EpgRenderManager: Scrolle ProgramBox', {
+      scrollPosition: scrollPosition,
+      programBoxExists: !!this.epgBox.programBox,
+      programBoxScrollLeft: this.epgBox.programBox.scrollLeft,
+    });
+
+    this.epgBox.programBox.scrollLeft = scrollPosition;
+
+    this._debug('EpgRenderManager: Scrolling abgeschlossen', {
+      newScrollLeft: this.epgBox.programBox.scrollLeft,
+    });
   }
 
   /**
