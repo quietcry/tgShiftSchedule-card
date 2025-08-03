@@ -54,7 +54,38 @@ export class SuperBase extends LitElement {
     else if (this.cardName) {
       className = this.cardName;
     }
-    this.tgCardHelper.className = className;
-    this.tgCardHelper._debug(message, data);
+
+    // Ermittle den Methodennamen des Aufrufers
+    let methodName = 'unknown';
+    try {
+      const stack = new Error().stack.split('\n');
+      const callerLine = stack[2]; // Index 2 für die aufrufende Methode
+
+      // Verschiedene Regex-Patterns für verschiedene Browser-Formate
+      const patterns = [
+        /at\s+\w+\.(\w+)/,           // Chrome/Node.js: "at ClassName.methodName"
+        /(\w+)@/,                     // Firefox: "methodName@"
+        /(\w+)\s+\(/,                 // Alternative: "methodName("
+        /at\s+(\w+)/                  // Fallback: "at methodName"
+      ];
+
+      for (const pattern of patterns) {
+        const methodMatch = callerLine.match(pattern);
+        if (methodMatch) {
+          methodName = methodMatch[1];
+          break;
+        }
+      }
+    } catch (error) {
+      // Fallback falls Stack Trace nicht verfügbar
+      methodName = 'unknown';
+    }
+    const path = {
+      methodName: methodName,
+      className: className,
+      cardName: this.cardName,
+    };
+    // this.tgCardHelper.className = className;
+    this.tgCardHelper._debug(path, message, data);
   }
 }

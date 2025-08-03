@@ -11,7 +11,7 @@ export class EpgProgramItem extends EpgElementBase {
     title: { type: String },
     description: { type: String },
     shortText: { type: String },
-    isCurrent: { type: Boolean },
+
     showTime: { type: Boolean },
     showDuration: { type: Boolean },
     showDescription: { type: Boolean },
@@ -29,7 +29,7 @@ export class EpgProgramItem extends EpgElementBase {
     this.title = '';
     this.description = '';
     this.shortText = '';
-    this.isCurrent = false;
+
     this.showTime = true;
     this.showDuration = true;
     this.showDescription = true;
@@ -153,7 +153,7 @@ export class EpgProgramItem extends EpgElementBase {
     // Normales Programm-Element
     return html`
       <div
-        class="programSlot ${this.isCurrent ? 'current' : ''}"
+        class="programSlot"
         @click=${this._onClick}
         @mouseenter=${this._onMouseEnter}
         @mouseleave=${this._onMouseLeave}

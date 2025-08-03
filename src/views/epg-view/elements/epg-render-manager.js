@@ -8,6 +8,10 @@ import { TgCardHelper } from '../../../tools/tg-card-helper.js';
  */
 export class EpgRenderManager extends TgCardHelper {
   static className = 'EpgRenderManager';
+  static cardName = CardName;
+  static debugMode = DebugMode;
+
+
 
   constructor(epgBox) {
     super();

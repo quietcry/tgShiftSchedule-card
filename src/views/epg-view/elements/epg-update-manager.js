@@ -323,6 +323,10 @@ export class EpgUpdateManager extends TgCardHelper {
     const programBox = this.epgBox.shadowRoot?.querySelector('.programBox');
     if (programBox) {
       programBox.style.setProperty('--epg-scale', this.epgBox.scale);
+      this._debug('czEpgUpdateManager: programBox gefunden');
+    }
+    else {
+      this._debug('czEpgUpdateManager: programBox nicht gefunden');
     }
     // Entferne das Setzen auf programRow, damit die Vererbung funktioniert
 

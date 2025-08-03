@@ -1,6 +1,6 @@
 export class TgCardHelper {
   constructor(cardName, debugMode, className) {
-    this.cardName = cardName || this.constructor.cardName || 'unknownCard';
+    this.cardName = cardName || this.constructor.cardName || null;
     this.debugMode = debugMode || this.constructor.debugMode || 'true';
     this.className = className || this.constructor.className || null;
 
@@ -11,27 +11,49 @@ export class TgCardHelper {
     if (!this.debugMode) return;
 
     // Versuche verschiedene Methoden, um den echten Klassennamen zu bekommen
-    let className = 'UnknownClass';
+    let classNameDefault = 'unknownClass';
+    let methodNameDefault = 'unknownMethod';
+    let cardNameDefault = 'unknownCard';
+    let className = null;
+    let methodName = null;
+    let cardName = null;
 
-    // Methode 1: Statischer Klassennamen (falls definiert)
-    if (this.constructor.className) {
-      className = this.constructor.className;
+    if (args[0] && args[0] instanceof Object && args[0].className) {
+      className = args[0].className || className;
+      methodName = args[0].methodName || methodName;
+      cardName = args[0].cardName || cardName;
+      args = args.slice(1);
     }
-    if (this.className) {
-      className = this.className;
+    // Versuche verschiedene Methoden, um den echten Klassennamen zu bekommen
+    className = className ||this.className || this.constructor.className || this.tagName?.toLowerCase().replace(/[^a-z0-9]/g, '') || this.constructor.name || this.cardName || classNameDefault;
+    cardName = cardName || this.cardName || cardNameDefault;
+    if (!methodName) {
+      try {
+        const stack = new Error().stack.split('\n');
+        const callerLine = stack[2]; // Index 2 für die aufrufende Methode
+
+        // Verschiedene Regex-Patterns für verschiedene Browser-Formate
+        const patterns = [
+          /at\s+\w+\.(\w+)/,           // Chrome/Node.js: "at ClassName.methodName"
+          /(\w+)@/,                     // Firefox: "methodName@"
+          /(\w+)\s+\(/,                 // Alternative: "methodName("
+          /at\s+(\w+)/                  // Fallback: "at methodName"
+        ];
+
+        for (const pattern of patterns) {
+          const methodMatch = callerLine.match(pattern);
+          if (methodMatch) {
+            methodName = methodMatch[1];
+            break;
+          }
+        }
+      } catch (error) {
+        // Fallback falls Stack Trace nicht verfügbar
+        methodName = null;
+      }
+
     }
-    // Methode 2: Tag-Name des Custom Elements
-    else if (this.tagName) {
-      className = this.tagName.toLowerCase().replace(/[^a-z0-9]/g, '');
-    }
-    // Methode 3: Constructor name (kann minifiziert sein)
-    else if (this.constructor.name && this.constructor.name.length > 2) {
-      className = this.constructor.name;
-    }
-    // Methode 4: Fallback auf cardName
-    else if (this.cardName) {
-      className = this.cardName;
-    }
+    methodName = methodName || methodNameDefault;
 
     const debugList = this.debugMode.split(',').map(item => item.trim().toLowerCase());
     const shouldDebug =
@@ -40,7 +62,9 @@ export class TgCardHelper {
         : debugList.includes(className.toLowerCase());
 
     if (shouldDebug) {
-      console.debug(`[${this.cardName}] [${className}] ::`, ...args);
+      let path=`[${cardName}]:[${className}]:[${methodName}]`
+      while (path.length < 50) {path = path + ' '}
+      console.debug(path, ...args);
     }
   }
 }

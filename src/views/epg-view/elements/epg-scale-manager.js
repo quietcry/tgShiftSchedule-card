@@ -16,13 +16,19 @@ export class EpgScaleManager {
     const scale = containerWidth / (showWidth * 60);
     const oldScale = this.epgBox.scale;
     this.epgBox.scale = scale;
+
     this.epgBox._debug('EpgScaleManager: Scale! berechnet', {
       containerWidth,
       showWidth,
       scale,
       oldScale: oldScale,
       newScale: this.epgBox.scale,
+      epgShowFutureTime: this.epgBox.epgShowFutureTime,
+      epgShowPastTime: this.epgBox.epgShowPastTime,
+      containerWidthFromGetter: this.epgBox.containerWidth,
+      channelWidth: this.epgBox.channelWidth
     });
+
     this.epgBox.updated(new Map([['scale', scale]]));
   }
 

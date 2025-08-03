@@ -10,6 +10,7 @@ import { EpgChannelManager } from './epg-channel-manager.js';
 import { EpgDataManager } from './epg-data-manager.js';
 import { EpgRenderManager } from './epg-render-manager.js';
 import { EpgUpdateManager } from './epg-update-manager.js';
+import { EpgProgramBox } from './epg-program-box.js';
 
 export class EpgBox extends EpgElementBase {
   static className = 'EpgBox';
@@ -118,6 +119,28 @@ export class EpgBox extends EpgElementBase {
   }
 
   updated(changedProperties) {
+    super.updated(changedProperties);
+
+    // Debug: Zeige scale-Änderungen
+    if (changedProperties.has('scale')) {
+      this._debug('EpgBox: scale geändert', {
+        oldScale: changedProperties.get('scale'),
+        newScale: this.scale,
+        scaleType: typeof this.scale
+      });
+    }
+
+    // Prüfe ob ScaleManager verfügbar ist
+    if (this.scaleManager) {
+      this._debug('EpgBox: ScaleManager verfügbar', {
+        scale: this.scale,
+        containerWidth: this.containerWidth,
+        channelWidth: this.channelWidth
+      });
+    } else {
+      this._debug('EpgBox: ScaleManager nicht verfügbar');
+    }
+
     // Ignoriere leere Property-Änderungen
     if (changedProperties.size === 0) {
       return;
@@ -139,6 +162,15 @@ export class EpgBox extends EpgElementBase {
     // ===== ZEIT-UPDATES (über DataManager) =====
     if (this._isTimeRelevant(changedProperties)) {
       // this.dataManager.updateTimeParameters();
+    }
+
+    // ===== SCALE-UPDATES (über ScaleManager) =====
+    if (this._isScaleRelevant(changedProperties)) {
+      this._debug('EpgBox: Scale-relevante Änderungen erkannt', {
+        changedProperties: Array.from(changedProperties.keys()),
+        scale: this.scale
+      });
+      this.scaleManager.calculateScale();
     }
 
     // ===== KANAL-UPDATES (über DataManager) =====
@@ -256,6 +288,17 @@ export class EpgBox extends EpgElementBase {
       channelBox: !!this.channelBox,
     });
 
+    // Debug: Zeige Werte vor Scale-Berechnung
+    this._debug('EpgBox: Werte vor Scale-Berechnung', {
+      scale: this.scale,
+      containerWidth: this.containerWidth,
+      channelWidth: this.channelWidth,
+      envSnifferCardWidth: this.envSnifferCardWidth,
+      epgShowFutureTime: this.epgShowFutureTime,
+      epgShowPastTime: this.epgShowPastTime,
+      epgShowWidth: this.epgShowWidth
+    });
+
     // Berechne Scale beim ersten Laden
     this.scaleManager.calculateScale();
     this._debug('EpgBox: Scale beim ersten Laden berechnet', {
@@ -356,6 +399,14 @@ export class EpgBox extends EpgElementBase {
             cardHeight: this.envSnifferCardHeight,
             updatedKeys: Object.keys(newState),
           });
+
+          // Berechne Scale neu nach Environment-Änderungen
+          this.scaleManager.calculateScale();
+          this._debug('_handleEnvironmentChanged(): Scale nach Environment-Änderung berechnet', {
+            scale: this.scale,
+            containerWidth: this.containerWidth,
+            channelWidth: this.channelWidth
+          });
         }
 
         // Benachrichtige UpdateManager über env-Änderung
@@ -415,19 +466,22 @@ export class EpgBox extends EpgElementBase {
 
     .programRow {
       display: flex;
-        border-bottom: none; /* Kein Border */
+      flex-direction: row; /* Explizit horizontal anordnen */
+      align-items: stretch; /* Items nehmen volle Höhe ein */
+      justify-content: flex-start; /* Items am Anfang ausrichten */
+      border-bottom: none; /* Kein Border */
       margin: 0; /* Keine äußeren Abstände */
       padding: 0; /* Keine inneren Abstände */
       flex-shrink: 0;
-        flex-grow: 0; /* Verhindert Wachsen */
-        /* Höhenklassen werden über epg-row-height angewendet */
-        height: calc(
-          var(--epg-row-height) + var(--has-time) + var(--has-duration) + var(--has-description) +
-            var(--has-shorttext)
-        );
-        min-width: 100%; /* Mindestens so breit wie die sichtbare Box */
-        width: fit-content; /* Wächst mit dem Inhalt */
-      }
+      flex-grow: 0; /* Verhindert Wachsen */
+      /* Höhenklassen werden über epg-row-height angewendet */
+      height: calc(
+        var(--epg-row-height) + var(--has-time) + var(--has-duration) + var(--has-description) +
+          var(--has-shorttext)
+      );
+      min-width: 100%; /* Mindestens so breit wie die sichtbare Box */
+      width: fit-content; /* Wächst mit dem Inhalt */
+    }
 
       /* Alternierende Farben für Programm-Items in Zeilen */
       .programRow:nth-child(odd) epg-program-item:nth-child(even) {
@@ -682,6 +736,14 @@ export class EpgBox extends EpgElementBase {
    * Diese Version würde automatisch alle DOM-Updates handhaben
    */
   renderWithRepeat() {
+    this._debug('EpgBox: renderWithRepeat() aufgerufen', {
+      scale: this.scale,
+      scaleType: typeof this.scale,
+      flatChannelsLength: this._flatChannels.length,
+      containerWidth: this.containerWidth,
+      channelWidth: this.channelWidth
+    });
+
     return html`
       <!-- Channel-Box -->
       <div
@@ -699,22 +761,34 @@ export class EpgBox extends EpgElementBase {
       </div>
 
       <!-- Program-Box -->
-      <div class="programBox">
-        <!-- Time Marker über den Programmen -->
-        <epg-time-marker
-          .earliestProgramStart=${this.earliestProgramStart}
-          .latestProgramStop=${this.latestProgramStop}
-        ></epg-time-marker>
-
-        <!-- Program-Inhalte mit repeat -->
-        ${this._flatChannels.length > 0
-          ? repeat(
-              this._flatChannels,
-              item => item.id || `header-${item.name}`, // Key-Funktion für Kanäle und Headers
-              (item, index) => this.renderProgramItem(item, index)
-            )
-          : html`<div class="loading">Programme werden geladen...</div>`}
-      </div>
+      <!-- <div class="programBox"> -->
+      <epg-program-box
+        class="programBox"
+        .programs=${this.programs}
+        .scale=${this.scale}
+        .containerWidth=${this.containerWidth}
+        .channelWidth=${this.channelWidth}
+        .env=${this.env}
+        .earliestProgramStart=${this.earliestProgramStart}
+        .latestProgramStop=${this.latestProgramStop}
+        .showChannelGroups=${this.showChannelGroups}
+        .showShortText=${this.showShortText}
+        .showTime=${this.showTime}
+        .showDuration=${this.showDuration}
+        .showDescription=${this.showDescription}
+        ._sortedChannels=${this._sortedChannels}
+        ._flatChannels=${this._flatChannels}
+        ._channelGroups=${this._channelGroups}
+        ._channelsParameters=${this._channelsParameters}
+        ._channelOrderInitialized=${this._channelOrderInitialized}
+        .isFirstLoad=${this.isFirstLoad}
+        .isChannelUpdate=${this.isChannelUpdate}
+        .epgFutureTime=${this.epgFutureTime}
+        ._onChannelSelected=${this._onChannelSelected.bind(this)}
+        ._onProgramSelected=${this._onProgramSelected.bind(this)}
+      >
+      </epg-program-box>
+      <!-- </div> -->
     `;
   }
 
@@ -763,169 +837,6 @@ export class EpgBox extends EpgElementBase {
       return this.renderManager.renderProgramRow(item, index);
     }
   }
-
-  /**
-   * Aktualisiert nur die Channel-Container-Inhalte ohne vollständige Re-Renderung
-   * @deprecated Verwende stattdessen die repeat-Direktive - diese Methode ist nicht mehr nötig
-   */
-  // updateChannelContainer() {
-  //   this._debug(
-  //     'EpgBox: WARNUNG - updateChannelContainer() ist deprecated! Verwende repeat-Direktive'
-  //   );
-
-  //   const channelContainer = this.shadowRoot?.querySelector('#channelContainer');
-  //   if (!channelContainer) {
-  //     this._debug('EpgBox: Channel-Container nicht gefunden');
-  //     return;
-  //   }
-
-  //   this._debug('EpgBox: Aktualisiere Channel-Container', {
-  //     anzahlKanäle: this._sortedChannels.length,
-  //     showChannelGroups: this.showChannelGroups,
-  //   });
-
-  //   // Erstelle neuen Inhalt
-  //   const newContent =
-  //     this._sortedChannels.length > 0
-  //       ? this.showChannelGroups
-  //         ? this.renderManager.renderGroupedChannels(this._sortedChannels)
-  //         : this.renderManager.renderSimpleChannels(this._sortedChannels)
-  //       : html`<div class="loading">Kanäle werden geladen...</div>`;
-
-  //   // Rendere Lit-Template korrekt
-  //   render(newContent, channelContainer);
-  // }
-
-  /**
-   * Effiziente Methode: Fügt eine einzelne Programmzeile hinzu/aktualisiert sie
-   * @param {Object} channel - Der Kanal mit seinen Programmdaten
-   * @param {number} rowIndex - Index der Zeile (optional)
-   * @deprecated Verwende stattdessen die repeat-Direktive - diese Methode ist nicht mehr nötig
-   */
-  // updateSingleProgramRow(channel, rowIndex = 0) {
-  //   this._debug(
-  //     'EpgBox: WARNUNG - updateSingleProgramRow() ist deprecated! Verwende repeat-Direktive'
-  //   );
-
-  //   const programContainer = this.shadowRoot?.querySelector('#programContainer');
-  //   if (!programContainer) {
-  //     this._debug('EpgBox: Program-Container nicht gefunden');
-  //     return;
-  //   }
-
-  //   const rowId = `programRow-${channel.id}`;
-  //   let existingRow = programContainer.querySelector(`#${rowId}`);
-
-  //   this._debug('EpgBox: Update einzelne Programmzeile', {
-  //     kanal: channel.channeldata?.name || channel.name,
-  //     kanalId: channel.id,
-  //     rowId: rowId,
-  //     existingRow: !!existingRow,
-  //   });
-
-  //   // Erstelle neue Zeile als Lit-Template
-  //   const newRowTemplate = this.renderManager.renderProgramRow(channel, rowIndex);
-
-  //   if (existingRow) {
-  //     // Ersetze bestehende Zeile mit Lit-Template
-  //     render(newRowTemplate, existingRow.parentNode, { host: this });
-  //     // Das alte Element wird automatisch durch das neue ersetzt
-  //   } else {
-  //     // Füge neue Zeile am Ende hinzu
-  //     render(newRowTemplate, programContainer, { host: this });
-  //   }
-  // }
-
-  /**
-   * Fügt eine einzelne Programmzeile für einen Kanal hinzu/aktualisiert sie
-   * @param {Object} channel - Der Kanal mit seinen Programmdaten
-   * @param {number} rowIndex - Index der Zeile (optional)
-   * @deprecated Verwende stattdessen die repeat-Direktive - diese Methode ist nicht mehr nötig
-   */
-  // updateProgramRow(channel, rowIndex = 0) {
-  //   this._debug('EpgBox: WARNUNG - updateProgramRow() ist deprecated! Verwende repeat-Direktive');
-  //   // Verwende die effiziente Version
-  //   this.updateSingleProgramRow(channel, rowIndex);
-  // }
-
-  /**
-   * Fügt mehrere Programmzeilen hinzu/aktualisiert sie
-   * @param {Array} channels - Array von Kanälen
-   * @deprecated Verwende stattdessen die repeat-Direktive - diese Methode ist nicht mehr nötig
-   */
-  // updateProgramRows(channels) {
-  //   this._debug('EpgBox: WARNUNG - updateProgramRows() ist deprecated! Verwende repeat-Direktive');
-
-  //   this._debug('EpgBox: Update mehrere Programmzeilen', {
-  //     anzahlKanäle: channels.length,
-  //   });
-
-  //   channels.forEach((channel, index) => {
-  //     this.updateProgramRow(channel, index);
-  //   });
-  // }
-
-  /**
-   * Entfernt eine Programmzeile für einen Kanal
-   * @param {string} channelId - ID des Kanals
-   * @deprecated Verwende stattdessen die repeat-Direktive - diese Methode ist nicht mehr nötig
-   */
-  // removeProgramRow(channelId) {
-  //   this._debug('EpgBox: WARNUNG - removeProgramRow() ist deprecated! Verwende repeat-Direktive');
-
-  //   const programContainer = this.shadowRoot?.querySelector('#programContainer');
-  //   if (!programContainer) return;
-
-  //   const rowId = `programRow-${channelId}`;
-  //   const existingRow = programContainer.querySelector(`#${rowId}`);
-
-  //   if (existingRow) {
-  //     this._debug('EpgBox: Entferne Programmzeile', { channelId, rowId });
-  //     existingRow.remove();
-  //   }
-  // }
-
-  /**
-   * Aktualisiert nur die Program-Container-Inhalte ohne vollständige Re-Renderung
-   * @deprecated Verwende stattdessen die repeat-Direktive - diese Methode ist nicht mehr nötig
-   */
-  // updateProgramContainer() {
-  //   this._debug(
-  //     'EpgBox: WARNUNG - updateProgramContainer() ist deprecated! Verwende repeat-Direktive'
-  //   );
-
-  //   const programContainer = this.shadowRoot?.querySelector('#programContainer');
-  //   if (!programContainer) {
-  //     this._debug('EpgBox: Program-Container nicht gefunden');
-  //     return;
-  //   }
-
-  //   this._debug('EpgBox: Aktualisiere Program-Container (ineffizient)', {
-  //     anzahlKanäle: this._sortedChannels.length,
-  //     showChannelGroups: this.showChannelGroups,
-  //   });
-
-  //   // Erstelle neuen Inhalt
-  //   const newContent =
-  //     this._sortedChannels.length > 0
-  //       ? this.showChannelGroups
-  //         ? this.renderManager.renderGroupedPrograms(this._sortedChannels)
-  //         : this.renderManager.renderSimplePrograms(this._sortedChannels)
-  //       : html`<div class="loading">Programme werden geladen...</div>`;
-
-  //   // Rendere Lit-Template korrekt
-  //   render(newContent, programContainer);
-  // }
-
-  /**
-   * Aktualisiert beide Container selektiv
-   * @deprecated Verwende stattdessen die repeat-Direktive - diese Methode ist nicht mehr nötig
-   */
-  // updateContainers() {
-  //   this._debug('EpgBox: WARNUNG - updateContainers() ist deprecated! Verwende repeat-Direktive');
-  //   this.updateChannelContainer();
-  //   this.updateProgramContainer();
-  // }
 
   _onChannelSelected(channel) {
     this._debug('EpgBox: Verarbeite Kanal', {
@@ -1217,47 +1128,6 @@ export class EpgBox extends EpgElementBase {
     return results;
   }
 
-  /**
-   * DEBUG: Lädt Dummy-Daten für Tests und Debugging
-   * @deprecated Wird jetzt über EPGView._loadData() mit useDummyData Konfiguration gesteuert
-   */
-  // _loadDummyDataForDebug() {
-  //   this._debug('EpgBox: Lade Dummy-Daten für Debug-Zwecke');
-  //
-  //   try {
-  //     // Rufe die Dummy-Daten-Generierung im DataManager auf
-  //     const dummyData = this.dataManager.generateDummyData();
-  //
-  //     if (dummyData && dummyData.length > 0) {
-  //       this._debug('EpgBox: Dummy-Daten erfolgreich geladen', {
-  //         anzahlKanäle: dummyData.length,
-  //         kanäle: dummyData.map(channel => ({
-  //           id: channel.id,
-  //           name: channel.name,
-  //           anzahlProgramme: channel.programs?.length || 0
-  //         }))
-  //       });
-  //
-  //       // Setze die Dummy-Daten als aktuelle Kanäle
-  //       this._sortedChannels = dummyData;
-  //       this._flatChannels = this.channelManager.createFlatChannelArray(dummyData);
-  //
-  //       this._debug('EpgBox: Dummy-Daten in EPG-Box gesetzt', {
-  //         sortedChannels: this._sortedChannels.length,
-  //         flatChannels: this._flatChannels.length
-  //       });
-  //
-  //       // Markiere als ersten Load abgeschlossen
-  //       this.isFirstLoad = 2;
-  //
-  //       this._debug('EpgBox: Dummy-Daten-Ladung abgeschlossen');
-  //     } else {
-  //       this._debug('EpgBox: Keine Dummy-Daten generiert');
-  //     }
-  //   } catch (error) {
-  //     this._debug('EpgBox: Fehler beim Laden der Dummy-Daten', { error: error.message });
-  //   }
-  // }
 }
 
 customElements.define('epg-box', EpgBox);
