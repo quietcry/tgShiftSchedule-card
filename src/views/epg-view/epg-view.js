@@ -360,13 +360,6 @@ export class EPGView extends ViewBase {
     if (this._env !== value) {
       this._env = value;
 
-      // Übergebe env an die epg-box, falls sie bereits existiert
-      // const epgBox = this.shadowRoot?.querySelector('epg-box');
-      // if (epgBox) {
-      //   this._debug('EPG-View: Übergebe env an epg-box');
-      //   epgBox.env = value;
-      // }
-      // Nicht mehr nötig - Observer-Pattern übernimmt das
     }
   }
 
@@ -536,28 +529,6 @@ export class EPGView extends ViewBase {
     this._setupScrollSync();
   }
 
-  // _onRegisterMeForChanges(event) {
-  //   this._debug('EPG-View: Registrierungsanfrage empfangen', {
-  //     component: event.target,
-  //     detail: event.detail,
-  //   });
-
-  //   const { component, callback, eventType = "" } = event.detail;
-
-  //   if (component && typeof callback === 'function') {
-  //     this.registerMeForChanges(component, eventType, callback);
-  //     this._debug('EPG-View: Komponente erfolgreich registriert', {
-  //       component: component.tagName || component.constructor.name,
-  //       eventType: eventType,
-  //     });
-  //   } else {
-  //     this._debug('EPG-View: Registrierung fehlgeschlagen', {
-  //       componentExists: !!component,
-  //       hasCallback: typeof callback === 'function',
-  //     });
-  //   }
-  // }
-
   firstUpdated() {
     this._debug('EPG-View: firstUpdated');
 
@@ -604,101 +575,6 @@ export class EPGView extends ViewBase {
     this._debug('EPG-View: Scroll-Synchronisation eingerichtet');
   }
 
-  // /**
-  //  * Registriert einen Observer für View-Änderungen
-  //  * @param {Object} me - Das Objekt, das über Änderungen informiert werden soll
-  //  * @param {string|Array} eventType - Event-Typ als String oder Array von Strings
-  //  * @param {Function} callback - Callback-Funktion, die bei Änderungen aufgerufen wird
-  //  */
-  // registerMeForChanges(me, eventType = "", callback = null) {
-  //   this._debug('EPG-View: registerMeForChanges() Anfrage', {
-  //     me,
-  //     newEventType: eventType,
-  //   });
-
-  //   // Normalisiere die neuen EventTypes
-  //   const eventTypes = Array.isArray(eventType)
-  //     ? eventType.map(e => e.toLowerCase()).sort()
-  //     : typeof eventType === 'string' ? eventType.split(',').map(e => e.trim().toLowerCase()).filter(e => e.length > 0).sort() : [];
-
-  //   // Prüfe ob bereits ein Observer für denselben me existiert
-  //   const existingMeInformer = this.informMeAtViewChanges.find(informer => informer.me === me);
-
-  //   if (existingMeInformer) {
-  //     // Normalisiere die bestehenden eventTypes
-  //     const existingEventTypes = Array.isArray(existingMeInformer.eventType)
-  //       ? existingMeInformer.eventType.map(e => e.toLowerCase()).sort()
-  //       : typeof existingMeInformer.eventType === 'string'
-  //         ? existingMeInformer.eventType.split(',').map(e => e.trim().toLowerCase()).filter(e => e.length > 0).sort()
-  //         : [];
-
-  //     // Finde nur die wirklich neuen EventTypes
-  //     const newEventTypes = eventTypes.filter(newType => !existingEventTypes.includes(newType));
-
-  //     if (newEventTypes.length === 0) {
-  //       this._debug('EPG-View: registerMeForChanges() Alle EventTypes bereits vorhanden', {
-  //         me,
-  //         requestedEventTypes: eventTypes,
-  //         existingEventTypes,
-  //       });
-  //       return false;
-  //     } else {
-  //       // Füge nur die neuen EventTypes hinzu
-  //       const combinedEventTypes = [...existingEventTypes, ...newEventTypes].sort();
-  //       existingMeInformer.eventType = combinedEventTypes;
-
-  //       this._debug('EPG-View: registerMeForChanges() Neue EventTypes hinzugefügt', {
-  //         me,
-  //         newEventTypes,
-  //         existingEventTypes,
-  //         combinedEventTypes,
-  //       });
-  //       return true;
-  //     }
-  //   }
-
-  //   // Füge neuen Observer hinzu
-  //   this.informMeAtViewChanges.push({
-  //     me,
-  //     eventType: eventTypes,
-  //     callback,
-  //   });
-
-  //   this._debug('EPG-View: registerMeForChanges() Neuer Informer registriert', {
-  //     me,
-  //     eventTypes,
-  //     totalObservers: this.informMeAtViewChanges.length,
-  //   });
-
-  //   return true;
-  // }
-
-  // /**
-  //  * Benachrichtigt alle registrierten Observer über Property-Änderungen
-  //  * @param {Map} changedProperties - Geänderte Properties
-  //  */
-  // _informMeAtViewChanges(changedProperties) {
-  //   this._debug('EPG-View: Benachrichtige View-Änderungs-Observer', {
-  //     changedProperties: Array.from(changedProperties.keys()),
-  //     observerCount: this.informMeAtViewChanges.length,
-  //   });
-
-  //   if (this.informMeAtViewChanges && this.informMeAtViewChanges.length > 0) {
-  //     this.informMeAtViewChanges.forEach(observer => {
-  //       if (observer.callback && typeof observer.callback === 'function') {
-  //         try {
-  //           observer.callback(changedProperties);
-  //         } catch (error) {
-  //           this._debug('EPG-View: Fehler beim Aufrufen des Observer-Callbacks', {
-  //             observer: observer.me,
-  //             error: error.message,
-  //           });
-  //         }
-  //       }
-  //     });
-  //   }
-  // }
-
   render() {
     // Debug: Überprüfe die Konfigurationswerte
     this._debug('EPG-View render: Konfigurationswerte', {
@@ -712,7 +588,11 @@ export class EPGView extends ViewBase {
         <div class="headline">
         <div class="superbutton">${this._renderSuperButton()}</div>
           <div class="timeBar">
-            <epg-timebar .scale=${this._timeBarScale}></epg-timebar>
+            <epg-timebar
+              .scale=${this._timeBarScale}
+              .earliestProgramStart=${this._timeBarEarliestProgramStart}
+              .latestProgramStop=${this._timeBarLatestProgramStop}
+            ></epg-timebar>
           </div>
         </div>
         <epg-box
@@ -729,6 +609,7 @@ export class EPGView extends ViewBase {
           .channelOrder=${this.config.group_order}
           @epg-box-ready=${this._onEpgBoxReady}
           @epg-first-load-complete=${this._onEpgFirstLoadComplete}
+          @scale-changed=${this._onScaleChanged}
         ></epg-box>
       </div>
     `;
@@ -749,6 +630,15 @@ export class EPGView extends ViewBase {
     });
   }
 
+
+  _onScaleChanged(e) {
+    this._debug('EPG-View: scale geändert', {
+      oldValue: this._timeBarScale,
+      newValue: e.detail.value,
+    });
+    this._timeBarScale = e.detail.value;
+  }
+
   _onEpgFirstLoadComplete(e) {
     this._debug('EPG-View: Erster Load abgeschlossen', {
       isFirstLoad: e.detail.isFirstLoad,
@@ -763,8 +653,6 @@ export class EPGView extends ViewBase {
         neuerWert: 1,
       });
 
-      // Hier könntest du isFirstLoad in der EPG-View setzen, falls benötigt
-      // this.isFirstLoad = 1;
     }
 
     // Rufe testIsFirstLoadCompleteUpdated auf

@@ -7,6 +7,9 @@ export class EpgTimebar extends EpgElementBase {
   static properties = {
     ...super.properties,
     timeSlots: { type: Array },
+    earliestProgramStart: { type: Number },
+    latestProgramStop: { type: Number },
+    scale: { type: Number },
   };
 
   static styles = [
@@ -101,6 +104,7 @@ export class EpgTimebar extends EpgElementBase {
     super();
     this.timeSlots = [];
     this.scale = null;
+    this.timebar=null;
     this.earliestProgramStart = null;
     this.latestProgramStop = null;
     this.propsNumbers = ['earliestProgramStart', 'latestProgramStop', 'scale'];
@@ -125,7 +129,7 @@ export class EpgTimebar extends EpgElementBase {
         detail: {
           component: this,
           callback: this._handleChangeNotifys.bind(this),
-          eventType: "progScrollX,envChanges",
+          eventType: "progScrollX,envChanges,viewChanges",
           immediately: true,
         },
       })
@@ -136,19 +140,43 @@ export class EpgTimebar extends EpgElementBase {
 
   updated(changedProperties) {
     super.updated(changedProperties);
+    this.timebar = this.shadowRoot.querySelector('.timebar');
+    // Setze timebar Referenz nach dem Rendering
+    if (!this.timebar) {
+      // Das INNERE .timebar div ist das scrollbare Element
+      this.timebar = this.shadowRoot.querySelector('.timebar');
+      this._debug('EpgTimebar: updated() timebar Referenz gesetzt', {
+        timebar: this.timebar,
+        isInnerTimebar: this.timebar?.classList?.contains('timebar'),
+        scrollWidth: this.timebar?.scrollWidth,
+        clientWidth: this.timebar?.clientWidth
+      });
+    }
 
+    // Debug: Prüfe ob timebar Breite verfügbar ist
+    if (this.timebar && (this.timebar.scrollWidth === 0 || this.timebar.clientWidth === 0)) {
+      this._debug('EpgTimebar: updated() timebar hat keine Breite', {
+        scrollWidth: this.timebar.scrollWidth,
+        clientWidth: this.timebar.clientWidth,
+        offsetWidth: this.timebar.offsetWidth,
+        computedStyle: getComputedStyle(this.timebar).width,
+        timebarChildren: this.timebar.children.length,
+        timebarHTML: this.timebar.innerHTML.substring(0, 100) + '...'
+      });
+    }
+
+    this._debug('EpgTimebar: updated() Relevante Properties geändert', {
+      earliestProgramStart: this.earliestProgramStart,
+      latestProgramStop: this.latestProgramStop,
+      scale: this.scale,
+      changedProperties: Array.from(changedProperties.keys()),
+    });
     // Prüfe ob relevante Properties geändert wurden
     if (
       changedProperties.has('earliestProgramStart') ||
       changedProperties.has('latestProgramStop') ||
       changedProperties.has('scale')
     ) {
-      this._debug('EpgTimebar: Relevante Properties geändert', {
-        earliestProgramStart: this.earliestProgramStart,
-        latestProgramStop: this.latestProgramStop,
-        scale: this.scale,
-        changedProperties: Array.from(changedProperties.keys()),
-      });
     }
   }
 
@@ -157,51 +185,91 @@ export class EpgTimebar extends EpgElementBase {
    * @param {Object} eventdata - Event-Daten mit verschiedenen EventTypes
    */
   _handleChangeNotifys(eventdata) {
-    this._debug('EpgTimebar: Werte-Änderungen von epg-box empfangen')
+    this._debug('EpgTimebar: Werte-Änderungen von epg-box empfangen', { eventdata })
 
     // Durchlaufe alle Keys in eventdata
     for (const eventType of Object.keys(eventdata)) {
-      if (eventType === "viewChanges") {
-        const changedProperties = eventdata[eventType];
-        this._debug('EpgTimebar: View-Änderungen empfangen', {
-          changedProperties: Object.keys(changedProperties || {}),
-          currentValues: {
-            earliestProgramStart: this.earliestProgramStart,
-            latestProgramStop: this.latestProgramStop,
-            scale: this.scale,
-          },
-        });
+      this._debug('EpgTimebar: Verarbeite EventType', { eventType, eventdata: eventdata[eventType] });
+      switch (eventType) {
+        case "viewchanges":
+          this._handleChangeNotifys_viewChanges(eventdata[eventType]);
+          break;
+        case "envchanges":
+          this._handleChangeNotifys_envChanges(eventdata[eventType]);
+          break;
+        case "progscrollx":
+          this._handleChangeNotifys_progScrollX(eventdata[eventType]);
+          break;
+      }
 
-        // Setze die Werte direkt, da sie keine Lit-Properties mehr sind
-        let updated = false;
+    }
+  }
+  _handleChangeNotifys_viewChanges(eventdata) {
+    this._debug('EpgTimebar: View-Änderungen empfangen', { eventdata });
+    const changedProperties = eventdata;
 
-        // Schleife über alle relevanten Properties
-        for (const prop of this.propsNumbers) {
-          if (changedProperties.hasOwnProperty(prop) &&
-              changedProperties[prop] !== undefined &&
-              changedProperties[prop] !== null) {
-            const newValue = changedProperties[prop];
-            if (this[prop] !== newValue) {
-              this[prop] = newValue;
-              updated = true;
-            }
-          }
-        }
+    // Setze die Werte über Lit-Properties, damit changedProperties korrekt gefüllt wird
+    let updated = false;
 
-        // Trigger Update nur wenn sich Werte geändert haben
-        if (updated) {
-          this._debug('EpgTimebar: Timebar-relevante Änderungen erkannt, aktualisiere Rendering');
-
-          // Informiere den Time Marker über die Änderungen
-          this._informTimeMarker();
-
-          this.requestUpdate();
+    // Schleife über alle relevanten Properties
+    for (const prop of this.propsNumbers) {
+      if (changedProperties.hasOwnProperty(prop) &&
+          changedProperties[prop] !== undefined &&
+          changedProperties[prop] !== null) {
+        const newValue = changedProperties[prop];
+        if (this[prop] !== newValue) {
+          // Verwende requestUpdate für Lit-Properties
+          this[prop] = newValue;
+          updated = true;
         }
       }
-      // Hier können weitere EventTypes hinzugefügt werden
-      // else if (eventType === "envChanges") {
-      //   // Verarbeitung für Environment-Änderungen
-      // }
+    }
+    // Trigger Update nur wenn sich Werte geändert haben
+    if (updated) {
+      this._debug('EpgTimebar: Timebar-relevante Änderungen erkannt, aktualisiere Rendering');
+
+      // Informiere den Time Marker über die Änderungen
+      this._informTimeMarker();
+
+      this.requestUpdate();
+    }
+  }
+  _handleChangeNotifys_envChanges(eventdata) {
+    this._debug('EpgTimebar: Environment-Änderungen empfangen', { eventdata });
+  }
+  _handleChangeNotifys_progScrollX(eventdata) {
+    const changedProperties = eventdata;
+    if (changedProperties.hasOwnProperty('scrollLeft') && this.timebar) {
+      this._debug('EpgTimebar: Program-Scroll-Änderungen empfangen', {
+        eventdata,
+        timebar: this.timebar,
+        scrollLeft: changedProperties.scrollLeft,
+        timebarScrollWidth: this.timebar.scrollWidth,
+        timebarClientWidth: this.timebar.clientWidth,
+        timebarScrollLeft: this.timebar.scrollLeft,
+        canScroll: this.timebar.scrollWidth > this.timebar.clientWidth
+      });
+
+      // Nur scrollen wenn die Timebar scrollbar ist
+      if (this.timebar.scrollWidth > this.timebar.clientWidth) {
+        // Berechne proportionale Scroll-Position
+        const programBoxScrollLeft = changedProperties.scrollLeft;
+        const programBoxScrollWidth = this.epgBox?.programBox?.scrollWidth || 1;
+        const timebarScrollWidth = this.timebar.scrollWidth;
+
+        // Proportionale Berechnung: (programBoxScrollLeft / programBoxScrollWidth) * timebarScrollWidth
+        const proportionalScrollLeft = (programBoxScrollLeft / programBoxScrollWidth) * timebarScrollWidth;
+
+        this._debug('EpgTimebar: Proportionale Scroll-Berechnung', {
+          programBoxScrollLeft,
+          programBoxScrollWidth,
+          timebarScrollWidth,
+          proportionalScrollLeft,
+          originalScrollLeft: changedProperties.scrollLeft
+        });
+
+        this.timebar.scrollLeft = changedProperties.scrollLeft;
+      }
     }
   }
 
@@ -434,7 +502,21 @@ export class EpgTimebar extends EpgElementBase {
         break;
       }
     }
+
+    // Debug: Zeige warum allFine false ist
     if (!allFine) {
+      this._debug('EpgTimebar: Loading-Zustand', {
+        allFine,
+        propsNumbers: this.propsNumbers,
+        earliestProgramStart: this.earliestProgramStart,
+        latestProgramStop: this.latestProgramStop,
+        scale: this.scale,
+        propsValid: this.propsNumbers.map(prop => ({
+          prop,
+          value: this[prop],
+          isValid: this[prop] && !isNaN(this[prop])
+        }))
+      });
       return html`<div class="timebar">Loading...</div>`;
     }
 

@@ -30,20 +30,6 @@ export class EpgProgramBox extends EpgElementBase {
     isFirstLoad: { type: Boolean },
     isChannelUpdate: { type: Boolean },
     epgFutureTime: { type: Number },
-    // Callback-Funktionen - VERWAIST, da RenderManager das übernimmt
-    // _onChannelSelected: { type: Function },
-    // _onProgramSelected: { type: Function },
-    // _updateChannelPrograms: { type: Function },
-    // _addProgramsToChannel: { type: Function },
-    // _removeProgramsFromChannel: { type: Function },
-    // _updateAllCurrentStates: { type: Function },
-    // _cleanupOldPrograms: { type: Function },
-    // _updateTimeParameters: { type: Function },
-    // _optimizeFlatArray: { type: Function },
-    // _updateVisiblePrograms: { type: Function },
-    // _getRepeatPerformanceStats: { type: Function },
-    // _performFullOptimization: { type: Function },
-    // _addTeilEpg: { type: Function },
   };
 
   constructor() {
@@ -83,7 +69,7 @@ export class EpgProgramBox extends EpgElementBase {
         detail: {
           component: this,
           callback: this._handleChangeNotifys.bind(this),
-          eventType: "envChanges",
+          eventType: "progScrollX,envChanges,viewChanges",
           immediately: true,
         },
       })
@@ -205,19 +191,20 @@ export class EpgProgramBox extends EpgElementBase {
     super.updated(changedProperties);
 
     // Debug: Zeige alle geänderten Properties
-    this._debug('ProgramBox: updated() aufgerufen', {
-      changedProperties: Array.from(changedProperties.keys()),
-      scale: this.scale,
-      scaleType: typeof this.scale,
-      scaleInChangedProperties: changedProperties.has('scale'),
-      oldScale: changedProperties.get('scale')
-    });
-
-    // Setze CSS-Variable für epg-scale
-    // if (changedProperties.has('scale')) {
-    //   this.style.setProperty('--epg-scale', this.scale);
-    //   this._debug('ProgramBox: CSS-Variable --epg-scale gesetzt', { scale: this.scale });
-    // }
+    this._debug('ProgramBox: updated() aufgerufen');
+    // ===== SCROLLING NACH PROGRAMM-ÄNDERUNGEN =====
+    if (this.isFirstLoad === 1) {
+      this._debug('ProgramBox: updated()!: Scrolling-Trigger erkannt', {
+        isFirstLoad: this.isFirstLoad,
+        isFirstLoadType: typeof this.isFirstLoad
+      });
+      // Führe Scrolling nach Programm-Änderungen aus
+      if (this.renderManager && typeof this.renderManager.scrollProgramBox === 'function') {
+        this.renderManager.scrollProgramBox();
+      } else {
+        this._debug('ProgramBox: RenderManager oder scrollProgramBox nicht verfügbar');
+      }
+    }
   }
 
   /**
@@ -260,24 +247,23 @@ export class EpgProgramBox extends EpgElementBase {
 
         .programRow {
           display: flex;
-          flex-direction: row; /* Explizit horizontal anordnen */
-          align-items: stretch; /* Items nehmen volle Höhe ein */
-          justify-content: flex-start; /* Items am Anfang ausrichten */
-          border-bottom: none; /* Kein Border */
-          margin: 0; /* Keine äußeren Abstände */
-          padding: 0; /* Keine inneren Abstände */
+          flex-direction: row;
+          align-items: stretch;
+          justify-content: flex-start;
+          border-bottom: none;
+          margin: 0;
+          padding: 0;
           flex-shrink: 0;
-          flex-grow: 0; /* Verhindert Wachsen */
-          /* Höhenklassen werden über epg-row-height angewendet */
+          flex-grow: 0;
           height: calc(
             var(--epg-row-height) + var(--has-time) + var(--has-duration) + var(--has-description) +
               var(--has-shorttext)
           );
-          min-width: 100%; /* Mindestens so breit wie die sichtbare Box */
-          width: fit-content; /* Wächst mit dem Inhalt */
+          min-width: 100%;
+          width: fit-content;
         }
 
-        /* Alternierende Farben für Programm-Items in Zeilen */
+        /* Alternierende Farben für Programm-Items */
         .programRow:nth-child(odd) epg-program-item:nth-child(even) {
           background-color: var(--epg-odd-program-even-bg);
           color: var(--epg-odd-program-even-text);
@@ -341,37 +327,6 @@ export class EpgProgramBox extends EpgElementBase {
       </div>
     `;
   }
-
-  // /**
-  //  * Berechnet die Breite eines Programms basierend auf der Dauer
-  //  * VERWAIST - wird vom RenderManager übernommen
-  //  */
-  // _calculateProgramWidth(program) {
-  //   const duration = program.duration || ((program.stop || program.end || 0) - (program.start || 0));
-  //   return Math.max(60, duration * this.scale); // Mindestens 60px
-  // }
-
-  // /**
-  //  * Formatiert einen Unix-Timestamp als Zeit
-  //  * VERWAIST - wird vom RenderManager übernommen
-  //  */
-  // _formatTime(timestamp) {
-  //   if (!timestamp) return '--:--';
-  //   const date = new Date(timestamp * 1000);
-  //   return date.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-  // }
-
-  // /**
-  //  * Formatiert eine Dauer in Sekunden als Zeit
-  //  * VERWAIST - wird vom RenderManager übernommen
-  //  */
-  // _formatDuration(seconds) {
-  //   if (!seconds) return '';
-  //   const hours = Math.floor(seconds / 3600);
-  //   const minutes = Math.floor((seconds % 3600) / 60);
-  //   return `${hours}:${minutes.toString().padStart(2, '0')}`;
-  // }
-
 
 }
 

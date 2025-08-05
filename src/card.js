@@ -5,7 +5,7 @@ import './editor/editor.js';
 import { CardRegname, CardName, CardDescription } from './card-config.js';
 
 export class Card extends CardImpl {
-  static className = 'Card';
+  // className wird von CardImpl geerbt (ist 'CardImpl')
   static get styles() {
     return [
       super.styles,

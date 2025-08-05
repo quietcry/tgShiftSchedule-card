@@ -150,14 +150,34 @@ export class EpgRenderManager extends TgCardHelper {
    * Rendert eine einzelne Programmzeile
    */
   renderProgramRow(channel, rowIndex = 0) {
+    // Prüfe, ob es sich um einen Gruppen-Header handelt
+    if (this.epgBox.channelManager && this.epgBox.channelManager.isGroupHeader(channel)) {
+      // Gruppen-Header haben keine Programme - rendere sie als leeres Element
+      return html`
+        <div class="programRow epg-row-height" id="programRow-${channel.name}">
+          <epg-program-item
+            .type=${'group'}
+            .start=${this.epgBox.earliestProgramStart}
+            .stop=${this.epgBox.latestProgramStop}
+            .title=${channel.name}
+          ></epg-program-item>
+        </div>
+      `;
+    }
+
     const programs = channel.programs || [];
 
-    // Debug komplett ausgeschaltet für Performance
-    // this._debug('EpgRenderManager: Rendere Programmzeile für Kanal', {
-    //   kanal: channel.channeldata?.name || channel.name,
-    //   kanalId: channel.id,
-    //   anzahlProgramme: programs.length,
-    // });
+    // Debug für Problem-Diagnose
+    if (programs.length === 0 && this.epgBox.isFirstLoad === 0) {
+      this._debug('EpgRenderManager: Kanal ohne Programme', {
+        kanal: channel.channeldata?.name || channel.name,
+        kanalId: channel.id,
+        hatProgramsProperty: 'programs' in channel,
+        programsType: typeof channel.programs,
+        programsValue: channel.programs,
+        alleProperties: Object.keys(channel),
+      });
+    }
 
     let allElements = [];
 
@@ -165,7 +185,7 @@ export class EpgRenderManager extends TgCardHelper {
       // Startgap: Von earliestProgramStart bis zum ersten Programm (immer einfügen, auch bei 0 Breite)
       const firstProgramStart = programs[0].start;
       const lastProgramStop = programs[programs.length - 1].stop;
-
+      let mustUpdate = false;
       // Aktualisiere latestProgramStop wenn nötig
       if (lastProgramStop > this.epgBox.latestProgramStop) {
         this._debug('EpgRenderManager: latestProgramStop aktualisiert', {
@@ -175,10 +195,8 @@ export class EpgRenderManager extends TgCardHelper {
         });
         this.epgBox.latestProgramStop = lastProgramStop;
 
-        // Simuliere ein Lit-Update mit den geänderten Properties
-        const changedProperties = new Map();
-        changedProperties.set('latestProgramStop', lastProgramStop);
-        this.epgBox.updated(changedProperties);
+        // Benachrichtige die ProgramBox über die Änderung
+        mustUpdate = true;
 
         // Verzögere die Aktualisierung der Endgaps mit Debouncing
         this.scheduleEndgapUpdate();
@@ -189,19 +207,18 @@ export class EpgRenderManager extends TgCardHelper {
         this._debug('EpgRenderManager: earliestProgramStart aktualisiert', {
           alterWert: this.epgBox.earliestProgramStart,
           neuerWert: firstProgramStart,
-      kanal: channel.channeldata?.name || channel.name,
+          kanal: channel.channeldata?.name || channel.name,
         });
         this.epgBox.earliestProgramStart = firstProgramStart;
 
-        // Simuliere ein Lit-Update mit den geänderten Properties
-        const changedProperties = new Map();
-        changedProperties.set('earliestProgramStart', firstProgramStart);
-        this.epgBox.updated(changedProperties);
-
+        // Benachrichtige die ProgramBox über die Änderung
+        mustUpdate = true;
         // Verzögere die Aktualisierung der Startgaps mit Debouncing
         this.scheduleStartgapUpdate();
       }
-
+      if (mustUpdate) {
+        this._notifyTimeValueChanged({'latestProgramStop':lastProgramStop, 'earliestProgramStart': firstProgramStart});
+      }
       const startgapItem = {
         start: this.epgBox.earliestProgramStart,
         stop: firstProgramStart,
@@ -225,7 +242,16 @@ export class EpgRenderManager extends TgCardHelper {
         type: 'noprogram',
       };
       allElements = [nogapItem];
-      this._debug('EpgRenderManager: Keine Programme - großes Gap hinzugefügt');
+
+      // Debug für alle Fälle, um zu sehen ob das Problem noch auftritt
+      this._debug('EpgRenderManager: Keine Programme - großes Gap hinzugefügt', {
+        kanal: channel.channeldata?.name || channel.name,
+        kanalId: channel.id,
+        isFirstLoad: this.epgBox.isFirstLoad,
+        hatProgramsProperty: 'programs' in channel,
+        programsType: typeof channel.programs,
+        programsValue: channel.programs,
+      });
     }
 
     return html`
@@ -288,6 +314,7 @@ export class EpgRenderManager extends TgCardHelper {
   /**
    * Führt das Scrolling in der Programmbox aus
    */
+
   scrollProgramBox() {
     this._debug('EpgRenderManager: scrollProgramBox aufgerufen');
 
@@ -478,5 +505,36 @@ export class EpgRenderManager extends TgCardHelper {
     // Mit der repeat-Direktive werden Startgaps automatisch korrekt berechnet
     // Diese Methode ist nur noch für Kompatibilität vorhanden
     return;
+  }
+
+  /**
+   * Benachrichtigt die ProgramBox und Timebar über geänderte Zeitwerte
+   */
+  _notifyTimeValueChanged(properties) {
+    if (this.epgBox) {
+      // Setze die Werte in der EpgBox (das löst Lit-Updates aus)
+      for (const [propertyName, newValue] of Object.entries(properties)) {
+        this.epgBox[propertyName] = newValue;
+      }
+
+      // Benachrichtige alle registrierten Komponenten über die Änderung
+      this.epgBox.dispatchEvent(
+        new CustomEvent('viewchanges-event', {
+          detail: properties,
+          bubbles: true,
+          composed: true,
+        })
+      );
+
+      this._debug(`EpgRenderManager: viewChanges Event ausgelöst`, {
+        properties,
+        epgBox: this.epgBox ? 'verfügbar' : 'nicht verfügbar'
+      });
+    } else {
+      this._debug(`EpgRenderManager: EpgBox nicht verfügbar für viewChanges`, {
+        properties,
+        epgBox: this.epgBox ? 'verfügbar' : 'nicht verfügbar'
+      });
+    }
   }
 }

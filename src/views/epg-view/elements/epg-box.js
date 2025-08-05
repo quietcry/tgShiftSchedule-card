@@ -171,6 +171,15 @@ export class EpgBox extends EpgElementBase {
         scale: this.scale
       });
       this.scaleManager.calculateScale();
+
+      // Benachrichtige epg-view über Scale-Änderung
+      this.dispatchEvent(
+        new CustomEvent('scale-changed', {
+          detail: { value: this.scale },
+          bubbles: true,
+          composed: true,
+        })
+      );
     }
 
     // ===== KANAL-UPDATES (über DataManager) =====
@@ -191,7 +200,9 @@ export class EpgBox extends EpgElementBase {
 
       // Führe Scrolling nach Programm-Änderungen aus
       this.renderManager.scrollProgramBox();
-      }
+    }
+
+
 
     // Prüfe epgBackview Validierung
     if (
