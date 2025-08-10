@@ -29,18 +29,20 @@ export class EPGView extends ViewBase {
       :host {
         display: block;
         width: 100%;
-        height: 100%;
+        height: fit-content;
+        max-height: 100%;
       }
 
       .gridcontainer {
         display: grid;
         grid-template-columns: 1fr;
-        grid-template-rows: auto 1fr;
+        grid-template-rows: auto auto;
         grid-template-areas:
           'headline'
           'scrollBox';
         width: 100%;
-        height: 100%;
+        height: fit-content;
+        max-height: 100%;
         overflow: hidden;
       }
 
@@ -177,7 +179,8 @@ export class EPGView extends ViewBase {
       epg-box {
         grid-area: scrollBox;
         width: 100%;
-        height: 100%;
+        height: fit-content;
+        max-height: 100%;
       }
 
       .timeSlot {
