@@ -277,13 +277,16 @@ export class EpgRenderManager extends TgCardHelper {
   }
 
   /**
-   * Berechnet die Scroll-Position für die Programmbox
-   * Formel: ((now - epgShowPastTime) - earliestProgramStart) * scale
+   * Führt das Scrolling in der Programmbox aus
    */
-  calculateScrollPosition() {
-    const now = Math.floor(Date.now() / 1000);
-    const pastTime = this.epgBox.epgShowPastTime || 30; // Minuten in die Vergangenheit
-    const pastTimeSeconds = pastTime * 60;
+
+  scrollProgramBox(scrollThat, seconds=0) {
+    this._debug('EpgRenderManager: scrollProgramBox aufgerufen');
+
+    if (!scrollThat) {
+      this._debug('EpgRenderManager: ProgramBox nicht gefunden für Scrolling');
+      return;
+    }
 
     // Hole scale aus CSS-Properties oder verwende this.epgBox.scale
     let scale = this.epgBox.scale;
@@ -293,48 +296,37 @@ export class EpgRenderManager extends TgCardHelper {
       scale = parseFloat(cssScale) || 1;
     }
 
-    const scrollPosition = ((now - pastTimeSeconds) - this.epgBox.earliestProgramStart) * scale;
+    const scrollPosition = scale * seconds;
 
-    this._debug('EpgRenderManager: Berechne Scroll-Position', {
-      now: new Date(now * 1000).toISOString(),
-      nowLocal: new Date(now * 1000).toLocaleString(),
-      pastTimeMinutes: pastTime,
-      pastTimeSeconds: pastTimeSeconds,
-      earliestProgramStart: new Date(this.epgBox.earliestProgramStart * 1000).toISOString(),
-      earliestProgramStartLocal: new Date(this.epgBox.earliestProgramStart * 1000).toLocaleString(),
+    this._debug('EpgRenderManager: programmatic-scrollScrolle ProgramBox', {
+      seconds: seconds,
       scale: scale,
-      cssScale: this.epgBox.programBox ? getComputedStyle(this.epgBox.programBox).getPropertyValue('--epg-scale') : 'nicht verfügbar',
       scrollPosition: scrollPosition,
-      calculation: `((${now} - ${pastTimeSeconds}) - ${this.epgBox.earliestProgramStart}) * ${scale} = ${scrollPosition}`,
+      programBoxExists: !!scrollThat,
+      programBoxScrollLeft: scrollThat.scrollLeft,
+      scrollThat: scrollThat,
+      scrollWidth: scrollThat.scrollWidth,
+      clientWidth: scrollThat.clientWidth,
+      canScroll: scrollThat.scrollWidth > scrollThat.clientWidth
     });
 
-    return Math.max(0, scrollPosition); // Nicht negativ
-  }
-
-  /**
-   * Führt das Scrolling in der Programmbox aus
-   */
-
-  scrollProgramBox() {
-    this._debug('EpgRenderManager: scrollProgramBox aufgerufen');
-
-    if (!this.epgBox.programBox) {
-      this._debug('EpgRenderManager: ProgramBox nicht gefunden für Scrolling');
+    // Warte bis das Element vollständig gerendert ist
+    if (scrollThat.scrollWidth === 0) {
+      this._debug('EpgRenderManager: Element noch nicht gerendert, warte...');
+      setTimeout(() => this.scrollProgramBox(scrollThat), 50);
       return;
     }
 
-    const scrollPosition = this.calculateScrollPosition();
+    // Setze scrollLeft mit requestAnimationFrame für bessere Performance
+    requestAnimationFrame(() => {
+      scrollThat.scrollLeft = scrollPosition;
+      // scrollThat.dispatchEvent(new Event('scroll', { bubbles: true }));
 
-    this._debug('EpgRenderManager: Scrolle ProgramBox', {
-      scrollPosition: scrollPosition,
-      programBoxExists: !!this.epgBox.programBox,
-      programBoxScrollLeft: this.epgBox.programBox.scrollLeft,
-    });
-
-    this.epgBox.programBox.scrollLeft = scrollPosition;
-
-    this._debug('EpgRenderManager: Scrolling abgeschlossen', {
-      newScrollLeft: this.epgBox.programBox.scrollLeft,
+      this._debug('EpgRenderManager: Scrolling abgeschlossen programmatic-scroll', {
+        newScrollLeft: scrollThat.scrollLeft,
+        scrollPosition: scrollPosition,
+        success: scrollThat.scrollLeft === scrollPosition
+      });
     });
   }
 

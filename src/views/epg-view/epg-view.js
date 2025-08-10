@@ -7,6 +7,7 @@ import { EpgProgramList } from './elements/epg-program-list.js';
 import { EpgBox } from './elements/epg-box.js';
 import { DataProvider } from '../../tools/data-provider.js';
 import { EpgScrollManager } from './elements/epg-scroll-manager.js';
+import { TooltipManager } from '../../tools/tooltip-manager.js';
 
 export class EPGView extends ViewBase {
   static className = 'EPGView';
@@ -14,12 +15,13 @@ export class EPGView extends ViewBase {
   static properties = {
     ...super.properties,
     _dataProvider: { type: Object },
-    _dataFetchStarted: { type: Boolean },
     env: { type: Object },
     // Timebar-Werte von der epg-box
     _timeBarEarliestProgramStart: { type: Number },
     _timeBarLatestProgramStop: { type: Number },
     _timeBarScale: { type: Number },
+    // Tooltip Manager
+    _tooltipManager: { type: Object },
   };
 
   static get styles() {
@@ -224,6 +226,97 @@ export class EPGView extends ViewBase {
         font-size: 0.8em;
         color: var(--secondary-text-color);
       }
+
+      /* Tooltip Styles */
+      .tooltip {
+        background: rgba(0, 0, 0, 0.9);
+        color: white;
+        padding: 8px 12px;
+        border-radius: 6px;
+        font-size: 12px;
+        max-width: 300px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        pointer-events: none;
+        white-space: nowrap;
+        animation: tooltipFadeIn 0.2s ease-in-out;
+      }
+
+      .tooltip::before {
+        content: '';
+        position: absolute;
+        width: 0;
+        height: 0;
+        border: 6px solid transparent;
+        left: var(--tooltip-arrow-left, 50%);
+        transform: translateX(-50%);
+      }
+
+      .tooltip.top::before {
+        bottom: -6px;
+        border-top-color: rgba(0, 0, 0, 0.9);
+      }
+
+      .tooltip.bottom::before {
+        top: -6px;
+        border-bottom-color: rgba(0, 0, 0, 0.9);
+      }
+
+      .tooltip.right::before {
+        left: -6px;
+        top: var(--tooltip-arrow-left, 50%);
+        transform: translateY(-50%);
+        border-right-color: rgba(0, 0, 0, 0.9);
+      }
+
+      .tooltip.left::before {
+        right: -6px;
+        top: var(--tooltip-arrow-left, 50%);
+        transform: translateY(-50%);
+        border-left-color: rgba(0, 0, 0, 0.9);
+      }
+
+      .tooltip-content {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .tooltip-title {
+        font-weight: bold;
+        font-size: 13px;
+        color: #ffffff;
+      }
+
+      .tooltip-subtitle {
+        font-size: 11px;
+        color: #cccccc;
+        font-style: italic;
+      }
+
+      .tooltip-time {
+        font-size: 11px;
+        color: #dddddd;
+      }
+
+      .tooltip-description {
+        font-size: 11px;
+        color: #cccccc;
+        line-height: 1.3;
+        white-space: normal;
+        max-width: 280px;
+        word-wrap: break-word;
+      }
+
+      @keyframes tooltipFadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(5px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
     `;
   }
 
@@ -236,7 +329,9 @@ export class EPGView extends ViewBase {
     this._env = null;
     this._dataProvider = null;
     this._lastUpdate = null;
-    this._dataFetchStarted = false;
+
+    // Tooltip Manager wird in firstUpdated() initialisiert
+    this._tooltipManager = null;
 
     // Array für View-Änderungs-Observer
     // this.informMeAtViewChanges = [];
@@ -279,14 +374,13 @@ export class EPGView extends ViewBase {
       }
 
       // Nur wenn sich last_update tatsächlich ändert oder beim ersten Mal
-      if (newLastUpdate !== this._lastUpdate || this._lastUpdate === null || this._dataFetchStarted === false) {
+      if (this._lastUpdate === null || newLastUpdate !== this._lastUpdate) {
         this._debug('EPGView: last_update Vergleich', {
           newLastUpdate,
           thisLastUpdate: this._lastUpdate,
           hasHass: !!this._hass,
           hasConfig: !!this.config,
           entity: this.config?.entity,
-          dataFetchStarted: this._dataFetchStarted,
         });
 
         if (this._hass && this.config?.entity) {
@@ -360,6 +454,10 @@ export class EPGView extends ViewBase {
     if (this._env !== value) {
       this._env = value;
 
+      // Aktualisiere TooltipManager mit neuer env
+      if (this._tooltipManager) {
+        this._tooltipManager.env = value;
+      }
     }
   }
 
@@ -368,62 +466,54 @@ export class EPGView extends ViewBase {
   }
 
   async _loadData() {
-    // Verhindere parallele Aufrufe
-    if (this._dataFetchStarted) {
-      this._debug('EPG-View: _loadData bereits in Bearbeitung, überspringe Aufruf');
+    this._debug('EPG-View: _loadData wird aufgerufen');
+
+    // Hole die EPG-Box
+    const epgBox = this.shadowRoot?.querySelector('epg-box');
+    if (!epgBox) {
+      this._debug('EPG-View: _loadData: EPG-Box nicht gefunden, überspringe Datenabruf');
+      return;
+    }
+    this._debug('EPG-View: _loadData: Datenabruf wird gestartet');
+
+    // Prüfe, ob Dummy-Daten verwendet werden sollen (Build-Variable)
+    if (this.useDummyData && this.useDummyData.toLowerCase() === 'true') {
+      this._debug('EPG-View: _loadData: Verwende Dummy-Daten (Build-Variable)', {
+        useDummyData: this.useDummyData,
+      });
+
+      try {
+        // Rufe die Dummy-Daten-Generierung im DataManager auf
+        const dummyData = epgBox.dataManager.generateDummyData();
+
+        if (dummyData && dummyData.length > 0) {
+          this._debug('EPG-View: Dummy-Daten erfolgreich generiert', {
+            anzahlKanäle: dummyData.length,
+            kanäle: dummyData.map(channel => ({
+              id: channel.id,
+              name: channel.name,
+              anzahlProgramme: channel.programs?.length || 0,
+            })),
+          });
+
+          // Füge jeden Kanal als Teil-EPG hinzu
+          dummyData.forEach(channelData => {
+            epgBox.addTeilEpg(channelData);
+          });
+
+          this._debug('EPG-View: Dummy-Daten erfolgreich geladen', {
+            anzahlKanäle: dummyData.length,
+          });
+        } else {
+          this._debug('EPG-View: Keine Dummy-Daten generiert');
+        }
+      } catch (error) {
+        this._debug('EPG-View: Fehler beim Laden der Dummy-Daten', { error: error.message });
+      }
       return;
     }
 
-    this._dataFetchStarted = true;
-    this._debug('EPG-View: _loadData wird aufgerufen');
-
-    try {
-      // Hole die EPG-Box
-      const epgBox = this.shadowRoot?.querySelector('epg-box');
-      if (!epgBox) {
-        this._debug('EPG-View: _loadData: EPG-Box nicht gefunden, überspringe Datenabruf');
-        return;
-      }
-      this._debug('EPG-View: _loadData: Datenabruf wird gestartet');
-
-      // Prüfe, ob Dummy-Daten verwendet werden sollen (Build-Variable)
-      if (this.useDummyData && this.useDummyData.toLowerCase() === 'true') {
-        this._debug('EPG-View: _loadData: Verwende Dummy-Daten (Build-Variable)', {
-          useDummyData: this.useDummyData,
-        });
-
-        try {
-          // Rufe die Dummy-Daten-Generierung im DataManager auf
-          const dummyData = epgBox.dataManager.generateDummyData();
-
-          if (dummyData && dummyData.length > 0) {
-            this._debug('EPG-View: Dummy-Daten erfolgreich generiert', {
-              anzahlKanäle: dummyData.length,
-              kanäle: dummyData.map(channel => ({
-                id: channel.id,
-                name: channel.name,
-                anzahlProgramme: channel.programs?.length || 0,
-              })),
-            });
-
-            // Füge jeden Kanal als Teil-EPG hinzu
-            dummyData.forEach(channelData => {
-              epgBox.addTeilEpg(channelData);
-            });
-
-            this._debug('EPG-View: Dummy-Daten erfolgreich geladen', {
-              anzahlKanäle: dummyData.length,
-            });
-          } else {
-            this._debug('EPG-View: Keine Dummy-Daten generiert');
-          }
-        } catch (error) {
-          this._debug('EPG-View: Fehler beim Laden der Dummy-Daten', { error: error.message });
-        }
-        return;
-      }
-
-      // Normale EPG-Daten laden
+    // Normale EPG-Daten laden
     if (!this._dataProvider || !this.config.entity) {
       this._debug('EPG-View: _loadData: Übersprungen - dataProvider oder entity fehlt', {
         dataProvider: !!this._dataProvider,
@@ -433,11 +523,8 @@ export class EPGView extends ViewBase {
     }
 
     // Starte den Datenabruf direkt
-      this._debug('EPG-View: Starte Datenabruf für echte EPG-Daten');
+    this._debug('EPG-View: Starte Datenabruf für echte EPG-Daten');
     await this._fetchViewData(this.config);
-    } finally {
-      this._dataFetchStarted = false;
-    }
   }
 
   async _fetchViewData(config) {
@@ -523,6 +610,10 @@ export class EPGView extends ViewBase {
 
   _onEpgBoxReady() {
     this._debug('EPG-View: _onEpgBoxReady aufgerufen');
+
+    // Initialisiere TooltipManager mit ProgramBox-Referenz
+    this._initializeTooltipManager();
+
     this._loadData();
 
     // Setup Scroll-Synchronisation
@@ -540,13 +631,66 @@ export class EPGView extends ViewBase {
     // Registriere Event-Listener für automatische Registrierung
     // this.addEventListener('registerMeForChanges', this._onRegisterMeForChanges.bind(this));
 
+    // Registriere Tooltip-Event-Listener (TooltipManager wird später initialisiert)
+    this.addEventListener('tooltip-event', (event) => {
+      if (this._tooltipManager) {
+        this._tooltipManager.handleTooltipEvent(event);
+      }
+    });
+
     // Prüfe ob epgBox bereits vorhanden ist
     const epgBox = this.shadowRoot.querySelector('epg-box');
     if (epgBox) {
       this._debug('EPG-View: epgBox bereits vorhanden, starte Datenladung');
+      this._initializeTooltipManager();
       this._loadData();
     } else {
       this._debug('EPG-View: epgBox noch nicht vorhanden, warte auf _onEpgBoxReady');
+    }
+  }
+
+  /**
+   * Initialisiert den TooltipManager mit ProgramBox-Referenz
+   */
+  _initializeTooltipManager() {
+    // Finde die epg-program-box innerhalb der epg-box
+    const epgBox = this.shadowRoot.querySelector('epg-box');
+    const programBox = epgBox?.shadowRoot?.querySelector('epg-program-box');
+
+    this._debug('EPG-View: TooltipManager Initialisierung', {
+      epgBoxFound: !!epgBox,
+      programBoxFound: !!programBox
+    });
+
+    if (programBox) {
+      this._debug('EPG-View: ProgramBox gefunden, initialisiere TooltipManager');
+      this._tooltipManager = new TooltipManager(this, this.env, programBox);
+    } else {
+      this._debug('EPG-View: ProgramBox nicht gefunden, TooltipManager ohne Referenz');
+      this._tooltipManager = new TooltipManager(this, this.env);
+
+      // Versuche es mit einem kurzen Delay nochmal
+      setTimeout(() => {
+        this._retryTooltipManagerInitialization();
+      }, 100);
+    }
+  }
+
+  /**
+   * Versucht erneut den TooltipManager mit ProgramBox-Referenz zu initialisieren
+   */
+  _retryTooltipManagerInitialization() {
+    const epgBox = this.shadowRoot.querySelector('epg-box');
+    const programBox = epgBox?.shadowRoot?.querySelector('epg-program-box');
+
+    this._debug('EPG-View: TooltipManager Retry-Initialisierung', {
+      epgBoxFound: !!epgBox,
+      programBoxFound: !!programBox
+    });
+
+    if (programBox && this._tooltipManager) {
+      this._debug('EPG-View: ProgramBox nachträglich gefunden, aktualisiere TooltipManager');
+      this._tooltipManager.programBoxRef = programBox;
     }
   }
 
@@ -611,6 +755,9 @@ export class EPGView extends ViewBase {
           @epg-first-load-complete=${this._onEpgFirstLoadComplete}
           @scale-changed=${this._onScaleChanged}
         ></epg-box>
+
+        <!-- Tooltip -->
+        ${this._tooltipManager?.isVisible ? this._renderTooltip() : ''}
       </div>
     `;
   }
@@ -620,6 +767,39 @@ export class EPGView extends ViewBase {
       <button @click=${this._handleRefresh}>
         <ha-icon icon="mdi:refresh"></ha-icon>
       </button>
+    `;
+  }
+
+  _renderTooltip() {
+    if (!this._tooltipManager || !this._tooltipManager.isVisible) return '';
+
+    return html`
+      <div class="tooltip" style="${this._tooltipManager.getStyle()}">
+        ${this._getTooltipContentTemplate()}
+      </div>
+    `;
+  }
+
+  _getTooltipContentTemplate() {
+    if (!this._tooltipManager || !this._tooltipManager.data) return '';
+
+    const data = this._tooltipManager.data;
+    const startTime = this._tooltipManager.formatTime(data.start);
+    const endTime = this._tooltipManager.formatTime(data.stop);
+    const duration = data.duration ? Math.round(data.duration / 60) : 0;
+
+    return html`
+      <div class="tooltip-content">
+        <div class="tooltip-title">${data.title || 'Unbekanntes Programm'}</div>
+        ${data.shortText ? html`<div class="tooltip-subtitle">${data.shortText}</div>` : ''}
+        <div class="tooltip-time">
+          <span class="tooltip-start">${startTime}</span>
+          <span class="tooltip-separator"> - </span>
+          <span class="tooltip-end">${endTime}</span>
+          ${duration > 0 ? html`<span class="tooltip-duration"> (${duration} Min)</span>` : ''}
+        </div>
+        ${data.description ? html`<div class="tooltip-description">${data.description}</div>` : ''}
+      </div>
     `;
   }
 
@@ -665,6 +845,8 @@ export class EPGView extends ViewBase {
     // Hier können Aktionen ausgeführt werden, die nach dem ersten Load erfolgen sollen
     // z.B. Loading-Status beenden, UI-Updates, etc.
   }
+
+
 }
 
 if (!customElements.get('epg-view')) {

@@ -775,6 +775,7 @@ export class EpgBox extends EpgElementBase {
       <!-- <div class="programBox"> -->
       <epg-program-box
         class="programBox"
+        .epgBox=${this}
         .programs=${this.programs}
         .scale=${this.scale}
         .containerWidth=${this.containerWidth}

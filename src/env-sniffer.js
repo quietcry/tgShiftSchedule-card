@@ -20,6 +20,11 @@ export class EnvSniffer extends TgCardHelper {
     this.envSnifferTypeOfView = 'unknown';
     this.envSnifferScreenWidth = 0;
     this.envSnifferScreenHeight = 0;
+    this.lovelaceContext = 'unknown';
+
+    // Hui-View Informationen
+    this.huiViewPosition = { left: 0, top: 0, width: 0, height: 0 };
+    this.cardPosition = { left: 0, top: 0 };
 
     // Interne Variablen
     this.envSnifferCardElement = null;
@@ -94,6 +99,18 @@ export class EnvSniffer extends TgCardHelper {
 
     // View-Typ
     this.envSnifferTypeOfView = this.detectViewType();
+
+    // Lovelace-Kontext
+    this.lovelaceContext = this.detectLovelaceContext();
+
+    // Hui-View-Position
+    this.detectHuiViewPosition();
+    this._debug('EnvSniffer: Lovelace-Kontext erkannt', {
+      lovelaceContext: this.lovelaceContext,
+      cardElement: this.envSnifferCardElement?.tagName,
+      parentElement: this.envSnifferCardElement?.parentElement?.tagName,
+      grandParent: this.envSnifferCardElement?.parentElement?.parentElement?.tagName
+    });
 
     // Prüfe auf Änderungen und sende Event
     const newState = this.getEnvironmentState();
@@ -176,6 +193,111 @@ export class EnvSniffer extends TgCardHelper {
 
     // Fallback: Standardmäßig als Tile behandeln
     return 'tile';
+  }
+
+  /**
+   * Erkennt den spezifischen Lovelace-Kontext (Panel/Card/Section)
+   */
+  detectLovelaceContext() {
+    // Panel Detection - durchquere Shadow DOMs (Panel hat Priorität)
+    const panel = this._findAncestorThroughShadowDOM('ha-panel-lovelace');
+    if (panel) {
+      // Prüfe ob es sich um ein Panel handelt (hui-panel-view vorhanden)
+      const panelView = this._findAncestorThroughShadowDOM('hui-panel-view');
+      if (panelView) return 'panel';
+    }
+
+    // Card Detection - durchquere Shadow DOMs (spezifischer)
+    const card = this._findAncestorThroughShadowDOM('hui-card');
+    if (card) return 'card';
+
+    // Section Detection - durchquere Shadow DOMs (spezifischer)
+    const section = this._findAncestorThroughShadowDOM('hui-section');
+    if (section) return 'section';
+
+    // Default
+    return 'unknown';
+  }
+
+  /**
+   * Erkennt die Hui-View-Position und Kartenposition
+   */
+  detectHuiViewPosition() {
+    if (!this.envSnifferCardElement) {
+      this._debug('EnvSniffer: Kein Card-Element für Hui-View-Erkennung');
+      return;
+    }
+
+    // Finde Hui-View Element
+    const huiView = this._findAncestorThroughShadowDOM('hui-view');
+
+    if (huiView) {
+      // Hui-View Position relativ zum Viewport
+      const huiViewRect = huiView.getBoundingClientRect();
+      this.huiViewPosition = {
+        left: huiViewRect.left,
+        top: huiViewRect.top,
+        width: huiViewRect.width,
+        height: huiViewRect.height
+      };
+
+      // Kartenposition relativ zum Hui-View
+      const cardRect = this.envSnifferCardElement.getBoundingClientRect();
+      this.cardPosition = {
+        left: cardRect.left - huiViewRect.left,
+        top: cardRect.top - huiViewRect.top
+      };
+
+      this._debug('EnvSniffer: Hui-View-Position erkannt', {
+        huiViewPosition: this.huiViewPosition,
+        cardPosition: this.cardPosition
+      });
+    } else {
+      // Fallback: Verwende Viewport als Hui-View
+      this.huiViewPosition = {
+        left: 0,
+        top: 0,
+        width: window.innerWidth,
+        height: window.innerHeight
+      };
+
+      const cardRect = this.envSnifferCardElement.getBoundingClientRect();
+      this.cardPosition = {
+        left: cardRect.left,
+        top: cardRect.top
+      };
+
+      this._debug('EnvSniffer: Hui-View nicht gefunden, verwende Viewport', {
+        huiViewPosition: this.huiViewPosition,
+        cardPosition: this.cardPosition
+      });
+    }
+  }
+
+  /**
+   * Findet einen Ancestor-Element durch Shadow DOMs hindurch
+   */
+  _findAncestorThroughShadowDOM(selector) {
+    let element = this.envSnifferCardElement;
+
+    while (element) {
+      // Prüfe ob das aktuelle Element dem Selector entspricht
+      if (element.matches && element.matches(selector)) {
+        return element;
+      }
+
+      // Gehe zum Parent
+      let parent = element.parentElement;
+
+      // Wenn kein Parent, versuche Shadow Root
+      if (!parent && element.parentNode && element.parentNode.host) {
+        parent = element.parentNode.host;
+      }
+
+      element = parent;
+    }
+
+    return null;
   }
 
   /**
@@ -264,6 +386,9 @@ export class EnvSniffer extends TgCardHelper {
       envSnifferTypeOfView: this.envSnifferTypeOfView,
       envSnifferScreenWidth: this.envSnifferScreenWidth,
       envSnifferScreenHeight: this.envSnifferScreenHeight,
+      lovelaceContext: this.lovelaceContext,
+      huiViewPosition: this.huiViewPosition,
+      cardPosition: this.cardPosition,
     };
   }
 
@@ -387,6 +512,7 @@ export class EnvSniffer extends TgCardHelper {
    */
   handleCardResize() {
     this.updateCardDimensions();
+    this.detectHuiViewPosition(); // Aktualisiere Hui-View-Position bei Kartenänderungen
     this.detectEnvironment();
   }
 

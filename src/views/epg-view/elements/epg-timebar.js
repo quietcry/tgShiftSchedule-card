@@ -92,19 +92,13 @@ export class EpgTimebar extends EpgElementBase {
       tr.row4 > td:last-child {
         border-right: none;
       }
-      // /* Optional: optische Trennung der Zeilen */
-      // tr.row1 > td { background: var(--epg-timebar-bg, #f0f0f0); }
-      // tr.row2 > td,
-      // tr.row3 > td,
-      // tr.row4 > td { background: #fff; }
     `,
   ];
 
   constructor() {
     super();
-    this.timeSlots = [];
     this.scale = null;
-    this.timebar=null;
+    this.timebar = null;
     this.earliestProgramStart = null;
     this.latestProgramStop = null;
     this.propsNumbers = ['earliestProgramStart', 'latestProgramStop', 'scale'];
@@ -112,11 +106,6 @@ export class EpgTimebar extends EpgElementBase {
 
   async firstUpdated() {
     await super.firstUpdated();
-    this._debug('EpgTimebar: firstUpdated', {
-      earliestProgramStart: this.earliestProgramStart,
-      latestProgramStop: this.latestProgramStop,
-      scale: this.scale,
-    });
 
     // Informiere den Time Marker beim ersten Rendering
     this._informTimeMarker();
@@ -134,49 +123,20 @@ export class EpgTimebar extends EpgElementBase {
         },
       })
     );
-
-    this._debug('EpgTimebar: registerMeForChanges Event ausgelöst');
   }
 
   updated(changedProperties) {
     super.updated(changedProperties);
     this.timebar = this.shadowRoot.querySelector('.timebar');
-    // Setze timebar Referenz nach dem Rendering
-    if (!this.timebar) {
-      // Das INNERE .timebar div ist das scrollbare Element
-      this.timebar = this.shadowRoot.querySelector('.timebar');
-      this._debug('EpgTimebar: updated() timebar Referenz gesetzt', {
-        timebar: this.timebar,
-        isInnerTimebar: this.timebar?.classList?.contains('timebar'),
-        scrollWidth: this.timebar?.scrollWidth,
-        clientWidth: this.timebar?.clientWidth
-      });
-    }
 
-    // Debug: Prüfe ob timebar Breite verfügbar ist
-    if (this.timebar && (this.timebar.scrollWidth === 0 || this.timebar.clientWidth === 0)) {
-      this._debug('EpgTimebar: updated() timebar hat keine Breite', {
-        scrollWidth: this.timebar.scrollWidth,
-        clientWidth: this.timebar.clientWidth,
-        offsetWidth: this.timebar.offsetWidth,
-        computedStyle: getComputedStyle(this.timebar).width,
-        timebarChildren: this.timebar.children.length,
-        timebarHTML: this.timebar.innerHTML.substring(0, 100) + '...'
-      });
-    }
-
-    this._debug('EpgTimebar: updated() Relevante Properties geändert', {
-      earliestProgramStart: this.earliestProgramStart,
-      latestProgramStop: this.latestProgramStop,
-      scale: this.scale,
-      changedProperties: Array.from(changedProperties.keys()),
-    });
     // Prüfe ob relevante Properties geändert wurden
     if (
       changedProperties.has('earliestProgramStart') ||
       changedProperties.has('latestProgramStop') ||
       changedProperties.has('scale')
     ) {
+      // Informiere den Time Marker über die Änderungen
+      this._informTimeMarker();
     }
   }
 
@@ -185,11 +145,8 @@ export class EpgTimebar extends EpgElementBase {
    * @param {Object} eventdata - Event-Daten mit verschiedenen EventTypes
    */
   _handleChangeNotifys(eventdata) {
-    this._debug('EpgTimebar: Werte-Änderungen von epg-box empfangen', { eventdata })
-
     // Durchlaufe alle Keys in eventdata
     for (const eventType of Object.keys(eventdata)) {
-      this._debug('EpgTimebar: Verarbeite EventType', { eventType, eventdata: eventdata[eventType] });
       switch (eventType) {
         case "viewchanges":
           this._handleChangeNotifys_viewChanges(eventdata[eventType]);
@@ -201,11 +158,10 @@ export class EpgTimebar extends EpgElementBase {
           this._handleChangeNotifys_progScrollX(eventdata[eventType]);
           break;
       }
-
     }
   }
+
   _handleChangeNotifys_viewChanges(eventdata) {
-    this._debug('EpgTimebar: View-Änderungen empfangen', { eventdata });
     const changedProperties = eventdata;
 
     // Setze die Werte über Lit-Properties, damit changedProperties korrekt gefüllt wird
@@ -226,30 +182,23 @@ export class EpgTimebar extends EpgElementBase {
     }
     // Trigger Update nur wenn sich Werte geändert haben
     if (updated) {
-      this._debug('EpgTimebar: Timebar-relevante Änderungen erkannt, aktualisiere Rendering');
-
       // Informiere den Time Marker über die Änderungen
       this._informTimeMarker();
-
       this.requestUpdate();
     }
   }
+
   _handleChangeNotifys_envChanges(eventdata) {
-    this._debug('EpgTimebar: Environment-Änderungen empfangen', { eventdata });
+    // Environment-Änderungen werden hier verarbeitet (falls nötig)
   }
+
   _handleChangeNotifys_progScrollX(eventdata) {
     const changedProperties = eventdata;
+    this._debug('EpgTimebar: _handleChangeNotifys_progScrollX programmatic-scroll', {
+      changedProperties: changedProperties,
+      timebar: this.timebar,
+    });
     if (changedProperties.hasOwnProperty('scrollLeft') && this.timebar) {
-      this._debug('EpgTimebar: Program-Scroll-Änderungen empfangen', {
-        eventdata,
-        timebar: this.timebar,
-        scrollLeft: changedProperties.scrollLeft,
-        timebarScrollWidth: this.timebar.scrollWidth,
-        timebarClientWidth: this.timebar.clientWidth,
-        timebarScrollLeft: this.timebar.scrollLeft,
-        canScroll: this.timebar.scrollWidth > this.timebar.clientWidth
-      });
-
       // Nur scrollen wenn die Timebar scrollbar ist
       if (this.timebar.scrollWidth > this.timebar.clientWidth) {
         // Berechne proportionale Scroll-Position
@@ -260,15 +209,7 @@ export class EpgTimebar extends EpgElementBase {
         // Proportionale Berechnung: (programBoxScrollLeft / programBoxScrollWidth) * timebarScrollWidth
         const proportionalScrollLeft = (programBoxScrollLeft / programBoxScrollWidth) * timebarScrollWidth;
 
-        this._debug('EpgTimebar: Proportionale Scroll-Berechnung', {
-          programBoxScrollLeft,
-          programBoxScrollWidth,
-          timebarScrollWidth,
-          proportionalScrollLeft,
-          originalScrollLeft: changedProperties.scrollLeft
-        });
-
-        this.timebar.scrollLeft = changedProperties.scrollLeft;
+        this.timebar.scrollLeft = proportionalScrollLeft;
       }
     }
   }
@@ -380,6 +321,7 @@ export class EpgTimebar extends EpgElementBase {
       row4: row4,
     };
   }
+
   _createTimeSlots() {
     const viertel = 900;
     const startDate = new Date(this.earliestProgramStart * 1000);
@@ -458,7 +400,6 @@ export class EpgTimebar extends EpgElementBase {
         row4.push(...slot.row4);
       }
     }
-    // NEUES TABLE-SKELETT BEGINN
     return html`
       <table class="epg-timebar-table">
         <tr class="row1">
@@ -475,13 +416,6 @@ export class EpgTimebar extends EpgElementBase {
         </tr>
       </table>
     `;
-    // return html`
-    //   <div class="time-slot tab">
-    //     <div class="tabrow">
-    //       ${slots}
-    //     </div>
-    //   </div>
-    // `;
   }
 
   _formatTime(timestamp) {
@@ -503,23 +437,9 @@ export class EpgTimebar extends EpgElementBase {
       }
     }
 
-    // Debug: Zeige warum allFine false ist
     if (!allFine) {
-      this._debug('EpgTimebar: Loading-Zustand', {
-        allFine,
-        propsNumbers: this.propsNumbers,
-        earliestProgramStart: this.earliestProgramStart,
-        latestProgramStop: this.latestProgramStop,
-        scale: this.scale,
-        propsValid: this.propsNumbers.map(prop => ({
-          prop,
-          value: this[prop],
-          isValid: this[prop] && !isNaN(this[prop])
-        }))
-      });
       return html`<div class="timebar">Loading...</div>`;
     }
-
 
     return html`
       <div class="timebar" style="--epg-scale: ${this.scale}">
@@ -535,5 +455,5 @@ export class EpgTimebar extends EpgElementBase {
 }
 
 if (!customElements.get('epg-timebar')) {
-customElements.define('epg-timebar', EpgTimebar);
+  customElements.define('epg-timebar', EpgTimebar);
 }

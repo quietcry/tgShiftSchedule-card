@@ -19,6 +19,8 @@ export class EpgProgramItem extends EpgElementBase {
     type: { type: String }, // 'endgap', 'startgap', 'item', 'title' oder undefined/null
     rowIndex: { type: Number },
     itemIndex: { type: Number },
+
+
   };
 
   constructor() {
@@ -37,6 +39,8 @@ export class EpgProgramItem extends EpgElementBase {
     this.type = undefined; // Standard: normales Programmitem
     this.rowIndex = 0;
     this.itemIndex = 0;
+
+
   }
 
   // Getter für Kompatibilität
@@ -176,6 +180,8 @@ export class EpgProgramItem extends EpgElementBase {
         ${this.showDescription && this.description
           ? html` <div class="programDescription">${this.description}</div> `
           : ''}
+
+
       </div>
     `;
   }
@@ -209,6 +215,15 @@ export class EpgProgramItem extends EpgElementBase {
 
     this.style.backgroundColor = 'var(--epg-hover-bg)';
     this.style.color = 'var(--epg-text-color)';
+
+    // Tooltip-Event senden
+    this._sendTooltipEvent('show');
+
+    this._debug('EpgProgramItem: Tooltip-Event gesendet', {
+      title: this.title,
+      isGap: this.isGap,
+      isGroup: this.isGroup
+    });
   }
 
   _onMouseLeave() {
@@ -216,6 +231,13 @@ export class EpgProgramItem extends EpgElementBase {
     if (this.isGap) {
       return;
     }
+
+    // Tooltip-Event senden
+    this._sendTooltipEvent('hide');
+
+    this._debug('EpgProgramItem: Tooltip-Event gesendet (hide)', {
+      title: this.title
+    });
 
     // Berechne die ursprünglichen Farben neu
     // const isOddRow = this.rowIndex % 2 === 1;
@@ -244,6 +266,70 @@ export class EpgProgramItem extends EpgElementBase {
     // this.style.backgroundColor = bgColor;
     // this.style.color = textColor;
   }
+
+  /**
+   * Sendet Tooltip-Events an die Kartenebene
+   */
+  _sendTooltipEvent(action) {
+    if (this.isGap || this.isGroup) return;
+
+    const rect = this.getBoundingClientRect();
+    const viewportHeight = window.innerHeight;
+
+    // Berechne Position
+    const spaceAbove = rect.top;
+    const spaceBelow = viewportHeight - rect.bottom;
+    const tooltipPosition = spaceAbove > spaceBelow ? 'top' : 'bottom';
+
+    this.dispatchEvent(
+      new CustomEvent('tooltip-event', {
+        detail: {
+          action: action, // 'show' oder 'hide'
+          position: tooltipPosition,
+          elementRect: rect,
+          data: {
+            title: this.title,
+            shortText: this.shortText,
+            description: this.description,
+            start: this.start,
+            stop: this.stop,
+            duration: this.duration
+          }
+        },
+        bubbles: true,
+        composed: true
+      })
+    );
+  }
+
+  /**
+   * Formatiert die Zeit für den Tooltip
+   */
+  _formatTime(timestamp) {
+    if (!timestamp) return '';
+    const date = new Date(timestamp * 1000);
+    return date.toLocaleTimeString('de-DE', {
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  }
+
+  /**
+   * Formatiert die Dauer für die Anzeige
+   */
+  _formatDuration(duration) {
+    if (!duration) return '';
+    const minutes = Math.round(duration / 60);
+    if (minutes < 60) {
+      return `${minutes} Min`;
+    } else {
+      const hours = Math.floor(minutes / 60);
+      const remainingMinutes = minutes % 60;
+      return `${hours}h ${remainingMinutes}min`;
+    }
+  }
+
+
 
   static styles = [
     super.styles,
@@ -338,6 +424,31 @@ export class EpgProgramItem extends EpgElementBase {
       }
 
       .programTime {
+        font-size: 0.8em;
+        margin-top: 1px;
+        color: inherit;
+        opacity: 0.8;
+      }
+
+      .programDuration {
+        font-size: 0.7em;
+        margin-top: 1px;
+        color: inherit;
+        opacity: 0.7;
+      }
+
+      .programDescription {
+        font-size: 0.8em;
+        margin-top: 2px;
+        line-height: 1.3;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        color: inherit;
+        opacity: 0.9;
+      }
+
+
         font-size: 0.8em;
         margin-top: 1px;
         overflow: hidden;
