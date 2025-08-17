@@ -19,12 +19,11 @@ export class EpgProgramItem extends EpgElementBase {
     type: { type: String }, // 'endgap', 'startgap', 'item', 'title' oder undefined/null
     rowIndex: { type: Number },
     itemIndex: { type: Number },
-
-
   };
 
   constructor() {
     super();
+
     this.start = 0;
     this.stop = 0;
     this.duration = 0;
@@ -40,7 +39,10 @@ export class EpgProgramItem extends EpgElementBase {
     this.rowIndex = 0;
     this.itemIndex = 0;
 
-
+    // Tooltip-Event-Filterung
+    this._lastTooltipAction = null;
+    this._tooltipTimer = null;
+    this._isTooltipVisible = false; // Tracke den aktuellen Tooltip-Status
   }
 
   // Getter für Kompatibilität
@@ -180,8 +182,6 @@ export class EpgProgramItem extends EpgElementBase {
         ${this.showDescription && this.description
           ? html` <div class="programDescription">${this.description}</div> `
           : ''}
-
-
       </div>
     `;
   }
@@ -213,17 +213,15 @@ export class EpgProgramItem extends EpgElementBase {
       return;
     }
 
-    this.style.backgroundColor = 'var(--epg-hover-bg)';
-    this.style.color = 'var(--epg-text-color)';
-
-    // Tooltip-Event senden
-    this._sendTooltipEvent('show');
-
-    this._debug('EpgProgramItem: Tooltip-Event gesendet', {
-      title: this.title,
-      isGap: this.isGap,
-      isGroup: this.isGroup
-    });
+    // Nur senden wenn der Tooltip noch nicht sichtbar ist
+    if (!this._isTooltipVisible) {
+      this._sendDelayedTooltipEvent('show');
+      this._debug('EpgProgramItem: Tooltip-Event geplant (show)', {
+        title: this.title,
+        isGap: this.isGap,
+        isGroup: this.isGroup,
+      });
+    }
   }
 
   _onMouseLeave() {
@@ -232,12 +230,20 @@ export class EpgProgramItem extends EpgElementBase {
       return;
     }
 
-    // Tooltip-Event senden
-    this._sendTooltipEvent('hide');
+    // Stoppe den verzögerten Tooltip-Timer
+    if (this._tooltipTimer) {
+      clearTimeout(this._tooltipTimer);
+      this._tooltipTimer = null;
+      this._debug('EpgProgramItem: Tooltip-Timer gestoppt');
+    }
 
-    this._debug('EpgProgramItem: Tooltip-Event gesendet (hide)', {
-      title: this.title
-    });
+    // Nur senden wenn der Tooltip sichtbar ist
+    if (this._isTooltipVisible) {
+      this._sendTooltipEvent('hide');
+      this._debug('EpgProgramItem: Tooltip-Event gesendet (hide)', {
+        title: this.title,
+      });
+    }
 
     // Berechne die ursprünglichen Farben neu
     // const isOddRow = this.rowIndex % 2 === 1;
@@ -273,33 +279,56 @@ export class EpgProgramItem extends EpgElementBase {
   _sendTooltipEvent(action) {
     if (this.isGap || this.isGroup) return;
 
-    const rect = this.getBoundingClientRect();
-    const viewportHeight = window.innerHeight;
+    // Aktualisiere den lokalen Status
+    if (action === 'show') {
+      this._isTooltipVisible = true;
+    } else if (action === 'hide') {
+      this._isTooltipVisible = false;
+    }
 
-    // Berechne Position
-    const spaceAbove = rect.top;
-    const spaceBelow = viewportHeight - rect.bottom;
-    const tooltipPosition = spaceAbove > spaceBelow ? 'top' : 'bottom';
+    // Nur senden wenn sich die Action geändert hat
+    if (this._lastTooltipAction === action) {
+      this._debug('EpgProgramItem: Tooltip-Event ignoriert - gleiche Action', { action });
+      return;
+    }
 
+    this._lastTooltipAction = action;
     this.dispatchEvent(
       new CustomEvent('tooltip-event', {
         detail: {
-          action: action, // 'show' oder 'hide'
-          position: tooltipPosition,
-          elementRect: rect,
+          action: action,
+          element: this,
           data: {
             title: this.title,
             shortText: this.shortText,
             description: this.description,
             start: this.start,
             stop: this.stop,
-            duration: this.duration
-          }
+            duration: this.duration,
+          },
         },
         bubbles: true,
-        composed: true
+        composed: true,
       })
     );
+    this._debug('EpgProgramItem: Tooltip-Event gesendet', { action });
+  }
+
+  /**
+   * Sendet verzögerte Tooltip-Events (für mouseenter)
+   */
+  _sendDelayedTooltipEvent(action) {
+    if (this.isGap || this.isGroup) return;
+
+    // Stoppe vorherige Timer falls vorhanden
+    if (this._tooltipTimer) {
+      clearTimeout(this._tooltipTimer);
+    }
+
+    // Verzögertes Event nach 200ms senden
+    this._tooltipTimer = setTimeout(() => {
+      this._sendTooltipEvent(action);
+    }, 200);
   }
 
   /**
@@ -310,7 +339,7 @@ export class EpgProgramItem extends EpgElementBase {
     const date = new Date(timestamp * 1000);
     return date.toLocaleTimeString('de-DE', {
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
     });
   }
 
@@ -328,8 +357,6 @@ export class EpgProgramItem extends EpgElementBase {
       return `${hours}h ${remainingMinutes}min`;
     }
   }
-
-
 
   static styles = [
     super.styles,

@@ -45,6 +45,7 @@ export class EpgProgramBox extends EpgElementBase {
     this.channelWidth = 180;
     this.env = {};
     this.scrollPositionSeconds = 0;
+    this.programaticalScroll = false;
 
     // Scroll-Debouncing
     this.scrollAnimationFrame = null;
@@ -73,7 +74,7 @@ export class EpgProgramBox extends EpgElementBase {
         detail: {
           component: this,
           callback: this._handleChangeNotifys.bind(this),
-          eventType: "progScrollX,envChanges,viewChanges",
+          eventType: 'progScrollX,envChanges,viewChanges',
           immediately: true,
         },
       })
@@ -90,7 +91,7 @@ export class EpgProgramBox extends EpgElementBase {
     this._debug('ProgramBox: _handleChangeNotifys() aufgerufen', { eventdata });
 
     for (const eventType of Object.keys(eventdata)) {
-      if (eventType === "envchanges") {
+      if (eventType === 'envchanges') {
         const { oldState, newState } = eventdata[eventType];
 
         this._debug('ProgramBox: Environment-Änderungen empfangen', {
@@ -124,6 +125,16 @@ export class EpgProgramBox extends EpgElementBase {
             });
           }
         }
+      } else if (eventType === 'progscrollx') {
+        const scrollevent = eventdata[eventType];
+        this.programaticalScroll = true;
+        this.programBox.scrollLeft = scrollevent.scrollLeft;
+        this._debug('ProgramBox: progscrollx event empfangen', {
+          element: this.programBox,
+          scrollLeft: scrollevent.scrollLeft,
+          scrollLeftReal: this.programBox.scrollLeft,
+          scrollevent,
+        });
       }
     }
   }
@@ -136,6 +147,11 @@ export class EpgProgramBox extends EpgElementBase {
     const programBoxElement = this.shadowRoot?.querySelector('.programBox');
     if (!programBoxElement) {
       this._debug('ProgramBox: programBox Element nicht gefunden');
+      return;
+    }
+    if (this.programaticalScroll) {
+      this._debug('ProgramBox: programaticalScroll ist true, scroll event wird ignoriert');
+      this.programaticalScroll = false;
       return;
     }
     this._debug('ProgramBox: scroll event triggered');
@@ -183,7 +199,7 @@ export class EpgProgramBox extends EpgElementBase {
             detail: {
               scrollLeft: eventData.scrollLeft,
               scrollLeftSeconds: eventData.scrollLeftSeconds,
-              component: this
+              component: this,
             },
           })
         );
@@ -201,7 +217,7 @@ export class EpgProgramBox extends EpgElementBase {
     // Debug: Zeige alle geänderten Properties
     this._debug('ProgramBox: updated() aufgerufen', {
       isFirstLoad: this.isFirstLoad,
-      changedProperties: Array.from(changedProperties.keys())
+      changedProperties: Array.from(changedProperties.keys()),
     });
 
     // ===== SCROLLING NACH PROGRAMM-ÄNDERUNGEN =====
@@ -229,7 +245,7 @@ export class EpgProgramBox extends EpgElementBase {
     } else {
       this._debug('ProgramBox: Automatisches Scrolling übersprungen', {
         isFirstLoad: this.isFirstLoad,
-        reason: 'Nicht erstes Laden'
+        reason: 'Nicht erstes Laden',
       });
     }
   }
@@ -252,7 +268,7 @@ export class EpgProgramBox extends EpgElementBase {
     const pastTime = this.epgBox?.epgShowPastTime || 40; // Minuten in die Vergangenheit
     const pastTimeSeconds = pastTime * 60;
 
-    const scrollPosition = ((now - pastTimeSeconds) - this.earliestProgramStart);
+    const scrollPosition = now - pastTimeSeconds - this.earliestProgramStart;
     this._debug('ProgramBox: updated()!: First Calculate Scrolling-Trigger erkannt', {
       now: new Date(now * 1000).toLocaleString(),
       nowSeconds: now,
@@ -261,7 +277,7 @@ export class EpgProgramBox extends EpgElementBase {
       pastTimeSeconds: pastTimeSeconds,
       earliestProgramStart: this.earliestProgramStart,
       scrollPosition: scrollPosition,
-      })
+    });
 
     return Math.max(0, scrollPosition); // Nicht negativ
   }
@@ -296,6 +312,12 @@ export class EpgProgramBox extends EpgElementBase {
           position: relative;
           height: 100%;
           width: 100%;
+          scrollbar-width: none;
+          -ms-overflow-style: none;
+        }
+
+        .programBox::-webkit-scrollbar {
+          display: none;
         }
 
         .programContainer {
@@ -364,30 +386,24 @@ export class EpgProgramBox extends EpgElementBase {
           height: 100%;
           color: var(--epg-error-color, red);
         }
-      `
+      `,
     ];
   }
 
   render() {
-    this._debug('ProgramBox: render() aufgerufen')
+    this._debug('ProgramBox: render() aufgerufen');
     return html`
-      <div
-        class="programBox"
-        @scroll="${this._onScroll}"
-      >
+      <div class="programBox" @scroll="${this._onScroll}">
         <!-- Time Marker über den Programmen -->
         <epg-time-marker
           .earliestProgramStart=${this.earliestProgramStart}
           .latestProgramStop=${this.latestProgramStop}
         ></epg-time-marker>
 
-        <div class="programContainer">
-          ${this._renderPrograms()}
-        </div>
+        <div class="programContainer">${this._renderPrograms()}</div>
       </div>
     `;
   }
-
 }
 
 customElements.define('epg-program-box', EpgProgramBox);

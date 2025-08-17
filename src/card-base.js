@@ -22,7 +22,6 @@ export class CardBase extends SuperBase {
 
     // Registriere Event-Listener für automatische Registrierung
     this.addEventListener('registerMeForChanges', this._onRegisterMeForChanges.bind(this));
-
   }
 
   async firstUpdated() {
@@ -114,7 +113,7 @@ export class CardBase extends SuperBase {
       detail: event.detail,
     });
 
-    const { component, callback, eventType = "", immediately = false } = event.detail;
+    const { component, callback, eventType = '', immediately = false } = event.detail;
 
     if (component && typeof callback === 'function') {
       this.registerInformAtChangesClients(component, eventType, immediately, callback);
@@ -136,7 +135,7 @@ export class CardBase extends SuperBase {
    * @param {string|Array} eventType - Event-Typ als String oder Array von Strings
    * @param {Function} callback - Callback-Funktion, die bei Änderungen aufgerufen wird
    */
-  registerInformAtChangesClients(me, eventType = "", immediately = false, callback = null) {
+  registerInformAtChangesClients(me, eventType = '', immediately = false, callback = null) {
     this._debug('registerInformAtChangesClients() Anfrage', {
       me,
       newEventType: eventType,
@@ -145,7 +144,13 @@ export class CardBase extends SuperBase {
     // Normalisiere die neuen EventTypes
     const eventTypes = Array.isArray(eventType)
       ? eventType.map(e => e.toLowerCase()).sort()
-      : typeof eventType === 'string' ? eventType.split(',').map(e => e.trim().toLowerCase()).filter(e => e.length > 0).sort() : [];
+      : typeof eventType === 'string'
+        ? eventType
+            .split(',')
+            .map(e => e.trim().toLowerCase())
+            .filter(e => e.length > 0)
+            .sort()
+        : [];
 
     // Prüfe ob bereits ein Observer für denselben me existiert
     const existingMeInformer = this.informAtChangesClients.find(informer => informer.me === me);
@@ -155,31 +160,38 @@ export class CardBase extends SuperBase {
       existingEventTypes = Array.isArray(existingMeInformer.eventType)
         ? existingMeInformer.eventType.map(e => e.toLowerCase()).sort()
         : typeof existingMeInformer.eventType === 'string'
-          ? existingMeInformer.eventType.split(',').map(e => e.trim().toLowerCase()).filter(e => e.length > 0).sort()
+          ? existingMeInformer.eventType
+              .split(',')
+              .map(e => e.trim().toLowerCase())
+              .filter(e => e.length > 0)
+              .sort()
           : [];
-      }
+    }
     // Finde nur die wirklich neuen EventTypes
     const newEventTypes = eventTypes.filter(newType => !existingEventTypes.includes(newType));
     if (existingMeInformer && newEventTypes.length === 0) {
-      this._debug('registerInformAtChangesClients() Client war bereits mit allen Typen registriert', {
-        me,
-        requestedEventTypes: eventTypes,
-        existingEventTypes,
-      });
+      this._debug(
+        'registerInformAtChangesClients() Client war bereits mit allen Typen registriert',
+        {
+          me,
+          requestedEventTypes: eventTypes,
+          existingEventTypes,
+        }
+      );
       return false;
-      }
+    }
 
     if (existingMeInformer) {
-        // Füge nur die neuen EventTypes hinzu
-        const combinedEventTypes = [...existingEventTypes, ...newEventTypes].sort();
-        existingMeInformer.eventType = combinedEventTypes;
-        this._debug('registerInformAtChangesClients() Neue EventTypes hinzugefügt', {
-          me,
-          newEventTypes,
-          existingEventTypes,
-          combinedEventTypes,
-        });
-      } else {
+      // Füge nur die neuen EventTypes hinzu
+      const combinedEventTypes = [...existingEventTypes, ...newEventTypes].sort();
+      existingMeInformer.eventType = combinedEventTypes;
+      this._debug('registerInformAtChangesClients() Neue EventTypes hinzugefügt', {
+        me,
+        newEventTypes,
+        existingEventTypes,
+        combinedEventTypes,
+      });
+    } else {
       // Füge neuen Client hinzu
       this.informAtChangesClients.push({
         me,
@@ -201,23 +213,23 @@ export class CardBase extends SuperBase {
       } else {
         this._debug('Listener für EventType bereits vorhanden', { eventType });
       }
-      const fkt = "_onRegisterMeFor_" + eventType.charAt(0).toUpperCase() + eventType.slice(1);
-      this._debug('Registriere Komponente für EnvSniffer-Änderungen', {fkt})
+      const fkt = '_onRegisterMeFor_' + eventType.charAt(0).toUpperCase() + eventType.slice(1);
+      this._debug('Registriere Komponente für EnvSniffer-Änderungen', { fkt });
       if (typeof this[fkt] === 'function') {
         this[fkt](immediately, me);
       }
-    })
+    });
 
     return true;
   }
 
   _notifyClientsAtChanges(event) {
     this._debug('_notifyClientsAtChanges() Anfrage', {
-      event
+      event,
     });
     // Sichere Extraktion des EventTypes (entferne '-event' Suffix)
     const eventType = event.type.replace('-event', '');
-    const fkt = "_on" + eventType.charAt(0).toUpperCase() + eventType.slice(1);
+    const fkt = '_on' + eventType.charAt(0).toUpperCase() + eventType.slice(1);
     // const data = {[eventType]: (typeof this[fkt] === 'function') ? this[fkt](event.detail) : event.detail};
 
     this._debug('_notifyClientsAtChanges() EventType extrahiert', {
@@ -228,31 +240,36 @@ export class CardBase extends SuperBase {
     });
 
     this.informAtChangesClients.forEach(client => {
-        // Prüfe ob client.me auf ein existierendes DOM-Element verweist
-        if (eventType &&
-            client.eventType.includes(eventType) &&
-            (client.me && (client.me instanceof Element || client.me.nodeType)) ) {
-          // Zusätzliche Prüfung: Ist das Element noch im DOM?
-          if (document.contains(client.me) || client.me.isConnected) {
-            // Client benachrichtigen
-            const details = (typeof this[fkt] === 'function') ? this[fkt](client.me, event) : event.detail||{};
-            const data = {[eventType]: details};
-            if (details && client.callback && typeof client.callback === 'function') {
-              try {
-                this._debug('_notifyClientsAtChanges() Client benachrichtigen', {
-                  client: client.me.constructor.name,
-                  eventType: eventType,
-                  data: data,
-                });
-                client.callback(data);
-              } catch (error) {
-                console.error('_notifyClientsAtChanges() Fehler beim Benachrichtigen des Clients:', error);
-              }
+      // Prüfe ob client.me auf ein existierendes DOM-Element verweist
+      if (
+        eventType &&
+        client.eventType.includes(eventType) &&
+        client.me &&
+        (client.me instanceof Element || client.me.nodeType)
+      ) {
+        // Zusätzliche Prüfung: Ist das Element noch im DOM?
+        if (document.contains(client.me) || client.me.isConnected) {
+          // Client benachrichtigen
+          const details =
+            typeof this[fkt] === 'function' ? this[fkt](client.me, event) : event.detail || {};
+          const data = { [eventType]: details };
+          if (details && client.callback && typeof client.callback === 'function') {
+            try {
+              this._debug('_notifyClientsAtChanges() Client benachrichtigen', {
+                client: client.me.constructor.name,
+                eventType: eventType,
+                data: data,
+              });
+              client.callback(data);
+            } catch (error) {
+              console.error(
+                '_notifyClientsAtChanges() Fehler beim Benachrichtigen des Clients:',
+                error
+              );
             }
           }
         }
-      });
+      }
+    });
   }
-
-
 }

@@ -8,33 +8,23 @@ export class EnvSniffer extends TgCardHelper {
 
   constructor() {
     super();
-
-    // Umgebungsinformationen
+    this.envSnifferCardElement = null;
+    this.envSnifferEventTarget = new EventTarget();
+    this.envSnifferResizeObserver = null;
+    this.envSnifferResizeTimeout = null;
     this.envSnifferIsDesktop = false;
     this.envSnifferIsMobile = false;
     this.envSnifferIsHorizontal = false;
     this.envSnifferIsVertical = false;
-    this.envSnifferCardWidth = 0;
-    this.envSnifferCardHeight = 0;
     this.envSnifferIsTouchscreen = false;
     this.envSnifferTypeOfView = 'unknown';
     this.envSnifferScreenWidth = 0;
     this.envSnifferScreenHeight = 0;
-    this.lovelaceContext = 'unknown';
-
-    // Hui-View Informationen
-    this.huiViewPosition = { left: 0, top: 0, width: 0, height: 0 };
-    this.cardPosition = { left: 0, top: 0 };
-
-    // Interne Variablen
-    this.envSnifferCardElement = null;
-    this.envSnifferResizeObserver = null;
-    this.envSnifferResizeTimeout = null;
-    this.envSnifferEventTarget = new EventTarget();
+    this.envSnifferCardWidth = 0;
+    this.envSnifferCardHeight = 0;
+    this.huiViewPosition = null;
+    this.cardPosition = null;
     this._envSnifferDetectionInProgress = false;
-
-    // Öffentliche env-Property
-    this.env = this.getEnvironmentState();
   }
 
   /**
@@ -98,18 +88,15 @@ export class EnvSniffer extends TgCardHelper {
     this.updateCardDimensions();
 
     // View-Typ
-    this.envSnifferTypeOfView = this.detectViewType();
-
-    // Lovelace-Kontext
-    this.lovelaceContext = this.detectLovelaceContext();
+    this.envSnifferTypeOfView = this.detectLovelaceContext();
 
     // Hui-View-Position
     this.detectHuiViewPosition();
-    this._debug('EnvSniffer: Lovelace-Kontext erkannt', {
-      lovelaceContext: this.lovelaceContext,
+    this._debug('EnvSniffer: View-Typ erkannt', {
+      envSnifferTypeOfView: this.envSnifferTypeOfView,
       cardElement: this.envSnifferCardElement?.tagName,
       parentElement: this.envSnifferCardElement?.parentElement?.tagName,
-      grandParent: this.envSnifferCardElement?.parentElement?.parentElement?.tagName
+      grandParent: this.envSnifferCardElement?.parentElement?.parentElement?.tagName,
     });
 
     // Prüfe auf Änderungen und sende Event
@@ -167,35 +154,6 @@ export class EnvSniffer extends TgCardHelper {
   }
 
   /**
-   * Erkennt den View-Typ basierend auf DOM-Struktur
-   */
-  detectViewType() {
-    // Prüfe DOM-Hierarchie für Lovelace-Einbindung
-    const haCard = this.envSnifferCardElement?.closest('ha-card');
-    const grid = this.envSnifferCardElement?.closest('.grid');
-    const panel = this.envSnifferCardElement?.closest('hui-panel-view');
-    const sidebar = this.envSnifferCardElement?.closest('.sidebar');
-
-    // Panel-View: Ganze Seite
-    if (panel) return 'panel';
-
-    // Sidebar: In der Seitenleiste
-    if (sidebar) return 'sidebar';
-
-    // Grid-basierte Erkennung
-    if (grid) {
-      // Abschnitt: Einzige Karte im Grid
-      if (grid.children.length === 1) return 'abschnitt';
-
-      // Tile: Mehrere Karten im Grid
-      if (grid.children.length > 1) return 'tile';
-    }
-
-    // Fallback: Standardmäßig als Tile behandeln
-    return 'tile';
-  }
-
-  /**
    * Erkennt den spezifischen Lovelace-Kontext (Panel/Card/Section)
    */
   detectLovelaceContext() {
@@ -209,7 +167,7 @@ export class EnvSniffer extends TgCardHelper {
 
     // Card Detection - durchquere Shadow DOMs (spezifischer)
     const card = this._findAncestorThroughShadowDOM('hui-card');
-    if (card) return 'card';
+    if (card) return 'tile';
 
     // Section Detection - durchquere Shadow DOMs (spezifischer)
     const section = this._findAncestorThroughShadowDOM('hui-section');
@@ -238,19 +196,19 @@ export class EnvSniffer extends TgCardHelper {
         left: huiViewRect.left,
         top: huiViewRect.top,
         width: huiViewRect.width,
-        height: huiViewRect.height
+        height: huiViewRect.height,
       };
 
       // Kartenposition relativ zum Hui-View
       const cardRect = this.envSnifferCardElement.getBoundingClientRect();
       this.cardPosition = {
         left: cardRect.left - huiViewRect.left,
-        top: cardRect.top - huiViewRect.top
+        top: cardRect.top - huiViewRect.top,
       };
 
       this._debug('EnvSniffer: Hui-View-Position erkannt', {
         huiViewPosition: this.huiViewPosition,
-        cardPosition: this.cardPosition
+        cardPosition: this.cardPosition,
       });
     } else {
       // Fallback: Verwende Viewport als Hui-View
@@ -258,18 +216,18 @@ export class EnvSniffer extends TgCardHelper {
         left: 0,
         top: 0,
         width: window.innerWidth,
-        height: window.innerHeight
+        height: window.innerHeight,
       };
 
       const cardRect = this.envSnifferCardElement.getBoundingClientRect();
       this.cardPosition = {
         left: cardRect.left,
-        top: cardRect.top
+        top: cardRect.top,
       };
 
       this._debug('EnvSniffer: Hui-View nicht gefunden, verwende Viewport', {
         huiViewPosition: this.huiViewPosition,
-        cardPosition: this.cardPosition
+        cardPosition: this.cardPosition,
       });
     }
   }
@@ -386,7 +344,6 @@ export class EnvSniffer extends TgCardHelper {
       envSnifferTypeOfView: this.envSnifferTypeOfView,
       envSnifferScreenWidth: this.envSnifferScreenWidth,
       envSnifferScreenHeight: this.envSnifferScreenHeight,
-      lovelaceContext: this.lovelaceContext,
       huiViewPosition: this.huiViewPosition,
       cardPosition: this.cardPosition,
     };

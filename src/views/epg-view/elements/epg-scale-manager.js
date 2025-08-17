@@ -26,7 +26,7 @@ export class EpgScaleManager {
       epgShowFutureTime: this.epgBox.epgShowFutureTime,
       epgShowPastTime: this.epgBox.epgShowPastTime,
       containerWidthFromGetter: this.epgBox.containerWidth,
-      channelWidth: this.epgBox.channelWidth
+      channelWidth: this.epgBox.channelWidth,
     });
 
     this.epgBox.updated(new Map([['scale', scale]]));

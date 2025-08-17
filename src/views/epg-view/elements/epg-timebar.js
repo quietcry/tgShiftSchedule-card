@@ -118,7 +118,7 @@ export class EpgTimebar extends EpgElementBase {
         detail: {
           component: this,
           callback: this._handleChangeNotifys.bind(this),
-          eventType: "progScrollX,envChanges,viewChanges",
+          eventType: 'progScrollX,envChanges,viewChanges',
           immediately: true,
         },
       })
@@ -148,13 +148,13 @@ export class EpgTimebar extends EpgElementBase {
     // Durchlaufe alle Keys in eventdata
     for (const eventType of Object.keys(eventdata)) {
       switch (eventType) {
-        case "viewchanges":
+        case 'viewchanges':
           this._handleChangeNotifys_viewChanges(eventdata[eventType]);
           break;
-        case "envchanges":
+        case 'envchanges':
           this._handleChangeNotifys_envChanges(eventdata[eventType]);
           break;
-        case "progscrollx":
+        case 'progscrollx':
           this._handleChangeNotifys_progScrollX(eventdata[eventType]);
           break;
       }
@@ -169,9 +169,11 @@ export class EpgTimebar extends EpgElementBase {
 
     // Schleife über alle relevanten Properties
     for (const prop of this.propsNumbers) {
-      if (changedProperties.hasOwnProperty(prop) &&
-          changedProperties[prop] !== undefined &&
-          changedProperties[prop] !== null) {
+      if (
+        changedProperties.hasOwnProperty(prop) &&
+        changedProperties[prop] !== undefined &&
+        changedProperties[prop] !== null
+      ) {
         const newValue = changedProperties[prop];
         if (this[prop] !== newValue) {
           // Verwende requestUpdate für Lit-Properties
@@ -207,7 +209,8 @@ export class EpgTimebar extends EpgElementBase {
         const timebarScrollWidth = this.timebar.scrollWidth;
 
         // Proportionale Berechnung: (programBoxScrollLeft / programBoxScrollWidth) * timebarScrollWidth
-        const proportionalScrollLeft = (programBoxScrollLeft / programBoxScrollWidth) * timebarScrollWidth;
+        const proportionalScrollLeft =
+          (programBoxScrollLeft / programBoxScrollWidth) * timebarScrollWidth;
 
         this.timebar.scrollLeft = proportionalScrollLeft;
       }

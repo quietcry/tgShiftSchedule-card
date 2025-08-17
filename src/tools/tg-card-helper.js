@@ -25,7 +25,14 @@ export class TgCardHelper {
       args = args.slice(1);
     }
     // Versuche verschiedene Methoden, um den echten Klassennamen zu bekommen
-    className = className ||this.className || this.constructor.className || this.tagName?.toLowerCase().replace(/[^a-z0-9]/g, '') || this.constructor.name || this.cardName || classNameDefault;
+    className =
+      className ||
+      this.className ||
+      this.constructor.className ||
+      this.tagName?.toLowerCase().replace(/[^a-z0-9]/g, '') ||
+      this.constructor.name ||
+      this.cardName ||
+      classNameDefault;
     cardName = cardName || this.cardName || cardNameDefault;
     if (!methodName) {
       try {
@@ -34,10 +41,10 @@ export class TgCardHelper {
 
         // Verschiedene Regex-Patterns für verschiedene Browser-Formate
         const patterns = [
-          /at\s+\w+\.(\w+)/,           // Chrome/Node.js: "at ClassName.methodName"
-          /(\w+)@/,                     // Firefox: "methodName@"
-          /(\w+)\s+\(/,                 // Alternative: "methodName("
-          /at\s+(\w+)/                  // Fallback: "at methodName"
+          /at\s+\w+\.(\w+)/, // Chrome/Node.js: "at ClassName.methodName"
+          /(\w+)@/, // Firefox: "methodName@"
+          /(\w+)\s+\(/, // Alternative: "methodName("
+          /at\s+(\w+)/, // Fallback: "at methodName"
         ];
 
         for (const pattern of patterns) {
@@ -51,7 +58,6 @@ export class TgCardHelper {
         // Fallback falls Stack Trace nicht verfügbar
         methodName = null;
       }
-
     }
     methodName = methodName || methodNameDefault;
 
@@ -62,8 +68,10 @@ export class TgCardHelper {
         : debugList.includes(className.toLowerCase());
 
     if (shouldDebug) {
-      let path=`[${cardName}]:[${className}]:[${methodName}]`
-      while (path.length < 50) {path = path + ' '}
+      let path = `[${cardName}]:[${className}]:[${methodName}]`;
+      while (path.length < 50) {
+        path = path + ' ';
+      }
       console.debug(path, ...args);
     }
   }

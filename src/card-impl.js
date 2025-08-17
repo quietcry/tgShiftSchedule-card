@@ -65,8 +65,8 @@ export class CardImpl extends CardBase {
   _initEnvSnifferIfNeeded() {
     if (!this._envSniffer) {
       this._debug('Initialisiere EnvSniffer bei Bedarf');
-    this._envSniffer = new EnvSniffer();
-    this._envSniffer.init(this);
+      this._envSniffer = new EnvSniffer();
+      this._envSniffer.init(this);
 
       // Warte kurz und prüfe dann die Werte
       setTimeout(() => {
@@ -81,7 +81,6 @@ export class CardImpl extends CardBase {
           this._debug('EnvSniffer initialisiert, aber env noch nicht verfügbar');
         }
       }, 50);
-
     }
   }
   _onProgscrollx(me, event) {
@@ -89,7 +88,7 @@ export class CardImpl extends CardBase {
       me: me,
       event: event,
     });
-    return (me !== event.originalTarget) ? event.detail : false;
+    return me !== event.originalTarget ? event.detail : false;
   }
 
   _onRegisterMeFor_Envchanges(immediately, me) {
@@ -98,7 +97,6 @@ export class CardImpl extends CardBase {
       this._envSniffer.detectEnvironment();
     }
   }
-
 
   getDefaultConfig() {
     this._debug(`CardImpl getDefaultConfig wird aufgerufen`);
@@ -150,13 +148,13 @@ export class CardImpl extends CardBase {
     this._viewType = 'EPGView';
 
     try {
-    this._view = new EPGView();
+      this._view = new EPGView();
       this._debug('Übergebe Konfiguration an EPG-View', {
-      epgShowPastTime: this.config.epgShowPastTime,
-      epgShowFutureTime: this.config.epgShowFutureTime,
-    });
-    this._view.config = this.config;
-      // this._view.env = this.env; // Nicht mehr nötig - Observer-Pattern übernimmt das
+        epgShowPastTime: this.config.epgShowPastTime,
+        epgShowFutureTime: this.config.epgShowFutureTime,
+      });
+      this._view.config = this.config;
+      // env wird über Event-System übertragen
 
       // Übergebe hass an die View, falls es bereits gesetzt wurde
       if (this._hass) {
@@ -164,12 +162,12 @@ export class CardImpl extends CardBase {
         this._view.hass = this._hass;
       }
 
-    this._debug('setConfig: View initialisiert:', {
-      viewMode: this._viewMode,
-      viewType: this._viewType,
-      config: this.config,
+      this._debug('setConfig: View initialisiert:', {
+        viewMode: this._viewMode,
+        viewType: this._viewType,
+        config: this.config,
         // env: this.env, // Nicht mehr nötig
-    });
+      });
     } catch (error) {
       this._debug('setConfig: Fehler bei View-Initialisierung:', error);
       throw new Error(`Fehler bei der View-Initialisierung: ${error.message}`);
@@ -204,7 +202,7 @@ export class CardImpl extends CardBase {
     }
 
     try {
-    return this._view;
+      return this._view;
     } catch (error) {
       this._debug('render: Fehler beim Rendern der View:', error);
       return html`<div class="error">Fehler beim Rendern: ${error.message}</div>`;

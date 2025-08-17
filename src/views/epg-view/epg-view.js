@@ -7,7 +7,7 @@ import { EpgProgramList } from './elements/epg-program-list.js';
 import { EpgBox } from './elements/epg-box.js';
 import { DataProvider } from '../../tools/data-provider.js';
 import { EpgScrollManager } from './elements/epg-scroll-manager.js';
-import { TooltipManager } from '../../tools/tooltip-manager.js';
+import { EpgTooltip } from '../../tools/tooltip-manager.js';
 
 export class EPGView extends ViewBase {
   static className = 'EPGView';
@@ -20,8 +20,8 @@ export class EPGView extends ViewBase {
     _timeBarEarliestProgramStart: { type: Number },
     _timeBarLatestProgramStop: { type: Number },
     _timeBarScale: { type: Number },
-    // Tooltip Manager
-    _tooltipManager: { type: Object },
+    // Tooltip Custom Element Referenz
+    _tooltipElement: { type: Object },
   };
 
   static get styles() {
@@ -29,20 +29,19 @@ export class EPGView extends ViewBase {
       :host {
         display: block;
         width: 100%;
-        height: fit-content;
-        max-height: 100%;
+        position: relative;
+        /* Höhe wird über JavaScript berechnet: viewport_height - epg-view_top */
       }
 
       .gridcontainer {
         display: grid;
         grid-template-columns: 1fr;
-        grid-template-rows: auto auto;
+        grid-template-rows: auto 1fr;
         grid-template-areas:
           'headline'
           'scrollBox';
         width: 100%;
-        height: fit-content;
-        max-height: 100%;
+        height: 100%;
         overflow: hidden;
       }
 
@@ -181,6 +180,8 @@ export class EPGView extends ViewBase {
         width: 100%;
         height: fit-content;
         max-height: 100%;
+        overflow-y: auto;
+        overflow-x: hidden;
       }
 
       .timeSlot {
@@ -230,95 +231,44 @@ export class EPGView extends ViewBase {
         color: var(--secondary-text-color);
       }
 
-      /* Tooltip Styles */
-      .tooltip {
-        background: rgba(0, 0, 0, 0.9);
-        color: white;
-        padding: 8px 12px;
-        border-radius: 6px;
-        font-size: 12px;
-        max-width: 300px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-        pointer-events: none;
-        white-space: nowrap;
-        animation: tooltipFadeIn 0.2s ease-in-out;
-      }
-
-      .tooltip::before {
-        content: '';
+      /* Horizontale Scrollbar für epg-box */
+      .scrollbarx {
         position: absolute;
-        width: 0;
-        height: 0;
-        border: 6px solid transparent;
-        left: var(--tooltip-arrow-left, 50%);
-        transform: translateX(-50%);
+        bottom: 0;
+        left: var(--epg-channel-width, 200px);
+        right: 0;
+        height: 5px;
+        background-color: rgba(0, 0, 0, 0.1);
+        border-radius: 2px;
+        cursor: pointer;
+        z-index: 10;
+        transition: height 0.2s ease;
       }
 
-      .tooltip.top::before {
-        bottom: -6px;
-        border-top-color: rgba(0, 0, 0, 0.9);
+      .scrollbarx:hover {
+        height: 15px;
+        background-color: rgba(0, 0, 0, 0.3);
       }
 
-      .tooltip.bottom::before {
-        top: -6px;
-        border-bottom-color: rgba(0, 0, 0, 0.9);
+      .scrollbarx .scrollbarx-content {
+        width: 100%;
+        height: 100%;
+        background-color: transparent;
       }
 
-      .tooltip.right::before {
-        left: -6px;
-        top: var(--tooltip-arrow-left, 50%);
-        transform: translateY(-50%);
-        border-right-color: rgba(0, 0, 0, 0.9);
+      .scrollbarx .scrollbarx-thumb {
+        position: absolute;
+        top: 0;
+        left: 0;
+        height: 100%;
+        background-color: var(--accent-color, #03a9f4);
+        border-radius: 2px;
+        min-width: 20px;
+        cursor: grab;
       }
 
-      .tooltip.left::before {
-        right: -6px;
-        top: var(--tooltip-arrow-left, 50%);
-        transform: translateY(-50%);
-        border-left-color: rgba(0, 0, 0, 0.9);
-      }
-
-      .tooltip-content {
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-      }
-
-      .tooltip-title {
-        font-weight: bold;
-        font-size: 13px;
-        color: #ffffff;
-      }
-
-      .tooltip-subtitle {
-        font-size: 11px;
-        color: #cccccc;
-        font-style: italic;
-      }
-
-      .tooltip-time {
-        font-size: 11px;
-        color: #dddddd;
-      }
-
-      .tooltip-description {
-        font-size: 11px;
-        color: #cccccc;
-        line-height: 1.3;
-        white-space: normal;
-        max-width: 280px;
-        word-wrap: break-word;
-      }
-
-      @keyframes tooltipFadeIn {
-        from {
-          opacity: 0;
-          transform: translateY(5px);
-        }
-        to {
-          opacity: 1;
-          transform: translateY(0);
-        }
+      .scrollbarx .scrollbarx-thumb:active {
+        cursor: grabbing;
       }
     `;
   }
@@ -333,11 +283,8 @@ export class EPGView extends ViewBase {
     this._dataProvider = null;
     this._lastUpdate = null;
 
-    // Tooltip Manager wird in firstUpdated() initialisiert
-    this._tooltipManager = null;
-
-    // Array für View-Änderungs-Observer
-    // this.informMeAtViewChanges = [];
+    // Tooltip Custom Element Referenz
+    this._tooltipElement = null;
   }
 
   disconnectedCallback() {
@@ -387,14 +334,19 @@ export class EPGView extends ViewBase {
         });
 
         if (this._hass && this.config?.entity) {
-          this._debug('EPGView: last_update hat sich geändert oder erstmaliger Aufruf, starte Update', {
+          this._debug(
+            'EPGView: last_update hat sich geändert oder erstmaliger Aufruf, starte Update',
+            {
               old: this._lastUpdate,
               new: newLastUpdate,
-            });
+            }
+          );
           this._lastUpdate = newLastUpdate; // Aktualisiere sofort
           // Fange async Fehler ab
           this._loadData().catch(error => {
-            this._debug('EPGView: Fehler beim Laden der Daten im hass Setter', { error: error.message });
+            this._debug('EPGView: Fehler beim Laden der Daten im hass Setter', {
+              error: error.message,
+            });
           });
         } else {
           this._debug('EPGView: hass oder entity nicht verfügbar', {
@@ -457,9 +409,9 @@ export class EPGView extends ViewBase {
     if (this._env !== value) {
       this._env = value;
 
-      // Aktualisiere TooltipManager mit neuer env
-      if (this._tooltipManager) {
-        this._tooltipManager.env = value;
+      // Aktualisiere TooltipCustomElement mit neuer env
+      if (this._tooltipElement) {
+        this._tooltipElement.env = value;
       }
     }
   }
@@ -558,6 +510,10 @@ export class EPGView extends ViewBase {
       {
         blacklist: config.blacklist || '',
         whitelist: config.whitelist || '',
+        // Deaktiviere Zeitfilterung, um alle Programme zu laden
+        disableTimeFilter: true,
+        // Erweitere den Zeitbereich für veraltete Daten
+        extendedTimeRange: true,
       }, // Blacklist/Whitelist-Konfiguration übergeben
       // Callback für EPG-Daten (wird für jeden Kanal aufgerufen)
       data => {
@@ -614,9 +570,18 @@ export class EPGView extends ViewBase {
   _onEpgBoxReady() {
     this._debug('EPG-View: _onEpgBoxReady aufgerufen');
 
-    // Initialisiere TooltipManager mit ProgramBox-Referenz
-    this._initializeTooltipManager();
+    // Initialisiere DataProvider, falls noch nicht geschehen
+    if (!this._dataProvider && this._hass && this.config) {
+      this._debug('EPG-View: Initialisiere DataProvider in _onEpgBoxReady');
+      this._dataProvider = new DataProvider();
+      this._dataProvider.hass = this._hass;
+    }
 
+    // Initialisiere TooltipCustomElement mit ProgramBox-Referenz
+    this._initializeTooltipElement();
+
+    // Lade die Daten, wenn die EPG-Box bereit ist
+    this._debug('EPG-View: EPG-Box ist bereit, starte Datenladung');
     this._loadData();
 
     // Setup Scroll-Synchronisation
@@ -631,13 +596,27 @@ export class EPGView extends ViewBase {
       this._dataProvider = new DataProvider(this._hass);
     }
 
-    // Registriere Event-Listener für automatische Registrierung
-    // this.addEventListener('registerMeForChanges', this._onRegisterMeForChanges.bind(this));
+    // Registriere mich für Environment-Änderungen
+    this.dispatchEvent(
+      new CustomEvent('registerMeForChanges', {
+        bubbles: true,
+        composed: true,
+        detail: {
+          component: this,
+          callback: this._handleChangeNotifys.bind(this),
+          eventType: 'envChanges',
+          immediately: true,
+        },
+      })
+    );
 
-    // Registriere Tooltip-Event-Listener (TooltipManager wird später initialisiert)
-    this.addEventListener('tooltip-event', (event) => {
-      if (this._tooltipManager) {
-        this._tooltipManager.handleTooltipEvent(event);
+    // Registriere Tooltip-Event-Listener (TooltipCustomElement wird später initialisiert)
+    this.addEventListener('tooltip-event', event => {
+      // Leite das komplette event.detail an den Tooltip weiter
+      // Der Tooltip entscheidet selbst über show/hide
+      if (this._tooltipElement) {
+        this._tooltipElement.setEventData(event.detail);
+        this._debug('EPG-View: Tooltip-Event-Daten weitergeleitet', { detail: event.detail });
       }
     });
 
@@ -645,56 +624,170 @@ export class EPGView extends ViewBase {
     const epgBox = this.shadowRoot.querySelector('epg-box');
     if (epgBox) {
       this._debug('EPG-View: epgBox bereits vorhanden, starte Datenladung');
-      this._initializeTooltipManager();
+      this._initializeTooltipElement();
       this._loadData();
     } else {
       this._debug('EPG-View: epgBox noch nicht vorhanden, warte auf _onEpgBoxReady');
     }
+
+    // Berechne optimale Höhe
+    this._calculateOptimalHeight();
   }
 
   /**
-   * Initialisiert den TooltipManager mit ProgramBox-Referenz
+   * Initialisiert den TooltipCustomElement mit ProgramBox-Referenz
    */
-  _initializeTooltipManager() {
-    // Finde die epg-program-box innerhalb der epg-box
-    const epgBox = this.shadowRoot.querySelector('epg-box');
-    const programBox = epgBox?.shadowRoot?.querySelector('epg-program-box');
+  _initializeTooltipElement() {
+    // Das Custom Element wird über das Template erstellt
+    this._tooltipElement = this.shadowRoot.querySelector('epg-tooltip');
 
-    this._debug('EPG-View: TooltipManager Initialisierung', {
-      epgBoxFound: !!epgBox,
-      programBoxFound: !!programBox
-    });
+    if (this._tooltipElement) {
+      this._debug('EPG-View: TooltipCustomElement gefunden, setze Konfiguration');
 
-    if (programBox) {
-      this._debug('EPG-View: ProgramBox gefunden, initialisiere TooltipManager');
-      this._tooltipManager = new TooltipManager(this, this.env, programBox);
+      // Setze Konfiguration für den Tooltip
+      this._tooltipElement.initialDelay = 3000;
+      this._tooltipElement.scrollPause = 4000;
+      this._tooltipElement.position = 'bottom';
+
+      // Warte bis die epg-program-box verfügbar ist
+      this._waitForProgramBox();
     } else {
-      this._debug('EPG-View: ProgramBox nicht gefunden, TooltipManager ohne Referenz');
-      this._tooltipManager = new TooltipManager(this, this.env);
+      this._debug('EPG-View: TooltipCustomElement nicht gefunden, versuche es später');
 
       // Versuche es mit einem kurzen Delay nochmal
       setTimeout(() => {
-        this._retryTooltipManagerInitialization();
+        this._retryTooltipElementInitialization();
       }, 100);
     }
   }
 
   /**
-   * Versucht erneut den TooltipManager mit ProgramBox-Referenz zu initialisieren
+   * Wartet bis die epg-program-box verfügbar ist und setzt dann die Referenzen
    */
-  _retryTooltipManagerInitialization() {
+  _waitForProgramBox() {
     const epgBox = this.shadowRoot.querySelector('epg-box');
     const programBox = epgBox?.shadowRoot?.querySelector('epg-program-box');
 
-    this._debug('EPG-View: TooltipManager Retry-Initialisierung', {
-      epgBoxFound: !!epgBox,
-      programBoxFound: !!programBox
+    if (programBox) {
+      this._tooltipElement.frameElement = epgBox;
+      this._tooltipElement.hostElement = programBox;
+      this._debug('EPG-View: Frame und Host Element für Tooltip gesetzt');
+    } else {
+      // Warte noch ein bisschen und versuche es erneut
+      setTimeout(() => {
+        this._waitForProgramBox();
+      }, 200);
+    }
+  }
+
+  /**
+   * Versucht erneut den TooltipCustomElement mit ProgramBox-Referenz zu initialisieren
+   */
+  _retryTooltipElementInitialization() {
+    this._debug('EPG-View: TooltipCustomElement Retry-Initialisierung');
+
+    // Das Custom Element wird über das Template erstellt
+    this._tooltipElement = this.shadowRoot.querySelector('epg-tooltip');
+
+    if (this._tooltipElement) {
+      this._debug('EPG-View: TooltipCustomElement nachträglich gefunden, setze Konfiguration');
+
+      // Setze Konfiguration für den Tooltip
+      this._tooltipElement.initialDelay = 3000;
+      this._tooltipElement.scrollPause = 4000;
+      this._tooltipElement.position = 'bottom';
+
+      // Setze den Host Frame (ProgramBox) für die Positionierung
+      const epgBox = this.shadowRoot.querySelector('epg-box');
+      const programBox = epgBox?.shadowRoot?.querySelector('epg-program-box');
+      if (programBox) {
+        this._tooltipElement.frameElement = epgBox;
+        this._tooltipElement.hostElement = programBox;
+        this._debug('EPG-View: Frame und Host Element für Tooltip nachträglich gesetzt');
+      }
+    }
+  }
+
+  /**
+   * Behandelt Änderungen von anderen Komponenten
+   * @param {Object} eventdata - Event-Daten mit verschiedenen Event-Typen
+   */
+  _handleChangeNotifys(eventdata) {
+    this._debug('EPG-View: _handleChangeNotifys() aufgerufen', { eventdata });
+
+    for (const eventType of Object.keys(eventdata)) {
+      if (eventType === 'envchanges') {
+        const { oldState, newState } = eventdata[eventType];
+
+        this._debug('EPG-View: Environment-Änderungen empfangen', {
+          oldState,
+          newState,
+        });
+
+        // Update Environment-Properties
+        if (newState) {
+          let updated = false;
+
+          if (
+            newState.envSnifferTypeOfView !== undefined &&
+            this.env?.envSnifferTypeOfView !== newState.envSnifferTypeOfView
+          ) {
+            this.env = { ...this.env, envSnifferTypeOfView: newState.envSnifferTypeOfView };
+            updated = true;
+          }
+          if (this.env?.envSnifferTypeOfView == 'panel') {
+            if (
+              newState.envSnifferCardHeight !== undefined &&
+              this.env?.envSnifferCardHeight !== newState.envSnifferCardHeight
+            ) {
+              this.env = { ...this.env, envSnifferCardHeight: newState.envSnifferCardHeight };
+              updated = true;
+            }
+            if (
+              newState.envSnifferScreenHeight !== undefined &&
+              this.env?.envSnifferScreenHeight !== newState.envSnifferScreenHeight
+            ) {
+              this.env = { ...this.env, envSnifferScreenHeight: newState.envSnifferScreenHeight };
+              updated = true;
+            }
+          }
+          if (updated) {
+            this._debug('EPG-View: Environment-Properties aktualisiert', {
+              env: this.env,
+            });
+
+            // Höhe neu berechnen wenn sich der View-Typ ändert
+            this._calculateOptimalHeight();
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * Berechnet die optimale Höhe der epg-view: viewport_height - epg-view_top
+   * Nur im Panel-Modus, im Card-Modus wird normale Höhe verwendet
+   */
+  _calculateOptimalHeight() {
+    // Prüfe ob wir im Panel-Modus sind
+    if (this.env?.envSnifferTypeOfView !== 'panel') {
+      this._debug('EPG-View: Nicht im Panel-Modus, verwende normale Höhe');
+      return;
+    }
+
+    const viewportHeight = window.innerHeight;
+    const epgViewRect = this.getBoundingClientRect();
+    const optimalHeight = viewportHeight - epgViewRect.top;
+
+    this._debug('EPG-View: Höhe berechnet (Panel-Modus)', {
+      viewportHeight,
+      epgViewTop: epgViewRect.top,
+      optimalHeight,
+      envSnifferTypeOfView: this.env?.envSnifferTypeOfView,
     });
 
-    if (programBox && this._tooltipManager) {
-      this._debug('EPG-View: ProgramBox nachträglich gefunden, aktualisiere TooltipManager');
-      this._tooltipManager.programBoxRef = programBox;
-    }
+    // Höhe setzen
+    this.style.height = optimalHeight + 'px';
   }
 
   /**
@@ -703,23 +796,14 @@ export class EPGView extends ViewBase {
   _setupScrollSync() {
     this._debug('EPG-View: Setup Scroll-Synchronisation');
 
-    // Finde die benötigten Elemente
-    const epgBox = this.shadowRoot.querySelector('epg-box');
-    const timeBar = this.shadowRoot.querySelector('.timeBar');
+    // Registriere Scroll-Event-Listener für Synchronisation
+    this.addEventListener('scroll-sync', event => {
+      const { direction, element } = event.detail;
+      this._debug('EPG-View: Scroll-Synchronisation empfangen', { direction, element });
 
-    if (!epgBox || !timeBar) {
-      this._debug('EPG-View: Scroll-Sync Setup übersprungen - Elemente nicht gefunden', {
-        epgBoxFound: !!epgBox,
-        timeBarFound: !!timeBar,
-      });
-      return;
-    }
-
-    // Richte Scroll-Synchronisation zwischen ProgramBox und TimeBar ein
-    const scrollManager = new EpgScrollManager();
-    scrollManager.setupScrollSync(epgBox, timeBar);
-
-    this._debug('EPG-View: Scroll-Synchronisation eingerichtet');
+      // Hier kann die Scroll-Synchronisation implementiert werden
+      // z.B. zwischen verschiedenen EPG-Komponenten
+    });
   }
 
   render() {
@@ -733,7 +817,7 @@ export class EPGView extends ViewBase {
     return html`
       <div class="gridcontainer">
         <div class="headline">
-        <div class="superbutton">${this._renderSuperButton()}</div>
+          <div class="superbutton">${this._renderSuperButton()}</div>
           <div class="timeBar">
             <epg-timebar
               .scale=${this._timeBarScale}
@@ -759,8 +843,15 @@ export class EPGView extends ViewBase {
           @scale-changed=${this._onScaleChanged}
         ></epg-box>
 
-        <!-- Tooltip -->
-        ${this._tooltipManager?.isVisible ? this._renderTooltip() : ''}
+        <!-- Tooltip Custom Element -->
+        <epg-tooltip
+          .data=${this._tooltipElement?.data}
+          .visible=${this._tooltipElement?.visible}
+          .position=${this._tooltipElement?.position}
+          .initialDelay=${3000}
+          .scrollPause=${4000}
+        >
+        </epg-tooltip>
       </div>
     `;
   }
@@ -773,46 +864,12 @@ export class EPGView extends ViewBase {
     `;
   }
 
-  _renderTooltip() {
-    if (!this._tooltipManager || !this._tooltipManager.isVisible) return '';
-
-    return html`
-      <div class="tooltip" style="${this._tooltipManager.getStyle()}">
-        ${this._getTooltipContentTemplate()}
-      </div>
-    `;
-  }
-
-  _getTooltipContentTemplate() {
-    if (!this._tooltipManager || !this._tooltipManager.data) return '';
-
-    const data = this._tooltipManager.data;
-    const startTime = this._tooltipManager.formatTime(data.start);
-    const endTime = this._tooltipManager.formatTime(data.stop);
-    const duration = data.duration ? Math.round(data.duration / 60) : 0;
-
-    return html`
-      <div class="tooltip-content">
-        <div class="tooltip-title">${data.title || 'Unbekanntes Programm'}</div>
-        ${data.shortText ? html`<div class="tooltip-subtitle">${data.shortText}</div>` : ''}
-        <div class="tooltip-time">
-          <span class="tooltip-start">${startTime}</span>
-          <span class="tooltip-separator"> - </span>
-          <span class="tooltip-end">${endTime}</span>
-          ${duration > 0 ? html`<span class="tooltip-duration"> (${duration} Min)</span>` : ''}
-        </div>
-        ${data.description ? html`<div class="tooltip-description">${data.description}</div>` : ''}
-      </div>
-    `;
-  }
-
   _handleRefresh() {
     // Fange async Fehler ab
     this._loadData().catch(error => {
       this._debug('EPG-View: Fehler beim Laden der Daten im Refresh', { error: error.message });
     });
   }
-
 
   _onScaleChanged(e) {
     this._debug('EPG-View: scale geändert', {
@@ -835,7 +892,6 @@ export class EPGView extends ViewBase {
         alterWert: e.detail.isFirstLoad,
         neuerWert: 1,
       });
-
     }
 
     // Rufe testIsFirstLoadCompleteUpdated auf
@@ -848,10 +904,8 @@ export class EPGView extends ViewBase {
     // Hier können Aktionen ausgeführt werden, die nach dem ersten Load erfolgen sollen
     // z.B. Loading-Status beenden, UI-Updates, etc.
   }
-
-
 }
 
 if (!customElements.get('epg-view')) {
-customElements.define('epg-view', EPGView);
+  customElements.define('epg-view', EPGView);
 }

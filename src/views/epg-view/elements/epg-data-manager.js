@@ -229,7 +229,7 @@ export class EpgDataManager extends TgCardHelper {
       this._debug('addTeilEpg()', 'Neuer Kanal - füge zur Struktur hinzu', {
         channelId: channelWithPrograms.id,
       });
-    this.epgBox.channelManager.sortChannelIntoStructure(channelWithPrograms);
+      this.epgBox.channelManager.sortChannelIntoStructure(channelWithPrograms);
     }
 
     // Mit repeat-Direktive ist requestUpdate() nicht mehr nötig - Lit macht es automatisch

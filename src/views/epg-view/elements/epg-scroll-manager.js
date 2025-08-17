@@ -65,7 +65,7 @@ export class EpgScrollManager {
     });
 
     // Höre auf TimeBar-Scroll-Events vom Parent
-    this.epgBox.addEventListener('time-bar-scroll', (event) => {
+    this.epgBox.addEventListener('time-bar-scroll', event => {
       const { scrollLeft } = event.detail;
       this.epgBox._debug('EpgScrollManager: Empfange time-bar-scroll Event', {
         scrollLeft: scrollLeft,
@@ -85,7 +85,9 @@ export class EpgScrollManager {
       channelBoxExists: !!channelBox,
       programBoxExists: !!programBox,
       channelBoxScrollable: channelBox.scrollHeight > channelBox.clientHeight,
-      programBoxScrollable: programBox.scrollHeight > programBox.clientHeight || programBox.scrollWidth > programBox.clientWidth,
+      programBoxScrollable:
+        programBox.scrollHeight > programBox.clientHeight ||
+        programBox.scrollWidth > programBox.clientWidth,
     });
   }
 }

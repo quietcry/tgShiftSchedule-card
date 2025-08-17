@@ -52,7 +52,12 @@ export class EpgStyleManager {
    * Styles für die Program-Box
    */
   static getProgramBoxStyles(config = {}) {
-    const { showTime = true, showDuration = true, showDescription = true, showShortText = false } = config;
+    const {
+      showTime = true,
+      showDuration = true,
+      showDescription = true,
+      showShortText = false,
+    } = config;
 
     return css`
       .programBox {
@@ -207,7 +212,12 @@ export class EpgStyleManager {
    * Styles für Programm-Items
    */
   static getProgramItemStyles(config = {}) {
-    const { showTime = true, showDuration = true, showDescription = true, showShortText = false } = config;
+    const {
+      showTime = true,
+      showDuration = true,
+      showDescription = true,
+      showShortText = false,
+    } = config;
 
     return css`
       .programSlot {

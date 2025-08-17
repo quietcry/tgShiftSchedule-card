@@ -11,8 +11,6 @@ export class EpgRenderManager extends TgCardHelper {
   static cardName = CardName;
   static debugMode = DebugMode;
 
-
-
   constructor(epgBox) {
     super();
     this.epgBox = epgBox;
@@ -125,24 +123,24 @@ export class EpgRenderManager extends TgCardHelper {
       `;
     } else {
       // Normales Programm-Item - verwende bereits berechnete isCurrent Property
-    return html`
-      <epg-program-item
-        .start=${program.start || 0}
-        .stop=${program.end || program.stop || 0}
-        .duration=${program.duration || 0}
-        .title=${program.title || ''}
-        .description=${program.description || ''}
-        .shortText=${program.shorttext || ''}
+      return html`
+        <epg-program-item
+          .start=${program.start || 0}
+          .stop=${program.end || program.stop || 0}
+          .duration=${program.duration || 0}
+          .title=${program.title || ''}
+          .description=${program.description || ''}
+          .shortText=${program.shorttext || ''}
           .isCurrent=${program.isCurrent || false}
-        .showTime=${this.epgBox.showTime}
-        .showDuration=${this.epgBox.showDuration}
-        .showDescription=${this.epgBox.showDescription}
-        .showShortText=${this.epgBox.showShortText}
-        .id=${channelId + '_' + program.id || ''}
+          .showTime=${this.epgBox.showTime}
+          .showDuration=${this.epgBox.showDuration}
+          .showDescription=${this.epgBox.showDescription}
+          .showShortText=${this.epgBox.showShortText}
+          .id=${channelId + '_' + program.id || ''}
           .type=${'item'}
-        @program-selected=${e => this.epgBox._onProgramSelected(e.detail)}
-      ></epg-program-item>
-    `;
+          @program-selected=${e => this.epgBox._onProgramSelected(e.detail)}
+        ></epg-program-item>
+      `;
     }
   }
 
@@ -217,7 +215,10 @@ export class EpgRenderManager extends TgCardHelper {
         this.scheduleStartgapUpdate();
       }
       if (mustUpdate) {
-        this._notifyTimeValueChanged({'latestProgramStop':lastProgramStop, 'earliestProgramStart': firstProgramStart});
+        this._notifyTimeValueChanged({
+          latestProgramStop: lastProgramStop,
+          earliestProgramStart: firstProgramStart,
+        });
       }
       const startgapItem = {
         start: this.epgBox.earliestProgramStart,
@@ -280,7 +281,7 @@ export class EpgRenderManager extends TgCardHelper {
    * Führt das Scrolling in der Programmbox aus
    */
 
-  scrollProgramBox(scrollThat, seconds=0) {
+  scrollProgramBox(scrollThat, seconds = 0) {
     this._debug('EpgRenderManager: scrollProgramBox aufgerufen');
 
     if (!scrollThat) {
@@ -307,7 +308,7 @@ export class EpgRenderManager extends TgCardHelper {
       scrollThat: scrollThat,
       scrollWidth: scrollThat.scrollWidth,
       clientWidth: scrollThat.clientWidth,
-      canScroll: scrollThat.scrollWidth > scrollThat.clientWidth
+      canScroll: scrollThat.scrollWidth > scrollThat.clientWidth,
     });
 
     // Warte bis das Element vollständig gerendert ist
@@ -325,7 +326,7 @@ export class EpgRenderManager extends TgCardHelper {
       this._debug('EpgRenderManager: Scrolling abgeschlossen programmatic-scroll', {
         newScrollLeft: scrollThat.scrollLeft,
         scrollPosition: scrollPosition,
-        success: scrollThat.scrollLeft === scrollPosition
+        success: scrollThat.scrollLeft === scrollPosition,
       });
     });
   }
@@ -520,12 +521,12 @@ export class EpgRenderManager extends TgCardHelper {
 
       this._debug(`EpgRenderManager: viewChanges Event ausgelöst`, {
         properties,
-        epgBox: this.epgBox ? 'verfügbar' : 'nicht verfügbar'
+        epgBox: this.epgBox ? 'verfügbar' : 'nicht verfügbar',
       });
     } else {
       this._debug(`EpgRenderManager: EpgBox nicht verfügbar für viewChanges`, {
         properties,
-        epgBox: this.epgBox ? 'verfügbar' : 'nicht verfügbar'
+        epgBox: this.epgBox ? 'verfügbar' : 'nicht verfügbar',
       });
     }
   }

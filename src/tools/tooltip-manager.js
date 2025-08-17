@@ -1,125 +1,193 @@
-import { TgCardHelper } from './tg-card-helper.js';
-import { CardName, DebugMode } from '../card-config.js';
+import { SuperBase } from '../super-base.js';
+import { css, html } from 'lit';
 
 /**
- * Manager für Tooltip-Funktionalität
- * Übernimmt die komplette Tooltip-Logik inklusive Positionierung
+ * Custom Element für EPG-Tooltips
+ * Übernimmt die komplette Tooltip-Logik inklusive Positionierung und Auto-Scroll
  */
-export class TooltipManager {
-  static className = 'TooltipManager';
+export class EpgTooltip extends SuperBase {
+  static className = 'EpgTooltip';
 
-  constructor(hostElement, env, programBoxRef = null) {
-    this.hostElement = hostElement;
-    this.env = env;
-    this.programBoxRef = programBoxRef;
-    this.tgCardHelper = new TgCardHelper(CardName, DebugMode);
+  static properties = {
+    visible: { type: Boolean, reflect: true },
+    data: { type: Object },
+    position: { type: String, reflect: true },
+    margin: { type: Number },
+    initialDelay: { type: Number },
+    scrollPause: { type: Number },
+    frameElement: { type: Object },
+    hostElement: { type: Object },
+  };
+
+  static styles = css`
+    :host {
+      display: block;
+      position: absolute;
+      top: -9999px;
+      left: -9999px;
+      opacity: 0;
+      visibility: hidden;
+      z-index: 10000;
+      pointer-events: none;
+    }
+
+    :host([visible]) {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+    }
+
+    .tooltip {
+      background-color: rgba(0, 0, 0, 0.9);
+      color: white;
+      border-radius: 8px;
+      padding: 12px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      font-family: Arial, sans-serif;
+      font-size: 14px;
+      line-height: 1.4;
+      max-width: 300px;
+      overflow: hidden;
+    }
+
+    .tooltip-content {
+      display: grid;
+      grid-template-rows: auto 1fr;
+      height: 100%;
+    }
+
+    .tooltip-header {
+      margin-bottom: 8px;
+    }
+
+    .tooltip-title {
+      font-weight: bold;
+      font-size: 16px;
+      margin-bottom: 4px;
+      color: #ffffff;
+    }
+
+    .tooltip-subtitle {
+      font-size: 13px;
+      color: #cccccc;
+      margin-bottom: 4px;
+      font-style: italic;
+    }
+
+    .tooltip-time {
+      font-size: 12px;
+      color: #aaaaaa;
+      margin-bottom: 0;
+    }
+
+    .tooltip-description {
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding-right: 4px;
+      color: #dddddd;
+      font-size: 13px;
+      line-height: 1.3;
+    }
+
+    .tooltip-description::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .tooltip-description::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 3px;
+    }
+
+    .tooltip-description::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.3);
+      border-radius: 3px;
+    }
+
+    .tooltip-description::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.5);
+    }
+  `;
+
+  constructor() {
+    super();
+
+    // Tooltip-Eigenschaften
+    this.margin = 8;
+    this.initialDelay = 3000;
+    this.scrollPause = 4000;
 
     // Tooltip-Zustand
-    this.isVisible = false;
+    this.visible = false;
     this.data = null;
-    this.position = 'top';
-    this.elementRect = null;
+    this.position = 'bottom';
 
-    // Standard-Dimensionen
-    this.tooltipWidth = 300;
-    this.tooltipHeight = 120;
-    this.margin = 8;
+    // Auto-Scroll
+    this._autoScrollTimer = null;
 
-    this._debug('TooltipManager initialisiert', {
-      hasHostElement: !!this.hostElement,
-      hasEnv: !!this.env,
-      hasProgramBoxRef: !!this.programBoxRef
-    });
+    this._debug('EpgTooltip initialisiert');
   }
 
   /**
-   * Debug-Methode (vereinfacht, da keine SuperBase-Vererbung)
+   * Debug-Methode
    */
   _debug(message, data = null) {
-    // Versuche verschiedene Methoden, um den echten Klassennamen zu bekommen
-    let className = 'Unknown';
-
-    // Methode 1: Statischer Klassennamen (falls definiert)
-    if (this.constructor.className) {
-      className = this.constructor.className;
-    }
-    // Methode 2: Tag-Name des Custom Elements
-    else if (this.tagName) {
-      className = this.tagName.toLowerCase().replace(/[^a-z0-9]/g, '');
-    }
-    // Methode 3: Constructor name (kann minifiziert sein)
-    else if (this.constructor.name && this.constructor.name.length > 2) {
-      className = this.constructor.name;
-    }
-    // Methode 4: Fallback auf cardName
-    else if (this.cardName) {
-      className = this.cardName;
-    }
-
-    this.tgCardHelper._debug(className, message, data);
+    this.tgCardHelper._debug(this.constructor.className, message, data);
   }
 
   /**
-   * Ermittelt den Namen der aufrufenden Methode
+   * Render-Methode für das Custom Element
    */
-  _getCallerMethodName() {
-    try {
-      const stack = new Error().stack;
-      const lines = stack.split('\n');
-      // Suche nach der ersten Zeile, die nicht _debug oder _getCallerMethodName enthält
-      for (let i = 3; i < lines.length; i++) {
-        const line = lines[i];
-        if (line && !line.includes('_debug') && !line.includes('_getCallerMethodName')) {
-          const match = line.match(/at\s+(?:.*\.)?(\w+)/);
-          return match ? match[1] : 'unknown';
-        }
-      }
-      return 'unknown';
-    } catch (e) {
-      return 'unknown';
-    }
+  render() {
+    if (!this.data) return html``;
+
+    const startTime = this.formatTime(this.data.start);
+    const endTime = this.formatTime(this.data.stop);
+    const duration = this.data.duration ? Math.round(this.data.duration / 60) : 0;
+
+    return html`
+      <div class="tooltip">
+        <div class="tooltip-content">
+          <div class="tooltip-header">
+            <div class="tooltip-title">${this.data.title || 'Unbekanntes Programm'}</div>
+            ${this.data.shortText
+              ? html`<div class="tooltip-subtitle">${this.data.shortText}</div>`
+              : ''}
+            <div class="tooltip-time">
+              <span class="tooltip-start">${startTime}</span>
+              <span class="tooltip-separator"> - </span>
+              <span class="tooltip-end">${endTime}</span>
+              ${duration > 0 ? html`<span class="tooltip-duration"> (${duration} Min)</span>` : ''}
+            </div>
+          </div>
+          ${this.data.description
+            ? html`<div class="tooltip-description">${this.data.description}</div>`
+            : ''}
+        </div>
+      </div>
+    `;
   }
 
   /**
-   * Zeigt den Tooltip an
+   * Lifecycle: Wird aufgerufen, wenn das Element aktualisiert wird
    */
-  show(data, position, elementRect) {
-    this._debug('TooltipManager: Tooltip anzeigen', {
-      data: data?.title,
-      position,
-      elementRect: elementRect ? {
-        top: elementRect.top,
-        left: elementRect.left,
-        width: elementRect.width,
-        height: elementRect.height
-      } : null
-    });
+  updated(changedProperties) {
+    super.updated(changedProperties);
 
-    this.isVisible = true;
-    this.data = data;
-    this.position = position;
-    this.elementRect = elementRect;
-
-    // Triggere Update des Host-Elements
-    if (this.hostElement && typeof this.hostElement.requestUpdate === 'function') {
-      this.hostElement.requestUpdate();
+    if (changedProperties.has('visible') && this.visible) {
+      // Starte automatisches Scrollen nach Verzögerung
+      this._startAutoScrollTimer();
+    } else if (changedProperties.has('visible') && !this.visible) {
+      // Stoppe automatisches Scrollen
+      this._stopAutoScroll();
     }
   }
 
   /**
-   * Versteckt den Tooltip
+   * Lifecycle: Wird aufgerufen, wenn das Element entfernt wird
    */
-  hide() {
-    this._debug('TooltipManager: Tooltip verstecken');
-
-    this.isVisible = false;
-    this.data = null;
-    this.elementRect = null;
-
-    // Triggere Update des Host-Elements
-    if (this.hostElement && typeof this.hostElement.requestUpdate === 'function') {
-      this.hostElement.requestUpdate();
-    }
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    this._stopAutoScroll();
   }
 
   /**
@@ -130,312 +198,176 @@ export class TooltipManager {
     const date = new Date(timestamp * 1000);
     return date.toLocaleTimeString('de-DE', {
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
     });
   }
 
   /**
-   * Erstellt den Tooltip-Inhalt (HTML-String)
+   * Startet den Timer für automatisches Scrollen
    */
-  getContent() {
-    if (!this.data) return '';
-
-    const startTime = this.formatTime(this.data.start);
-    const endTime = this.formatTime(this.data.stop);
-    const duration = this.data.duration ? Math.round(this.data.duration / 60) : 0;
-
-    // Baue HTML-String zusammen
-    let content = `<div class="tooltip-content">`;
-    content += `<div class="tooltip-title">${this.data.title || 'Unbekanntes Programm'}</div>`;
-
-    if (this.data.shortText) {
-      content += `<div class="tooltip-subtitle">${this.data.shortText}</div>`;
+  _startAutoScrollTimer() {
+    // Stoppe vorherige Timer falls vorhanden
+    if (this._autoScrollTimer) {
+      clearTimeout(this._autoScrollTimer);
     }
 
-    content += `<div class="tooltip-time">`;
-    content += `<span class="tooltip-start">${startTime}</span>`;
-    content += `<span class="tooltip-separator"> - </span>`;
-    content += `<span class="tooltip-end">${endTime}</span>`;
-    if (duration > 0) {
-      content += `<span class="tooltip-duration"> (${duration} Min)</span>`;
-    }
-    content += `</div>`;
-
-    if (this.data.description) {
-      content += `<div class="tooltip-description">${this.data.description}</div>`;
-    }
-
-    content += `</div>`;
-
-    return content;
+    this._debug(
+      'EpgTooltip-Scroll: Starte automatisches Scrollen nach ' +
+        this.initialDelay / 1000 +
+        ' Sekunden'
+    );
+    // Starte automatisches Scrollen nach konfigurierbarer Verzögerung
+    this._autoScrollTimer = setTimeout(() => {
+      this._startAutoScroll();
+    }, this.initialDelay);
   }
 
   /**
-   * Berechnet die komplette Tooltip-Position und gibt CSS-Style zurück
+   * Startet das automatische Scrollen der Description
    */
-  getStyle() {
-    this._debug('TooltipManager: Style berechnen', {
-      hasElementRect: !!this.elementRect,
-      hasEnv: !!this.env,
-      isVisible: this.isVisible
+  _startAutoScroll() {
+    this._debug('EpgTooltip-Scroll: automatisches Scrollen 1');
+    if (!this.visible) return;
+
+    const description = this.shadowRoot?.querySelector('.tooltip-description');
+    this._debug('EpgTooltip-Scroll: automatisches Scrollen 2');
+    if (!description) return;
+
+    const scrollHeight = description.scrollHeight - description.clientHeight;
+
+    // Wenn kein Scroll nötig ist, stoppe
+    this._debug('EpgTooltip-Scroll: automatisches Scrollen 3', {
+      scrollHeight,
+      descriptionScrollHeight: description.scrollHeight,
+      descriptionClientHeight: description.clientHeight,
+    });
+    if (scrollHeight <= 0) return;
+    this._debug('EpgTooltip-Scroll: automatisches Scrollen 4');
+
+    this._debug('EpgTooltip-Scroll: Starte automatisches Scrollen', {
+      scrollHeight,
+      clientHeight: description.clientHeight,
     });
 
-    if (!this.elementRect) return '';
+    // Scroll nach unten (langsamer)
+    description.scrollTo({ top: scrollHeight, behavior: 'smooth' });
 
-    const progItem = this.elementRect;
+    // Nach Scroll-Ende: längere Pause, dann zurück zum Anfang
+    setTimeout(() => {
+      if (!this.visible) return;
 
-    // Hui-View-Daten aus dem Sniffer (mit Fallback)
-    const huiView = this.env?.huiViewPosition || {
-      left: 0,
-      top: 0,
-      width: window.innerWidth,
-      height: window.innerHeight
-    };
-    const cardPos = this.env?.cardPosition || { left: 0, top: 0 };
+      // Scroll zurück zum Anfang (langsamer)
+      description.scrollTo({ top: 0, behavior: 'smooth' });
 
-    // Debug-Info
-    this._debug('TooltipManager: Positionierung (Hui-View)', {
-      progItem: { top: progItem.top, left: progItem.left, width: progItem.width, height: progItem.height },
-      huiView,
-      cardPos,
-      tooltip: { width: this.tooltipWidth, height: this.tooltipHeight }
-    });
-
-    // Berechne Ecken-Abstände für das Programmitem
-    const itemCorners = this._calculateItemCornerDistances(progItem, huiView, cardPos);
-
-    // Finde die Ecke mit dem größten Abstand
-    const bestCorner = this._findBestCorner(itemCorners);
-
-    // Berechne Tooltip-Position basierend auf der besten Ecke
-    const tooltipPosition = this._calculateTooltipPosition(progItem, bestCorner, huiView);
-
-    // Begrenze Tooltip auf Hui-View
-    const finalPosition = this._constrainToHuiView(tooltipPosition, huiView);
-
-    // Berechne Pfeil-Position
-    const arrowLeft = this._calculateArrowPosition(progItem, finalPosition);
-
-    this._debug('TooltipManager: Style-Berechnung abgeschlossen', {
-      bestCorner: bestCorner?.corner,
-      tooltipPosition,
-      finalPosition,
-      arrowLeft
-    });
-
-    return `position: fixed; left: ${finalPosition.left}px; top: ${finalPosition.top}px; z-index: 10000; --tooltip-arrow-left: ${arrowLeft}; --tooltip-class: ${finalPosition.tooltipClass};`;
+      // Nach Zurück-Scroll: längere Pause, dann Loop fortsetzen
+      setTimeout(() => {
+        if (!this.visible) return;
+        this._startAutoScroll(); // Rekursiver Aufruf für endlosen Loop
+      }, this.scrollPause); // Konfigurierbare Pause
+    }, this.scrollPause); // Konfigurierbare Pause
   }
 
   /**
-   * Berechnet die Abstände für alle 4 Ecken des Programmitems
+   * Setzt die Event-Daten und verarbeitet sie
    */
-  _calculateItemCornerDistances(progItem, huiView, cardPos) {
-    // Verwende direkte DOM-Messung der ProgramBox (falls verfügbar)
-    let programBoxRect = null;
+  setEventData(detail) {
+    this._debug('EpgTooltip: setEventData aufgerufen', { detail });
 
-    if (this.programBoxRef) {
-      programBoxRect = this.programBoxRef.getBoundingClientRect();
-      this._debug('TooltipManager: ProgramBox direkt gemessen', {
-        programBoxRect: {
-          left: programBoxRect.left,
-          top: programBoxRect.top,
-          width: programBoxRect.width,
-          height: programBoxRect.height
-        }
-      });
-    } else {
-      // Fallback: Berechnung basierend auf Layout-Werten
-      const TIMEBAR_HEIGHT = 60; // Aus EPG-View CSS: .timeBar { height: 60px; }
-      const channelWidth = this.hostElement?.config?.channelWidth || 180;
+    // Verarbeite die Event-Daten
+    this._eventData = detail;
 
-      programBoxRect = {
-        left: cardPos.left + channelWidth,
-        top: cardPos.top + TIMEBAR_HEIGHT,
-        width: huiView.width - cardPos.left - channelWidth,
-        height: huiView.height - (cardPos.top + TIMEBAR_HEIGHT)
-      };
-
-      this._debug('TooltipManager: ProgramBox berechnet (Fallback)', {
-        timebarHeight: TIMEBAR_HEIGHT,
-        channelWidth: channelWidth,
-        programBoxRect
-      });
-    }
-    // Berechne Abstände für alle 4 Ecken
-    const corners = [
-      { name: 'topLeft', x: progItem.left, y: progItem.top },
-      { name: 'topRight', x: progItem.right, y: progItem.top },
-      { name: 'bottomLeft', x: progItem.left, y: progItem.bottom },
-      { name: 'bottomRight', x: progItem.right, y: progItem.bottom }
-    ];
-
-    const cornerDistances = corners.map(corner => {
-      // Abstand zur linken Programmbox-Ecke
-      const distanceToProgramBoxLeft = Math.abs(corner.x - programBoxRect.left);
-      // Abstand zur linken Hui-View-Ecke
-      const distanceToHuiViewLeft = Math.abs(corner.x - huiView.left);
-      // Nimm den kleineren Wert
-      const leftDistance = Math.min(distanceToProgramBoxLeft, distanceToHuiViewLeft);
-
-      // Abstand zur oberen Programmbox-Ecke
-      const distanceToProgramBoxTop = Math.abs(corner.y - programBoxRect.top);
-      // Abstand zur oberen Hui-View-Ecke
-      const distanceToHuiViewTop = Math.abs(corner.y - huiView.top);
-      // Nimm den kleineren Wert
-      const topDistance = Math.min(distanceToProgramBoxTop, distanceToHuiViewTop);
-
-      // Gesamtabstand (Pythagoras)
-      const totalDistance = Math.sqrt(leftDistance * leftDistance + topDistance * topDistance);
-
-      return {
-        corner: corner.name,
-        position: { x: corner.x, y: corner.y },
-        distances: { left: leftDistance, top: topDistance, total: totalDistance },
-        programBox: {
-          left: programBoxRect.left,
-          top: programBoxRect.top,
-          width: programBoxRect.width,
-          height: programBoxRect.height
-        }
-      };
-    });
-
-    this._debug('TooltipManager: Ecken-Abstände berechnet', {
-      progItem: { left: progItem.left, top: progItem.top, right: progItem.right, bottom: progItem.bottom },
-      huiView,
-      cardPos,
-      programBox: programBoxRect,
-      cornerDistances
-    });
-
-    return cornerDistances;
-  }
-
-  /**
-   * Findet die Ecke mit dem größten Abstand
-   */
-  _findBestCorner(cornerDistances) {
-    const bestCorner = cornerDistances.reduce((best, current) => {
-      return current.distances.total > best.distances.total ? current : best;
-    });
-
-    this._debug('TooltipManager: Beste-Ecke gefunden', {
-      bestCorner,
-      allCorners: cornerDistances
-    });
-
-    return bestCorner;
-  }
-
-  /**
-   * Berechnet die Tooltip-Position basierend auf der besten Ecke
-   */
-  _calculateTooltipPosition(progItem, bestCorner, huiView) {
-    // Standard: Mittig über/unter dem sichtbaren Item-Teil
-    let left = progItem.left + (progItem.width / 2) - (this.tooltipWidth / 2);
-    let top = progItem.top - this.tooltipHeight - this.margin; // Über dem Item
-    let tooltipClass = 'bottom';
-
-    // Einfache Positionierung: Immer über dem Item versuchen
-    top = progItem.top - this.tooltipHeight - this.margin;
-    tooltipClass = 'bottom';
-
-    // Nur wenn wirklich kein Platz oben ist, dann unten
-    const spaceAbove = progItem.top - huiView.top;
-    this._debug('TooltipManager: Position-Berechnung', {
-      progItemTop: progItem.top,
-      huiViewTop: huiView.top,
-      spaceAbove,
-      tooltipHeight: this.tooltipHeight,
-      margin: this.margin,
-      finalTop: top,
-      tooltipClass
-    });
-
-    if (spaceAbove < this.tooltipHeight + this.margin) {
-      top = progItem.bottom + this.margin;
-      tooltipClass = 'top';
-    }
-
-    this._debug('TooltipManager: Position berechnet', {
-      progItem: { left: progItem.left, top: progItem.top, width: progItem.width, height: progItem.height },
-      bestCorner,
-      spaces: { above: spaceAbove },
-      position: { left, top, tooltipClass },
-      note: 'Programmbox darf überdeckt werden'
-    });
-
-    return { left, top, tooltipClass };
-  }
-
-  /**
-   * Begrenzt den Tooltip auf den Hui-View (Programmbox darf überdeckt werden)
-   */
-  _constrainToHuiView(position, huiView) {
-    let { left, top, tooltipClass } = position;
-
-    // Begrenze nur auf Hui-View (Programmbox-Grenzen werden ignoriert)
-    left = Math.max(huiView.left + 10, Math.min(left, huiView.left + huiView.width - this.tooltipWidth - 10));
-    top = Math.max(huiView.top + 10, Math.min(top, huiView.top + huiView.height - this.tooltipHeight - 10));
-
-    // Wenn Tooltip immer noch außerhalb, zentriere ihn im Hui-View
-    if (left < huiView.left || top < huiView.top ||
-        left + this.tooltipWidth > huiView.left + huiView.width ||
-        top + this.tooltipHeight > huiView.top + huiView.height) {
-      left = huiView.left + (huiView.width - this.tooltipWidth) / 2;
-      top = huiView.top + (huiView.height - this.tooltipHeight) / 2;
-      tooltipClass = 'bottom';
-    }
-
-    this._debug('TooltipManager: Hui-View-Begrenzung', {
-      original: position,
-      huiView,
-      final: { left, top, tooltipClass },
-      note: 'Programmbox darf überdeckt werden'
-    });
-
-    return { left, top, tooltipClass };
-  }
-
-  /**
-   * Berechnet die Pfeil-Position
-   */
-  _calculateArrowPosition(progItem, tooltipPosition) {
-    const { left, top, tooltipClass } = tooltipPosition;
-
-    if (tooltipClass === 'top' || tooltipClass === 'bottom') {
-      // Horizontaler Pfeil
-      const arrowPosition = progItem.left + (progItem.width / 2) - left;
-      return `${Math.max(10, Math.min(arrowPosition, this.tooltipWidth - 10))}px`;
-    } else {
-      // Vertikaler Pfeil
-      const arrowPosition = progItem.top + (progItem.height / 2) - top;
-      return `${Math.max(10, Math.min(arrowPosition, this.tooltipHeight - 10))}px`;
-    }
-  }
-
-  /**
-   * Event-Handler für Tooltip-Events
-   */
-  handleTooltipEvent(event) {
-    const { action, position, elementRect, data } = event.detail;
-
-    this._debug('TooltipManager: Event empfangen', {
-      action,
-      position,
-      title: data?.title,
-      elementRect: elementRect ? {
-        top: elementRect.top,
-        left: elementRect.left,
-        width: elementRect.width,
-        height: elementRect.height
-      } : null
-    });
-
-    if (action === 'show') {
-      this.show(data, position, elementRect);
-    } else if (action === 'hide') {
+    // Entscheide selbst über show/hide basierend auf action
+    if (detail.action === 'show') {
+      this.show(detail.data);
+    } else if (detail.action === 'hide') {
       this.hide();
     }
+
+    // Trigger re-render
+    this.requestUpdate();
   }
+
+  /**
+   * Zeigt den Tooltip an
+   */
+  show(data) {
+    this._debug('EpgTooltip: show aufgerufen', { data });
+
+    this.data = data;
+    this.visible = true;
+
+    // Berechne optimale Position
+    this._calculateOptimalPosition();
+
+    // Starte Auto-Scroll Timer
+    this._startAutoScrollTimer();
+  }
+
+  /**
+   * Versteckt den Tooltip
+   */
+  hide() {
+    this._debug('EpgTooltip: hide aufgerufen');
+
+    this.visible = false;
+
+    // Stoppe Auto-Scroll
+    this._stopAutoScroll();
+  }
+
+  /**
+   * Berechnet die optimale Position für den Tooltip
+   */
+  _calculateOptimalPosition() {
+    if (!this.hostElement) {
+      this._debug('EpgTooltip: Kein hostElement gesetzt, verwende Standard-Position');
+      return;
+    }
+
+    const hostRect = this.hostElement.getBoundingClientRect();
+    const tooltipRect = this.getBoundingClientRect();
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+
+    // Standard-Position (unten rechts vom Host)
+    let left = hostRect.right + 10;
+    let top = hostRect.top;
+
+    // Prüfe ob rechts genug Platz ist
+    if (left + tooltipRect.width > viewportWidth) {
+      // Links vom Host positionieren
+      left = hostRect.left - tooltipRect.width - 10;
+    }
+
+    // Prüfe ob unten genug Platz ist
+    if (top + tooltipRect.height > viewportHeight) {
+      // Über dem Host positionieren
+      top = hostRect.bottom - tooltipRect.height;
+    }
+
+    // Stelle sicher, dass der Tooltip nicht außerhalb des Viewports ist
+    left = Math.max(10, Math.min(left, viewportWidth - tooltipRect.width - 10));
+    top = Math.max(10, Math.min(top, viewportHeight - tooltipRect.height - 10));
+
+    this._debug('EpgTooltip: Position berechnet', { left, top, hostRect, tooltipRect });
+
+    // Setze die Position
+    this.style.left = `${left}px`;
+    this.style.top = `${top}px`;
+  }
+
+  /**
+   * Stoppt das automatische Scrollen
+   */
+  _stopAutoScroll() {
+    if (this._autoScrollTimer) {
+      clearTimeout(this._autoScrollTimer);
+      this._autoScrollTimer = null;
+    }
+  }
+}
+
+// Registriere das Custom Element
+if (!customElements.get('epg-tooltip')) {
+  customElements.define('epg-tooltip', EpgTooltip);
 }

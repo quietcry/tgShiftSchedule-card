@@ -79,6 +79,12 @@ export class EpgBox extends EpgElementBase {
     // DOM-Referenzen (werden in firstUpdated gesetzt)
     this.programBox = null;
     this.channelBox = null;
+    this.scrollbarX = null;
+
+    // Scroll-Debouncing
+    this.scrollAnimationFrame = null;
+    this.lastScrollLeft = 0;
+    this.scrollPositionSeconds = 0;
 
     // Load-State-Management (wird von allen Managern für Status-Tracking verwendet)
     this.isFirstLoad = 0; // Load-Status: 0=initial, 1=loading, 2=complete
@@ -107,7 +113,6 @@ export class EpgBox extends EpgElementBase {
     this.channelManager = new EpgChannelManager(this);
     this.dataManager = new EpgDataManager(this);
     this.renderManager = new EpgRenderManager(this);
-
   }
 
   /**
@@ -126,7 +131,7 @@ export class EpgBox extends EpgElementBase {
       this._debug('EpgBox: scale geändert', {
         oldScale: changedProperties.get('scale'),
         newScale: this.scale,
-        scaleType: typeof this.scale
+        scaleType: typeof this.scale,
       });
     }
 
@@ -135,7 +140,7 @@ export class EpgBox extends EpgElementBase {
       this._debug('EpgBox: ScaleManager verfügbar', {
         scale: this.scale,
         containerWidth: this.containerWidth,
-        channelWidth: this.channelWidth
+        channelWidth: this.channelWidth,
       });
     } else {
       this._debug('EpgBox: ScaleManager nicht verfügbar');
@@ -168,7 +173,7 @@ export class EpgBox extends EpgElementBase {
     if (this._isScaleRelevant(changedProperties)) {
       this._debug('EpgBox: Scale-relevante Änderungen erkannt', {
         changedProperties: Array.from(changedProperties.keys()),
-        scale: this.scale
+        scale: this.scale,
       });
       this.scaleManager.calculateScale();
 
@@ -182,13 +187,23 @@ export class EpgBox extends EpgElementBase {
       );
     }
 
+    // ===== CHANNEL-WIDTH UPDATES =====
+    if (changedProperties.has('channelWidth')) {
+      // Setze CSS-Variable für horizontale Scrollbar
+      this.style.setProperty('--epg-channel-width', `${this.channelWidth}px`);
+    }
+
     // ===== KANAL-UPDATES (über DataManager) =====
     if (this._isChannelRelevant(changedProperties)) {
       // Mit repeat-Direktive werden Kanal-Updates automatisch gehandhabt
     }
 
     // ===== SCROLLING NACH PROGRAMM-ÄNDERUNGEN =====
-    if (changedProperties.has('_sortedChannels') || changedProperties.has('earliestProgramStart') || changedProperties.has('latestProgramStop')) {
+    if (
+      changedProperties.has('_sortedChannels') ||
+      changedProperties.has('earliestProgramStart') ||
+      changedProperties.has('latestProgramStop')
+    ) {
       this._debug('EpgBox: Scrolling-Trigger erkannt', {
         hasSortedChannels: changedProperties.has('_sortedChannels'),
         hasEarliestProgramStart: changedProperties.has('earliestProgramStart'),
@@ -201,8 +216,6 @@ export class EpgBox extends EpgElementBase {
       // Führe Scrolling nach Programm-Änderungen aus
       this.renderManager.scrollProgramBox();
     }
-
-
 
     // Prüfe epgBackview Validierung
     if (
@@ -268,17 +281,17 @@ export class EpgBox extends EpgElementBase {
       });
 
       // Sende Event, dass der erste Load abgeschlossen ist
-    this.dispatchEvent(
+      this.dispatchEvent(
         new CustomEvent('epg-first-load-complete', {
           detail: {
             isFirstLoad: this.isFirstLoad,
             isChannelUpdate: this.isChannelUpdate,
             channelCount: this._sortedChannels.length,
           },
-        bubbles: true,
-        composed: true,
-      })
-    );
+          bubbles: true,
+          composed: true,
+        })
+      );
     }
 
     this._debug('EpgBox: testIsFirstLoadCompleteUpdated - Status', {
@@ -293,10 +306,12 @@ export class EpgBox extends EpgElementBase {
     // Speichere DOM-Referenzen für einfacheren Zugriff
     this.programBox = this.shadowRoot?.querySelector('.programBox');
     this.channelBox = this.shadowRoot?.querySelector('.channelBox');
+    this.scrollbarX = this.shadowRoot?.querySelector('.scrollbarx');
 
     this._debug('EpgBox: DOM-Referenzen gesetzt', {
       programBox: !!this.programBox,
       channelBox: !!this.channelBox,
+      scrollbarX: !!this.scrollbarX,
     });
 
     // Debug: Zeige Werte vor Scale-Berechnung
@@ -307,7 +322,7 @@ export class EpgBox extends EpgElementBase {
       envSnifferCardWidth: this.envSnifferCardWidth,
       epgShowFutureTime: this.epgShowFutureTime,
       epgShowPastTime: this.epgShowPastTime,
-      epgShowWidth: this.epgShowWidth
+      epgShowWidth: this.epgShowWidth,
     });
 
     // Berechne Scale beim ersten Laden
@@ -322,7 +337,15 @@ export class EpgBox extends EpgElementBase {
     // this._loadDummyDataForDebug();
 
     // Einrichten der Scroll-Synchronisation
-    this.scrollManager.setupScrollSync();
+    // this.scrollManager.setupScrollSync();
+
+    // Event-Listener für horizontale Scrollbar
+    // if (this.programBox) {
+    //   this.programBox.addEventListener('scroll', this._onProgramBoxScroll.bind(this));
+    // }
+
+    // Setze initiale CSS-Variable für horizontale Scrollbar
+    this.style.setProperty('--epg-channel-width', `${this.channelWidth}px`);
 
     // Registriere bei CardImpl für Umgebungsänderungen
     // this._registerForEnvironmentUpdates();
@@ -339,7 +362,7 @@ export class EpgBox extends EpgElementBase {
         detail: {
           component: this,
           callback: this._handleChangeNotifys.bind(this),
-          eventType: "envChanges",
+          eventType: 'envChanges,viewChanges,progScrollX',
           immediately: true,
         },
       })
@@ -373,17 +396,80 @@ export class EpgBox extends EpgElementBase {
       envSnifferCardWidth: this.envSnifferCardWidth,
       envSnifferCardHeight: this.envSnifferCardHeight,
     });
+    this.scrollbarX.addEventListener('scroll', this._onScrollbarScroll.bind(this));
+  }
+
+  /**
+   * Scroll-Event-Handler mit Debouncing
+   */
+  _onScrollbarScroll(event) {
+    // Hole das programBox Div-Element
+    if (!this.scrollbarX) {
+      this._debug('EpgBox: scrollbarX Element nicht gefunden');
+      return;
+    }
+    this._debug('EpgBox: scrollbarX scroll event triggered');
+    // Prüfe ob es sich um horizontales Scrollen handelt
+    const isHorizontalScroll = !this.scrollbarX.scrollLeft !== this.lastScrollLeft;
+
+    // Speichere aktuelle Scroll-Position für nächsten Vergleich
+    this.lastScrollLeft = this.scrollbarX.scrollLeft;
+
+    // Verarbeite nur horizontales Scrollen
+    if (isHorizontalScroll) {
+      // Speichere Event-Daten für requestAnimationFrame
+      const eventData = {
+        scrollLeft: this.scrollbarX.scrollLeft,
+        eventTarget: event.currentTarget,
+        eventType: event.type,
+        timeStamp: event.timeStamp,
+        scrollLeftSeconds: this.scrollbarX.scrollLeft / this.scale,
+      };
+      this.scrollPositionSeconds = eventData.scrollLeftSeconds;
+
+      // Debouncing: Lösche vorherigen Timer falls vorhanden
+      if (this.scrollAnimationFrame) {
+        cancelAnimationFrame(this.scrollAnimationFrame);
+      }
+
+      // Setze neuen Timer für debounced Event
+      this.scrollAnimationFrame = requestAnimationFrame(() => {
+        this._debug('EPG-Box: Horizontal scroll event (debounced)', {
+          scrollLeft: eventData.scrollLeft,
+          eventTarget: eventData.eventTarget,
+          eventType: eventData.eventType,
+          timeStamp: eventData.timeStamp,
+        });
+
+        this.dispatchEvent(
+          new CustomEvent('progscrollx-event', {
+            bubbles: true,
+            composed: true,
+            detail: {
+              scrollLeft: eventData.scrollLeft,
+              scrollLeftSeconds: eventData.scrollLeftSeconds,
+              component: this,
+            },
+          })
+        );
+
+        // Timer zurücksetzen
+        this.scrollAnimationFrame = null;
+      });
+    }
   }
 
   /**
    * Behandelt Environment-Änderungen über Events
    */
   _handleChangeNotifys(eventdata) {
-    this._debug('_handleEnvironmentChanged(): Environment-Änderung/Update empfangen')
+    this._debug('_handleEnvironmentChanged(): Environment-Änderung/Update empfangen', {
+      eventdata,
+    });
 
     // Durchlaufe alle Keys in eventdata
     for (const eventType of Object.keys(eventdata)) {
-      if (eventType === "envchanges") {
+      if (eventType === 'envchanges') {
         const { oldState, newState } = eventdata[eventType];
         this._debug('_handleEnvironmentChanged(): Environment-Änderung/Update empfangen', {
           oldState,
@@ -416,31 +502,77 @@ export class EpgBox extends EpgElementBase {
           this._debug('_handleEnvironmentChanged(): Scale nach Environment-Änderung berechnet', {
             scale: this.scale,
             containerWidth: this.containerWidth,
-            channelWidth: this.channelWidth
+            channelWidth: this.channelWidth,
           });
         }
 
         // Benachrichtige UpdateManager über env-Änderung
         this.updateManager.handleUpdate(new Map([['env', newState]]));
+      } else if (eventType === 'viewchanges') {
+        // Verarbeitung für viewChanges
+        this._handleViewChanges(eventdata[eventType]);
+      } else if (eventType === 'progscrollx') {
+        // Verarbeitung für progScrollX - Scrollbar-Position setzen
+        this._handleProgScrollX(eventdata[eventType]);
       }
-      // Hier können weitere EventTypes hinzugefügt werden
-      // else if (eventType === "viewChanges") {
-      //   // Verarbeitung für viewChanges
-      // }
+    }
+  }
+
+  /**
+   * Behandelt View-Änderungen
+   * @param {Object} data - View-Änderungsdaten
+   */
+  _handleViewChanges(data) {
+    this._debug('_handleViewChanges(): View-Änderungen empfangen', { data });
+    // Hier können View-spezifische Änderungen verarbeitet werden
+    if (data && data.earliestProgramStart !== undefined && data.latestProgramStop !== undefined) {
+      const scrollBarX = this.shadowRoot?.querySelector('.scrollbarx');
+      if (scrollBarX) {
+        scrollBarX.style.setProperty(
+          '--scrollerWidth',
+          `${(data.latestProgramStop - data.earliestProgramStart) * this.scale}px`
+        );
+        this._debug('_handleViewChanges(): Scrollbar-Breite aktualisiert', {
+          earliestProgramStart: data.earliestProgramStart,
+          latestProgramStop: data.latestProgramStop,
+          scrollerWidth: (data.latestProgramStop - data.earliestProgramStart) * this.scale,
+        });
+      } else {
+        this._debug(
+          '_handleViewChanges(): scrollBarX Element nicht gefunden, überspringe Style-Update'
+        );
+      }
+    }
+  }
+
+  /**
+   * Behandelt Program-Scroll-X Events
+   * @param {Object} data - Scroll-Daten
+   */
+  _handleProgScrollX(data) {
+    this._debug('_handleProgScrollX(): Program-Scroll-X Event empfangen', { data });
+
+    if (data && typeof data.scrollLeft === 'number') {
+      this.scrollbarX.scrollLeft = data.scrollLeft;
+      // Speichere die Scroll-Position für später
+
+      this._debug('_handleProgScrollX(): Scroll-Position gespeichert', {
+        scrollLeft: data.scrollLeft,
+      });
     }
   }
 
   static styles = [
     super.styles,
     css`
-    :host {
+      :host {
         display: flex;
         flex-direction: row;
-      width: 100%;
-        height: auto; /* Automatische Höhe basierend auf Inhalt */
+        width: 100%;
+        height: 100%; /* Feste Höhe für Scrollbalken */
         overflow: hidden; /* Versteckt Overflow, damit ProgramBox scrollen kann */
-      position: relative;
-    }
+        position: relative;
+      }
 
       .timeBar {
         width: 100%;
@@ -448,51 +580,51 @@ export class EpgBox extends EpgElementBase {
         flex-shrink: 0;
       }
 
-    .channelBox {
+      .channelBox {
         border-right: 1px solid var(--epg-border-color);
-      margin: 0; /* Keine äußeren Abstände */
-      padding: 0; /* Keine inneren Abstände */
-      display: flex;
-      flex-direction: column;
-      flex-shrink: 0;
+        margin: 0; /* Keine äußeren Abstände */
+        padding: 0; /* Keine inneren Abstände */
+        display: flex;
+        flex-direction: column;
+        flex-shrink: 0;
         /* Die Breite wird dynamisch über einen Inline-Style gesetzt */
         align-items: stretch; /* Verhindert Verteilung über Höhe */
         justify-content: flex-start; /* Startet oben */
         height: fit-content; /* Höhe passt sich an Inhalt an */
         max-height: none; /* Keine Höhenbegrenzung */
-    }
+      }
 
-    .programBox {
-      flex: 1;
-      overflow-x: auto;
+      .programBox {
+        flex: 1;
+        overflow-x: auto;
         overflow-y: auto;
-      margin: 0; /* Keine äußeren Abstände */
-      padding: 0; /* Keine inneren Abstände */
-      display: flex;
-      flex-direction: column;
+        margin: 0; /* Keine äußeren Abstände */
+        padding: 0; /* Keine inneren Abstände */
+        display: flex;
+        flex-direction: column;
         height: 100%; /* Feste Höhe für Scrollbalken */
         min-width: 0; /* Erlaubt Schrumpfen */
         position: relative; /* Für absolute Positionierung des TimeMarkers */
-    }
+      }
 
-    .programRow {
-      display: flex;
-      flex-direction: row; /* Explizit horizontal anordnen */
-      align-items: stretch; /* Items nehmen volle Höhe ein */
-      justify-content: flex-start; /* Items am Anfang ausrichten */
-      border-bottom: none; /* Kein Border */
-      margin: 0; /* Keine äußeren Abstände */
-      padding: 0; /* Keine inneren Abstände */
-      flex-shrink: 0;
-      flex-grow: 0; /* Verhindert Wachsen */
-      /* Höhenklassen werden über epg-row-height angewendet */
-      height: calc(
-        var(--epg-row-height) + var(--has-time) + var(--has-duration) + var(--has-description) +
-          var(--has-shorttext)
-      );
-      min-width: 100%; /* Mindestens so breit wie die sichtbare Box */
-      width: fit-content; /* Wächst mit dem Inhalt */
-    }
+      .programRow {
+        display: flex;
+        flex-direction: row; /* Explizit horizontal anordnen */
+        align-items: stretch; /* Items nehmen volle Höhe ein */
+        justify-content: flex-start; /* Items am Anfang ausrichten */
+        border-bottom: none; /* Kein Border */
+        margin: 0; /* Keine äußeren Abstände */
+        padding: 0; /* Keine inneren Abstände */
+        flex-shrink: 0;
+        flex-grow: 0; /* Verhindert Wachsen */
+        /* Höhenklassen werden über epg-row-height angewendet */
+        height: calc(
+          var(--epg-row-height) + var(--has-time) + var(--has-duration) + var(--has-description) +
+            var(--has-shorttext)
+        );
+        min-width: 100%; /* Mindestens so breit wie die sichtbare Box */
+        width: fit-content; /* Wächst mit dem Inhalt */
+      }
 
       /* Alternierende Farben für Programm-Items in Zeilen */
       .programRow:nth-child(odd) epg-program-item:nth-child(even) {
@@ -525,20 +657,20 @@ export class EpgBox extends EpgElementBase {
       epg-program-item:hover {
         background-color: var(--epg-hover-bg) !important;
         color: var(--epg-text-color) !important;
-    }
+      }
 
-    .channelGroup {
+      .channelGroup {
         padding: 4px var(--epg-padding);
         background-color: var(--epg-header-bg);
         color: var(--epg-text-color);
-      font-weight: bold;
-      display: flex;
-      align-items: center;
-      margin: 0; /* Keine äußeren Abstände */
-      flex-shrink: 0; /* Verhindert Schrumpfen */
+        font-weight: bold;
+        display: flex;
+        align-items: center;
+        margin: 0; /* Keine äußeren Abstände */
+        flex-shrink: 0; /* Verhindert Schrumpfen */
         height: var(--epg-row-height);
         box-sizing: border-box;
-    }
+      }
 
       /* Gruppen-Header Styles */
       .group-header {
@@ -583,14 +715,14 @@ export class EpgBox extends EpgElementBase {
         color: var(--epg-text-color) !important;
       }
 
-    .channelRow {
+      .channelRow {
         padding: 0; /* Kein Padding */
         border: none; /* Kein Border auf der Row selbst */
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      margin: 0; /* Keine äußeren Abstände */
-      flex-shrink: 0; /* Verhindert Schrumpfen */
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        margin: 0; /* Keine äußeren Abstände */
+        flex-shrink: 0; /* Verhindert Schrumpfen */
         flex-grow: 0; /* Verhindert Wachsen */
         /* Höhenklassen werden über epg-row-height angewendet */
         height: calc(
@@ -644,45 +776,45 @@ export class EpgBox extends EpgElementBase {
       .channelRow.selected .channelRowContent {
         background-color: var(--epg-accent);
         color: var(--epg-text-color);
-    }
+      }
 
-    .programSlot {
+      .programSlot {
         padding: var(--epg-padding);
         border: 1px solid var(--epg-border-color);
-      margin: 4px;
-      cursor: pointer;
-      transition: background-color 0.2s ease;
-    }
+        margin: 4px;
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+      }
 
-    .programSlot:hover {
+      .programSlot:hover {
         background-color: var(--epg-hover-bg);
-    }
+      }
 
-    .programSlot.current {
+      .programSlot.current {
         background-color: var(--epg-accent);
         color: var(--epg-text-color);
-    }
+      }
 
-    .programTitle {
-      font-weight: bold;
-      margin-bottom: 4px;
-    }
+      .programTitle {
+        font-weight: bold;
+        margin-bottom: 4px;
+      }
 
-    .programTime {
-      font-size: 0.8em;
+      .programTime {
+        font-size: 0.8em;
         color: var(--epg-time-color);
-    }
+      }
 
-    .programDescription {
-      font-size: 0.8em;
+      .programDescription {
+        font-size: 0.8em;
         color: var(--epg-description-color);
-      margin-top: 4px;
-    }
+        margin-top: 4px;
+      }
 
-    .loading {
-      display: flex;
+      .loading {
+        display: flex;
         justify-content: center;
-      align-items: center;
+        align-items: center;
         height: 200px;
         color: var(--epg-text-color);
       }
@@ -713,6 +845,14 @@ export class EpgBox extends EpgElementBase {
       /* DEBUG: Hintergrundfarben für verschiedene Elemente */
       .programBox {
         background-color: #ff0000 !important;
+        /* Scrollbar-Anzeige unterdrücken */
+        scrollbar-width: none; /* Firefox */
+        -ms-overflow-style: none; /* IE/Edge */
+      }
+
+      /* Chrome/Safari Scrollbar verstecken */
+      .programBox::-webkit-scrollbar {
+        display: none;
       }
 
       epg-program-item.type-startgap {
@@ -728,6 +868,35 @@ export class EpgBox extends EpgElementBase {
       epg-program-item.type-noprogram {
         background-color: #ff8800 !important;
         color: white !important;
+      }
+
+      /* Horizontale Scrollbar */
+      .scrollbarx {
+        position: absolute;
+        bottom: 0;
+        left: var(--epg-channel-width, 200px);
+        right: 0;
+        height: 15px;
+        background-color: transparent;
+        cursor: pointer;
+        --scrollerWidth: 0px;
+        overflow-x: auto;
+      }
+
+      .scrollbarx:hover {
+        height: 20px;
+        background-color: rgba(128, 128, 128, 0.1);
+      }
+      .scrollbarx:hover .scrollbarx-scroller {
+        height: 1px;
+        background-color: transparent;
+      }
+
+      .scrollbarx .scrollbarx-scroller {
+        width: var(--scrollerWidth, 0px);
+        height: 1px;
+        background-color: transparent;
+        display: block;
       }
     `,
   ];
@@ -752,7 +921,7 @@ export class EpgBox extends EpgElementBase {
       scaleType: typeof this.scale,
       flatChannelsLength: this._flatChannels.length,
       containerWidth: this.containerWidth,
-      channelWidth: this.channelWidth
+      channelWidth: this.channelWidth,
     });
 
     return html`
@@ -801,6 +970,11 @@ export class EpgBox extends EpgElementBase {
       >
       </epg-program-box>
       <!-- </div> -->
+
+      <!-- Horizontale Scrollbar -->
+      <div class="scrollbarx">
+        <div class="scrollbarx-scroller"></div>
+      </div>
     `;
   }
 
@@ -1140,6 +1314,111 @@ export class EpgBox extends EpgElementBase {
     return results;
   }
 
+  // ===== HORIZONTALE SCROLLBAR METHODEN =====
+
+  /**
+   * Berechnet die Breite des Scrollbar-Thumbs basierend auf dem sichtbaren Bereich
+   */
+  _getScrollbarThumbWidth() {
+    if (!this.programBox) return 100;
+
+    const scrollWidth = this.programBox.scrollWidth || 1000;
+    const clientWidth = this.programBox.clientWidth || 800;
+
+    // Thumb-Breite proportional zum sichtbaren Bereich
+    const thumbWidth = Math.max(
+      20,
+      (clientWidth / scrollWidth) * (this.containerWidth - this.channelWidth)
+    );
+    return Math.min(thumbWidth, this.containerWidth - this.channelWidth - 20);
+  }
+
+  /**
+   * Berechnet die Position des Scrollbar-Thumbs basierend auf der aktuellen Scroll-Position
+   */
+  _getScrollbarThumbLeft() {
+    if (!this.programBox) return 0;
+
+    const scrollLeft = this.programBox.scrollLeft || 0;
+    const scrollWidth = this.programBox.scrollWidth || 1000;
+    const clientWidth = this.programBox.clientWidth || 800;
+
+    // Thumb-Position proportional zur Scroll-Position
+    const maxScroll = scrollWidth - clientWidth;
+    const maxThumbTravel = this.containerWidth - this.channelWidth - this._getScrollbarThumbWidth();
+
+    if (maxScroll <= 0) return 0;
+    return (scrollLeft / maxScroll) * maxThumbTravel;
+  }
+
+  /**
+   * Event-Handler für Mausklick auf die Scrollbar
+   */
+  _onScrollbarMouseDown(event) {
+    event.preventDefault();
+    this._startScrollbarDrag(event.clientX, event.target);
+  }
+
+  /**
+   * Event-Handler für Touch-Start auf die Scrollbar
+   */
+  _onScrollbarTouchStart(event) {
+    event.preventDefault();
+    const touch = event.touches[0];
+    this._startScrollbarDrag(touch.clientX, event.target);
+  }
+
+  /**
+   * Startet das Scrollbar-Dragging
+   */
+  _startScrollbarDrag(startX, targetElement) {
+    if (!this.programBox || !targetElement) return;
+
+    const scrollbarElement = targetElement.closest('.scrollbarx');
+    if (!scrollbarElement) return;
+
+    const scrollbarRect = scrollbarElement.getBoundingClientRect();
+    const scrollbarLeft = scrollbarRect.left;
+    const scrollbarWidth = scrollbarRect.width;
+    const thumbWidth = this._getScrollbarThumbWidth();
+
+    const onMouseMove = moveEvent => {
+      const currentX = moveEvent.clientX;
+      const relativeX = currentX - scrollbarLeft;
+      const scrollRatio = Math.max(0, Math.min(1, relativeX / (scrollbarWidth - thumbWidth)));
+
+      const maxScroll = this.programBox.scrollWidth - this.programBox.clientWidth;
+      const newScrollLeft = scrollRatio * maxScroll;
+
+      this.programBox.scrollLeft = newScrollLeft;
+      this._updateScrollbarThumb();
+    };
+
+    const onMouseUp = () => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    };
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  }
+
+  /**
+   * Aktualisiert die Position des Scrollbar-Thumbs
+   */
+  _updateScrollbarThumb() {
+    const thumb = this.shadowRoot?.querySelector('.scrollbarx-thumb');
+    if (thumb) {
+      thumb.style.left = `${this._getScrollbarThumbLeft()}px`;
+    }
+  }
+
+  /**
+   * Event-Listener für Scroll-Events von der programBox
+   */
+  _onProgramBoxScroll() {
+    this._updateScrollbarThumb();
+  }
 }
 
 customElements.define('epg-box', EpgBox);

@@ -63,10 +63,10 @@ export class SuperBase extends LitElement {
 
       // Verschiedene Regex-Patterns für verschiedene Browser-Formate
       const patterns = [
-        /at\s+\w+\.(\w+)/,           // Chrome/Node.js: "at ClassName.methodName"
-        /(\w+)@/,                     // Firefox: "methodName@"
-        /(\w+)\s+\(/,                 // Alternative: "methodName("
-        /at\s+(\w+)/                  // Fallback: "at methodName"
+        /at\s+\w+\.(\w+)/, // Chrome/Node.js: "at ClassName.methodName"
+        /(\w+)@/, // Firefox: "methodName@"
+        /(\w+)\s+\(/, // Alternative: "methodName("
+        /at\s+(\w+)/, // Fallback: "at methodName"
       ];
 
       for (const pattern of patterns) {

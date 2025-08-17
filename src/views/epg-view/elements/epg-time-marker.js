@@ -79,7 +79,8 @@ export class EpgTimeMarker extends EpgElementBase {
     const now = Date.now() / 1000; // Aktuelle Zeit in Sekunden
 
     // Hole den aktuellen Scale von diesem Element selbst (geerbt von Container)
-    const scale = parseFloat(getComputedStyle(this).getPropertyValue('--epg-scale')) || this.scale || 0.8;
+    const scale =
+      parseFloat(getComputedStyle(this).getPropertyValue('--epg-scale')) || this.scale || 0.8;
     this.scale = scale;
 
     // Berechne Position direkt
@@ -103,7 +104,7 @@ export class EpgTimeMarker extends EpgElementBase {
       earliestProgramStart,
       latestProgramStop,
       scale,
-      newPosition: this.calculatePosition()
+      newPosition: this.calculatePosition(),
     });
   }
 
@@ -162,9 +163,7 @@ export class EpgTimeMarker extends EpgElementBase {
   ];
 
   render() {
-    return html`
-      <div class="time-marker-line"></div>
-    `;
+    return html` <div class="time-marker-line"></div> `;
   }
 }
 
