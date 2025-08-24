@@ -1,9 +1,19 @@
 import { LitElement, css } from 'lit';
-import { CardName, Version, DebugMode, showVersion, UseDummyData } from './card-config.js';
+import {
+  CardName,
+  CardRegname,
+  CardDescription,
+  Version,
+  DebugMode,
+  showVersion,
+  UseDummyData,
+} from './card-config.js';
 import { TgCardHelper } from './tools/tg-card-helper.js';
 
 export class SuperBase extends LitElement {
   static cardName = CardName;
+  static cardRegname = CardRegname;
+  static cardDescription = CardDescription;
   static version = Version;
   static debugMode = DebugMode;
   static useDummyData = UseDummyData;
@@ -31,7 +41,8 @@ export class SuperBase extends LitElement {
     this.useDummyData = this.constructor.useDummyData;
     this.showVersion = this.constructor.showVersion;
     this.tgCardHelper = new TgCardHelper(this.constructor.cardName, this.constructor.debugMode);
-    this._debug('SuperBase-Konstruktor wird aufgerufen');
+    this.debugMarker = 'SuperBase: ';
+    this._debug(this.debugMarker + 'Konstruktor wird aufgerufen');
   }
 
   _debug(message, data = null) {
@@ -87,5 +98,56 @@ export class SuperBase extends LitElement {
     };
     // this.tgCardHelper.className = className;
     this.tgCardHelper._debug(path, message, data);
+  }
+
+  /**
+   * Behandelt Änderungen von anderen Komponenten
+   * @param {Object} eventdata - Event-Daten mit verschiedenen Event-Typen
+   */
+  _handleChangeNotifys(eventdata) {
+    this._debug(this.debugMarker + 'ChangeNotifysSystem: _handleChangeNotifys() aufgerufen', {
+      eventdata,
+    });
+
+    for (const eventType of Object.keys(eventdata)) {
+      const fktName = '_handle_' + eventType + 'FromEvent';
+      const res =
+        typeof super[fktName] === 'function' ? super[fktName](eventdata[eventType]) : true;
+      if (typeof this[fktName] === 'function' && res) {
+        this._debug(
+          this.debugMarker +
+            `ChangeNotifysSystem: _handleChangeNotifys() event ${eventType} wird ausgewertet`,
+          { eventdata, element: this }
+        );
+        this[fktName](eventdata[eventType], res);
+        continue;
+      } else {
+        this._debug(
+          this.debugMarker +
+            `ChangeNotifysSystem: _handleChangeNotifys() event ${eventType} wird nicht ausgewertet`,
+          { eventdata, element: this }
+        );
+      }
+    }
+  }
+
+  _subscribeChangeNotifys(events = '') {
+    // Registriere mich für Environment-Änderungen
+    this._debug(this.debugMarker + 'ChangeNotifysSystem: _subscribeChangeNotifys() aufgerufen', {
+      events: events.split(','),
+    });
+
+    this.dispatchEvent(
+      new CustomEvent('registerMeForChanges', {
+        bubbles: true,
+        composed: true,
+        detail: {
+          component: this,
+          callback: this._handleChangeNotifys.bind(this),
+          eventType: events,
+          immediately: true,
+        },
+      })
+    );
   }
 }

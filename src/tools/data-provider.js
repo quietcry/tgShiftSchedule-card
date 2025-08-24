@@ -1,14 +1,13 @@
-import { CardName, DebugMode } from '../card-config.js';
 import { TgCardHelper } from './tg-card-helper.js';
 
-export class DataProvider {
+export class DataProvider extends TgCardHelper {
   static className = 'DataProvider';
-  constructor() {
-    this._hass = null;
-    this.tgCardHelper = new TgCardHelper(CardName, DebugMode);
 
-    if (this.constructor.debugMode)
-      console.debug(`[${this.constructor.cardName}] DataProvider-Modul wird geladen`);
+  constructor() {
+    super();
+    this._hass = null;
+
+    if (this.debugMode) console.debug(`[${this.cardName}] DataProvider-Modul wird geladen`);
     this._debug('DataProvider initialisiert');
   }
 
@@ -31,30 +30,6 @@ export class DataProvider {
       this._hass
     );
     return this._hass;
-  }
-
-  _debug(message, data = null) {
-    // Versuche verschiedene Methoden, um den echten Klassennamen zu bekommen
-    let className = 'Unknown';
-
-    // Methode 1: Statischer Klassennamen (falls definiert)
-    if (this.constructor.className) {
-      className = this.constructor.className;
-    }
-    // Methode 2: Tag-Name des Custom Elements
-    else if (this.tagName) {
-      className = this.tagName.toLowerCase().replace(/[^a-z0-9]/g, '');
-    }
-    // Methode 3: Constructor name (kann minifiziert sein)
-    else if (this.constructor.name && this.constructor.name.length > 2) {
-      className = this.constructor.name;
-    }
-    // Methode 4: Fallback auf cardName
-    else if (this.cardName) {
-      className = this.cardName;
-    }
-
-    this.tgCardHelper._debug(className, message, data);
   }
 
   async _callService(entity, params = {}) {

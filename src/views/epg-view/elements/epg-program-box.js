@@ -65,78 +65,58 @@ export class EpgProgramBox extends EpgElementBase {
 
     // Initialisiere RenderManager
     this.renderManager = new EpgRenderManager(this);
-
-    // Registriere mich für Environment-Änderungen
-    this.dispatchEvent(
-      new CustomEvent('registerMeForChanges', {
-        bubbles: true,
-        composed: true,
-        detail: {
-          component: this,
-          callback: this._handleChangeNotifys.bind(this),
-          eventType: 'progScrollX,envChanges,viewChanges',
-          immediately: true,
-        },
-      })
-    );
+    this._subscribeChangeNotifys('progScrollX,envChanges,viewChanges');
 
     this._debug('ProgramBox: Registrierung für Environment-Änderungen abgeschlossen');
   }
 
-  /**
-   * Behandelt Änderungen von anderen Komponenten
-   * @param {Object} eventdata - Event-Daten mit verschiedenen Event-Typen
-   */
-  _handleChangeNotifys(eventdata) {
-    this._debug('ProgramBox: _handleChangeNotifys() aufgerufen', { eventdata });
+  _handle_viewchangesFromEvent(eventdata) {}
+  _handle_envchangesFromEvent(eventdata) {
+    // Environment-Änderungen werden hier verarbeitet (falls nötig)
+    const { oldState, newState } = eventdata;
 
-    for (const eventType of Object.keys(eventdata)) {
-      if (eventType === 'envchanges') {
-        const { oldState, newState } = eventdata[eventType];
+    this._debug('ProgramBox: Environment-Änderungen empfangen', {
+      oldState,
+      newState,
+    });
 
-        this._debug('ProgramBox: Environment-Änderungen empfangen', {
-          oldState,
-          newState,
-        });
+    // Update Environment-Properties
+    if (newState) {
+      let updated = false;
 
-        // Update Environment-Properties
-        if (newState) {
-          let updated = false;
+      if (newState.cardWidth !== undefined && this.containerWidth !== newState.cardWidth) {
+        this.containerWidth = newState.cardWidth;
+        updated = true;
+      }
 
-          if (newState.cardWidth !== undefined && this.containerWidth !== newState.cardWidth) {
-            this.containerWidth = newState.cardWidth;
-            updated = true;
-          }
+      if (newState.cardHeight !== undefined && this.env.cardHeight !== newState.cardHeight) {
+        this.env.cardHeight = newState.cardHeight;
+        updated = true;
+      }
 
-          if (newState.cardHeight !== undefined && this.env.cardHeight !== newState.cardHeight) {
-            this.env.cardHeight = newState.cardHeight;
-            updated = true;
-          }
+      if (newState.deviceType !== undefined && this.env.deviceType !== newState.deviceType) {
+        this.env.deviceType = newState.deviceType;
+        updated = true;
+      }
 
-          if (newState.deviceType !== undefined && this.env.deviceType !== newState.deviceType) {
-            this.env.deviceType = newState.deviceType;
-            updated = true;
-          }
-
-          if (updated) {
-            this._debug('ProgramBox: Environment-Properties aktualisiert', {
-              containerWidth: this.containerWidth,
-              env: this.env,
-            });
-          }
-        }
-      } else if (eventType === 'progscrollx') {
-        const scrollevent = eventdata[eventType];
-        this.programaticalScroll = true;
-        this.programBox.scrollLeft = scrollevent.scrollLeft;
-        this._debug('ProgramBox: progscrollx event empfangen', {
-          element: this.programBox,
-          scrollLeft: scrollevent.scrollLeft,
-          scrollLeftReal: this.programBox.scrollLeft,
-          scrollevent,
+      if (updated) {
+        this._debug('ProgramBox: Environment-Properties aktualisiert', {
+          containerWidth: this.containerWidth,
+          env: this.env,
         });
       }
     }
+  }
+  _handle_progscrollxFromEvent(eventdata) {
+    const scrollevent = eventdata;
+    this.programaticalScroll = true;
+    this.programBox.scrollLeft = scrollevent.scrollLeft;
+    this._debug('ProgramBox: progscrollx event empfangen', {
+      element: this.programBox,
+      scrollLeft: scrollevent.scrollLeft,
+      scrollLeftReal: this.programBox.scrollLeft,
+      scrollevent,
+    });
   }
 
   /**

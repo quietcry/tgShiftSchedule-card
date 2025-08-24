@@ -285,6 +285,16 @@ export class EPGView extends ViewBase {
 
     // Tooltip Custom Element Referenz
     this._tooltipElement = null;
+
+    // Event-Listener für Konfigurationsänderungen
+    this.addEventListener('config-changed', event => {
+      this._debug('EPG-View: Konfigurationsänderung empfangen', {
+        config: event.detail.config,
+      });
+
+      // Setze die neue Konfiguration (löst Lit-Update aus)
+      this.config = event.detail.config;
+    });
   }
 
   disconnectedCallback() {
@@ -596,19 +606,7 @@ export class EPGView extends ViewBase {
       this._dataProvider = new DataProvider(this._hass);
     }
 
-    // Registriere mich für Environment-Änderungen
-    this.dispatchEvent(
-      new CustomEvent('registerMeForChanges', {
-        bubbles: true,
-        composed: true,
-        detail: {
-          component: this,
-          callback: this._handleChangeNotifys.bind(this),
-          eventType: 'envChanges',
-          immediately: true,
-        },
-      })
-    );
+    this._subscribeChangeNotifys('envChanges');
 
     // Registriere Tooltip-Event-Listener (TooltipCustomElement wird später initialisiert)
     this.addEventListener('tooltip-event', event => {
@@ -709,58 +707,50 @@ export class EPGView extends ViewBase {
   }
 
   /**
-   * Behandelt Änderungen von anderen Komponenten
-   * @param {Object} eventdata - Event-Daten mit verschiedenen Event-Typen
+   * Aktualisiert die Environment-Properties basierend auf einem Event
+   * @param {Object} eventData - Event-Daten mit oldState und newState
+   * @param {*} superResult - Ergebnis des Super-Aufrufs
    */
-  _handleChangeNotifys(eventdata) {
-    this._debug('EPG-View: _handleChangeNotifys() aufgerufen', { eventdata });
+  _handle_envchangesFromEvent(eventData, superResult) {
+    const { newState } = eventData;
+    if (!newState) return;
 
-    for (const eventType of Object.keys(eventdata)) {
-      if (eventType === 'envchanges') {
-        const { oldState, newState } = eventdata[eventType];
+    let updated = false;
 
-        this._debug('EPG-View: Environment-Änderungen empfangen', {
-          oldState,
-          newState,
-        });
+    // Update TypeOfView
+    if (
+      newState.envSnifferTypeOfView !== undefined &&
+      this.env?.envSnifferTypeOfView !== newState.envSnifferTypeOfView
+    ) {
+      this.env = { ...this.env, envSnifferTypeOfView: newState.envSnifferTypeOfView };
+      updated = true;
+    }
 
-        // Update Environment-Properties
-        if (newState) {
-          let updated = false;
-
-          if (
-            newState.envSnifferTypeOfView !== undefined &&
-            this.env?.envSnifferTypeOfView !== newState.envSnifferTypeOfView
-          ) {
-            this.env = { ...this.env, envSnifferTypeOfView: newState.envSnifferTypeOfView };
-            updated = true;
-          }
-          if (this.env?.envSnifferTypeOfView == 'panel') {
-            if (
-              newState.envSnifferCardHeight !== undefined &&
-              this.env?.envSnifferCardHeight !== newState.envSnifferCardHeight
-            ) {
-              this.env = { ...this.env, envSnifferCardHeight: newState.envSnifferCardHeight };
-              updated = true;
-            }
-            if (
-              newState.envSnifferScreenHeight !== undefined &&
-              this.env?.envSnifferScreenHeight !== newState.envSnifferScreenHeight
-            ) {
-              this.env = { ...this.env, envSnifferScreenHeight: newState.envSnifferScreenHeight };
-              updated = true;
-            }
-          }
-          if (updated) {
-            this._debug('EPG-View: Environment-Properties aktualisiert', {
-              env: this.env,
-            });
-
-            // Höhe neu berechnen wenn sich der View-Typ ändert
-            this._calculateOptimalHeight();
-          }
-        }
+    // Update Card- und Screen-Höhe nur bei Panel-View
+    if (this.env?.envSnifferTypeOfView === 'panel') {
+      if (
+        newState.envSnifferCardHeight !== undefined &&
+        this.env?.envSnifferCardHeight !== newState.envSnifferCardHeight
+      ) {
+        this.env = { ...this.env, envSnifferCardHeight: newState.envSnifferCardHeight };
+        updated = true;
       }
+      if (
+        newState.envSnifferScreenHeight !== undefined &&
+        this.env?.envSnifferScreenHeight !== newState.envSnifferScreenHeight
+      ) {
+        this.env = { ...this.env, envSnifferScreenHeight: newState.envSnifferScreenHeight };
+        updated = true;
+      }
+    }
+
+    if (updated) {
+      this._debug('EPG-View: Environment-Properties aktualisiert', {
+        env: this.env,
+      });
+
+      // Höhe neu berechnen wenn sich der View-Typ ändert
+      this._calculateOptimalHeight();
     }
   }
 

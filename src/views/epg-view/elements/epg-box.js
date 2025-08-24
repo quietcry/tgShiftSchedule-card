@@ -355,18 +355,7 @@ export class EpgBox extends EpgElementBase {
 
     // Registriere als Environment Observer bei CardImpl
     // Registriere mich automatisch für View-Änderungen
-    this.dispatchEvent(
-      new CustomEvent('registerMeForChanges', {
-        bubbles: true,
-        composed: true,
-        detail: {
-          component: this,
-          callback: this._handleChangeNotifys.bind(this),
-          eventType: 'envChanges,viewChanges,progScrollX',
-          immediately: true,
-        },
-      })
-    );
+    this._subscribeChangeNotifys('progScrollX,envChanges,viewChanges');
 
     // this.dispatchEvent(
     //   new CustomEvent('register-observer-client', {
@@ -462,68 +451,54 @@ export class EpgBox extends EpgElementBase {
   /**
    * Behandelt Environment-Änderungen über Events
    */
-  _handleChangeNotifys(eventdata) {
-    this._debug('_handleEnvironmentChanged(): Environment-Änderung/Update empfangen', {
-      eventdata,
+  _handle_envchangesFromEvent(eventdata) {
+    // Environment-Änderungen werden hier verarbeitet (falls nötig)
+    const { oldState, newState } = eventdata;
+    this._debug('_handle_envchangesFromEvent(): Environment-Änderung/Update empfangen', {
+      oldState,
+      newState,
+      newStateKeys: newState ? Object.keys(newState) : [],
+      currentEnvSnifferCardWidth: this.envSnifferCardWidth,
+      newCardWidth: newState?.envSnifferCardWidth,
     });
 
-    // Durchlaufe alle Keys in eventdata
-    for (const eventType of Object.keys(eventdata)) {
-      if (eventType === 'envchanges') {
-        const { oldState, newState } = eventdata[eventType];
-        this._debug('_handleEnvironmentChanged(): Environment-Änderung/Update empfangen', {
-          oldState,
-          newState,
-          newStateKeys: newState ? Object.keys(newState) : [],
-          currentEnvSnifferCardWidth: this.envSnifferCardWidth,
-          newCardWidth: newState?.envSnifferCardWidth,
-        });
+    // Aktualisiere Environment-Properties dynamisch
+    if (newState) {
+      const oldCardWidth = this.envSnifferCardWidth;
 
-        // Aktualisiere Environment-Properties dynamisch
-        if (newState) {
-          const oldCardWidth = this.envSnifferCardWidth;
-
-          // Durchlaufe alle Keys von newState und aktualisiere entsprechende Properties
-          for (const [key, value] of Object.entries(newState)) {
-            if (this.hasOwnProperty(key)) {
-              this[key] = value;
-            }
-          }
-
-          this._debug('_handleEnvironmentChanged(): Properties aktualisiert', {
-            oldCardWidth,
-            newCardWidth: this.envSnifferCardWidth,
-            cardHeight: this.envSnifferCardHeight,
-            updatedKeys: Object.keys(newState),
-          });
-
-          // Berechne Scale neu nach Environment-Änderungen
-          this.scaleManager.calculateScale();
-          this._debug('_handleEnvironmentChanged(): Scale nach Environment-Änderung berechnet', {
-            scale: this.scale,
-            containerWidth: this.containerWidth,
-            channelWidth: this.channelWidth,
-          });
+      // Durchlaufe alle Keys von newState und aktualisiere entsprechende Properties
+      for (const [key, value] of Object.entries(newState)) {
+        if (this.hasOwnProperty(key)) {
+          this[key] = value;
         }
-
-        // Benachrichtige UpdateManager über env-Änderung
-        this.updateManager.handleUpdate(new Map([['env', newState]]));
-      } else if (eventType === 'viewchanges') {
-        // Verarbeitung für viewChanges
-        this._handleViewChanges(eventdata[eventType]);
-      } else if (eventType === 'progscrollx') {
-        // Verarbeitung für progScrollX - Scrollbar-Position setzen
-        this._handleProgScrollX(eventdata[eventType]);
       }
+
+      this._debug('_handle_envchangesFromEvent(): Properties aktualisiert', {
+        oldCardWidth,
+        newCardWidth: this.envSnifferCardWidth,
+        cardHeight: this.envSnifferCardHeight,
+        updatedKeys: Object.keys(newState),
+      });
+
+      // Berechne Scale neu nach Environment-Änderungen
+      this.scaleManager.calculateScale();
+      this._debug('_handle_envchangesFromEvent(): Scale nach Environment-Änderung berechnet', {
+        scale: this.scale,
+        containerWidth: this.containerWidth,
+        channelWidth: this.channelWidth,
+      });
     }
+
+    // Benachrichtige UpdateManager über env-Änderung
+    this.updateManager.handleUpdate(new Map([['env', newState]]));
   }
 
   /**
    * Behandelt View-Änderungen
    * @param {Object} data - View-Änderungsdaten
    */
-  _handleViewChanges(data) {
-    this._debug('_handleViewChanges(): View-Änderungen empfangen', { data });
+  _handle_viewchangesFromEvent(data) {
+    this._debug('_handle_viewchangesFromEvent(): View-Änderungen empfangen', { data });
     // Hier können View-spezifische Änderungen verarbeitet werden
     if (data && data.earliestProgramStart !== undefined && data.latestProgramStop !== undefined) {
       const scrollBarX = this.shadowRoot?.querySelector('.scrollbarx');
@@ -532,14 +507,14 @@ export class EpgBox extends EpgElementBase {
           '--scrollerWidth',
           `${(data.latestProgramStop - data.earliestProgramStart) * this.scale}px`
         );
-        this._debug('_handleViewChanges(): Scrollbar-Breite aktualisiert', {
+        this._debug('_handle_viewchangesFromEvent(): Scrollbar-Breite aktualisiert', {
           earliestProgramStart: data.earliestProgramStart,
           latestProgramStop: data.latestProgramStop,
           scrollerWidth: (data.latestProgramStop - data.earliestProgramStart) * this.scale,
         });
       } else {
         this._debug(
-          '_handleViewChanges(): scrollBarX Element nicht gefunden, überspringe Style-Update'
+          '_handle_viewchangesFromEvent(): scrollBarX Element nicht gefunden, überspringe Style-Update'
         );
       }
     }
@@ -549,7 +524,7 @@ export class EpgBox extends EpgElementBase {
    * Behandelt Program-Scroll-X Events
    * @param {Object} data - Scroll-Daten
    */
-  _handleProgScrollX(data) {
+  _handle_progscrollxFromEvent(data) {
     this._debug('_handleProgScrollX(): Program-Scroll-X Event empfangen', { data });
 
     if (data && typeof data.scrollLeft === 'number') {

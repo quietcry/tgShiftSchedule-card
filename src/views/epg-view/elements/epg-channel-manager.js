@@ -252,7 +252,7 @@ export class EpgChannelManager {
             if (!patternObj.channels.find(c => c.id === channel.id)) {
               patternObj.channels.push(channel);
               // Debug-Ausgabe: Was wird in die Gruppe einsortiert?
-              console.log('DEBUG: Kanal in Gruppe einsortiert', {
+              this._debug('DEBUG: Kanal in Gruppe einsortiert', {
                 gruppe: item.name,
                 pattern: patternObj.pattern,
                 kanal: channel,

@@ -1,4 +1,4 @@
-import { css } from 'lit';
+import { css, html } from 'lit';
 import { SuperBase } from './super-base.js';
 
 export class CardBase extends SuperBase {
@@ -11,8 +11,13 @@ export class CardBase extends SuperBase {
 
   constructor() {
     super();
+    this.debugMarker = 'CardBase: ';
+    this._debug(this.debugMarker + 'Modul wird geladen');
+    this.config = this.getDefaultConfig();
+    this._envSniffer = null;
+    this._extendedConfigProcessor = null;
+    this._lastProcessedEnv = null;
     this._selectedTab = 0;
-    this._debug(`CardBase-Modul wird geladen`);
 
     // Array für Änderungs-Observer
     this.informAtChangesClients = [];
@@ -25,13 +30,13 @@ export class CardBase extends SuperBase {
   }
 
   async firstUpdated() {
-    this._debug('CardBase firstUpdated: Start');
+    this._debug(this.debugMarker + 'firstUpdated: Start');
     await super.firstUpdated();
-    this._debug('CardBase firstUpdated: Ende');
+    this._debug(this.debugMarker + 'firstUpdated: Ende');
   }
 
   setConfig(config) {
-    this._debug('setConfig wird aufgerufen mit:', config);
+    this._debug(this.debugMarker + 'setConfig wird aufgerufen mit:', config);
     if (!config) {
       throw new Error('Keine Konfiguration angegeben');
     }
@@ -53,11 +58,11 @@ export class CardBase extends SuperBase {
       };
     }
 
-    this._debug('config nach setConfig:', this.config);
+    this._debug(this.debugMarker + 'config nach setConfig:', this.config);
   }
 
   getDefaultConfig() {
-    this._debug('getDefaultConfig wird aufgerufen');
+    this._debug(this.debugMarker + 'getDefaultConfig wird aufgerufen');
     return {
       entity: '',
       time_window: 'C',
@@ -73,7 +78,7 @@ export class CardBase extends SuperBase {
   }
 
   render(content = '') {
-    this._debug('render wird aufgerufen');
+    this._debug(this.debugMarker + 'render wird aufgerufen');
     return html`
       <ha-card>
         <div class="card-content">${content}</div>
@@ -108,7 +113,7 @@ export class CardBase extends SuperBase {
   ];
 
   _onRegisterMeForChanges(event) {
-    this._debug('Registrierungsanfrage empfangen', {
+    this._debug(this.debugMarker + 'Registrierungsanfrage empfangen', {
       component: event.target,
       detail: event.detail,
     });
@@ -117,12 +122,12 @@ export class CardBase extends SuperBase {
 
     if (component && typeof callback === 'function') {
       this.registerInformAtChangesClients(component, eventType, immediately, callback);
-      this._debug('Komponente erfolgreich registriert', {
+      this._debug(this.debugMarker + 'Komponente erfolgreich registriert', {
         component: component.tagName || component.constructor.name,
         eventType: eventType,
       });
     } else {
-      this._debug('Registrierung fehlgeschlagen', {
+      this._debug(this.debugMarker + 'Registrierung fehlgeschlagen', {
         componentExists: !!component,
         hasCallback: typeof callback === 'function',
       });
@@ -136,7 +141,7 @@ export class CardBase extends SuperBase {
    * @param {Function} callback - Callback-Funktion, die bei Änderungen aufgerufen wird
    */
   registerInformAtChangesClients(me, eventType = '', immediately = false, callback = null) {
-    this._debug('registerInformAtChangesClients() Anfrage', {
+    this._debug(this.debugMarker + 'registerInformAtChangesClients() Anfrage', {
       me,
       newEventType: eventType,
     });
@@ -171,7 +176,8 @@ export class CardBase extends SuperBase {
     const newEventTypes = eventTypes.filter(newType => !existingEventTypes.includes(newType));
     if (existingMeInformer && newEventTypes.length === 0) {
       this._debug(
-        'registerInformAtChangesClients() Client war bereits mit allen Typen registriert',
+        this.debugMarker +
+          'registerInformAtChangesClients() Client war bereits mit allen Typen registriert',
         {
           me,
           requestedEventTypes: eventTypes,
@@ -185,12 +191,15 @@ export class CardBase extends SuperBase {
       // Füge nur die neuen EventTypes hinzu
       const combinedEventTypes = [...existingEventTypes, ...newEventTypes].sort();
       existingMeInformer.eventType = combinedEventTypes;
-      this._debug('registerInformAtChangesClients() Neue EventTypes hinzugefügt', {
-        me,
-        newEventTypes,
-        existingEventTypes,
-        combinedEventTypes,
-      });
+      this._debug(
+        this.debugMarker + 'registerInformAtChangesClients() Neue EventTypes hinzugefügt',
+        {
+          me,
+          newEventTypes,
+          existingEventTypes,
+          combinedEventTypes,
+        }
+      );
     } else {
       // Füge neuen Client hinzu
       this.informAtChangesClients.push({
@@ -198,23 +207,26 @@ export class CardBase extends SuperBase {
         eventType: newEventTypes,
         callback,
       });
-      this._debug('registerInformAtChangesClients() Neuer Informer registriert', {
-        me,
-        newEventTypes,
-        totalObservers: this.informAtChangesClients.length,
-      });
+      this._debug(
+        this.debugMarker + 'registerInformAtChangesClients() Neuer Informer registriert',
+        {
+          me,
+          newEventTypes,
+          totalObservers: this.informAtChangesClients.length,
+        }
+      );
     }
     newEventTypes.forEach(eventType => {
       // Prüfe ob bereits ein Listener für diesen EventType existiert
       if (!this._registeredEventTypes.has(eventType)) {
-        this._debug('Füge Listener für EventType hinzu', { eventType });
+        this._debug(this.debugMarker + 'Füge Listener für EventType hinzu', { eventType });
         this.addEventListener(eventType + '-event', this._notifyClientsAtChanges.bind(this));
         this._registeredEventTypes.add(eventType);
       } else {
-        this._debug('Listener für EventType bereits vorhanden', { eventType });
+        this._debug(this.debugMarker + 'Listener für EventType bereits vorhanden', { eventType });
       }
       const fkt = '_onRegisterMeFor_' + eventType.charAt(0).toUpperCase() + eventType.slice(1);
-      this._debug('Registriere Komponente für EnvSniffer-Änderungen', { fkt });
+      this._debug(this.debugMarker + 'Registriere Komponente für EnvSniffer-Änderungen', { fkt });
       if (typeof this[fkt] === 'function') {
         this[fkt](immediately, me);
       }
@@ -224,7 +236,7 @@ export class CardBase extends SuperBase {
   }
 
   _notifyClientsAtChanges(event) {
-    this._debug('_notifyClientsAtChanges() Anfrage', {
+    this._debug(this.debugMarker + '_notifyClientsAtChanges() Anfrage', {
       event,
     });
     // Sichere Extraktion des EventTypes (entferne '-event' Suffix)
@@ -232,7 +244,7 @@ export class CardBase extends SuperBase {
     const fkt = '_on' + eventType.charAt(0).toUpperCase() + eventType.slice(1);
     // const data = {[eventType]: (typeof this[fkt] === 'function') ? this[fkt](event.detail) : event.detail};
 
-    this._debug('_notifyClientsAtChanges() EventType extrahiert', {
+    this._debug(this.debugMarker + '_notifyClientsAtChanges() EventType extrahiert', {
       originalEventType: event.type,
       extractedEventType: eventType,
       clients: this.informAtChangesClients,
@@ -255,7 +267,7 @@ export class CardBase extends SuperBase {
           const data = { [eventType]: details };
           if (details && client.callback && typeof client.callback === 'function') {
             try {
-              this._debug('_notifyClientsAtChanges() Client benachrichtigen', {
+              this._debug(this.debugMarker + '_notifyClientsAtChanges() Client benachrichtigen', {
                 client: client.me.constructor.name,
                 eventType: eventType,
                 data: data,

@@ -1,8 +1,11 @@
+import { CardName, DebugMode, Version } from '../card-config.js';
+
 export class TgCardHelper {
-  constructor(cardName, debugMode, className) {
-    this.cardName = cardName || this.constructor.cardName || null;
-    this.debugMode = debugMode || this.constructor.debugMode || 'true';
+  constructor(cardName, debugMode, className, version) {
+    this.cardName = cardName || this.constructor.cardName || CardName || null;
+    this.debugMode = debugMode || this.constructor.debugMode || DebugMode || 'true';
     this.className = className || this.constructor.className || null;
+    this.version = version || this.constructor.version || Version || null;
 
     // if (this.debugMode) console.debug(`[${this.cardName}] tgCardHelper-Modul wird geladen`);
     // this._debug('tgCardHelper initialisiert');

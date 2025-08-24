@@ -110,19 +110,7 @@ export class EpgTimebar extends EpgElementBase {
     // Informiere den Time Marker beim ersten Rendering
     this._informTimeMarker();
 
-    // Registriere mich automatisch für View-Änderungen
-    this.dispatchEvent(
-      new CustomEvent('registerMeForChanges', {
-        bubbles: true,
-        composed: true,
-        detail: {
-          component: this,
-          callback: this._handleChangeNotifys.bind(this),
-          eventType: 'progScrollX,envChanges,viewChanges',
-          immediately: true,
-        },
-      })
-    );
+    this._subscribeChangeNotifys('progScrollX,envChanges,viewChanges');
   }
 
   updated(changedProperties) {
@@ -140,28 +128,7 @@ export class EpgTimebar extends EpgElementBase {
     }
   }
 
-  /**
-   * Callback für Änderungen in der epg-box (über registerMeForChanges)
-   * @param {Object} eventdata - Event-Daten mit verschiedenen EventTypes
-   */
-  _handleChangeNotifys(eventdata) {
-    // Durchlaufe alle Keys in eventdata
-    for (const eventType of Object.keys(eventdata)) {
-      switch (eventType) {
-        case 'viewchanges':
-          this._handleChangeNotifys_viewChanges(eventdata[eventType]);
-          break;
-        case 'envchanges':
-          this._handleChangeNotifys_envChanges(eventdata[eventType]);
-          break;
-        case 'progscrollx':
-          this._handleChangeNotifys_progScrollX(eventdata[eventType]);
-          break;
-      }
-    }
-  }
-
-  _handleChangeNotifys_viewChanges(eventdata) {
+  _handle_viewchangesFromEvent(eventdata) {
     const changedProperties = eventdata;
 
     // Setze die Werte über Lit-Properties, damit changedProperties korrekt gefüllt wird
@@ -190,13 +157,13 @@ export class EpgTimebar extends EpgElementBase {
     }
   }
 
-  _handleChangeNotifys_envChanges(eventdata) {
+  _handle_envchangesFromEvent(eventdata) {
     // Environment-Änderungen werden hier verarbeitet (falls nötig)
   }
 
-  _handleChangeNotifys_progScrollX(eventdata) {
+  _handle_progscrollxFromEvent(eventdata) {
     const changedProperties = eventdata;
-    this._debug('EpgTimebar: _handleChangeNotifys_progScrollX programmatic-scroll', {
+    this._debug('EpgTimebar: _handle_progscrollxFromEvent programmatic-scroll', {
       changedProperties: changedProperties,
       timebar: this.timebar,
     });
