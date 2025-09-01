@@ -106,13 +106,13 @@ export class EpgBox extends EpgElementBase {
     this.envSnifferTypeOfView = 'tile';
 
     // ===== MANAGER-INSTANZEN =====
-    // Alle Manager haben Zugriff auf die obigen Variablen über this.epgBox
-    this.updateManager = new EpgUpdateManager(this);
-    this.scrollManager = new EpgScrollManager(this);
-    this.scaleManager = new EpgScaleManager(this);
-    this.channelManager = new EpgChannelManager(this);
-    this.dataManager = new EpgDataManager(this);
-    this.renderManager = new EpgRenderManager(this);
+    // Hinweis: Instanziierung erfolgt in firstUpdated(), um Upgrades zu vermeiden
+    this.updateManager = null;
+    this.scrollManager = null;
+    this.scaleManager = null;
+    this.channelManager = null;
+    this.dataManager = null;
+    this.renderManager = null;
   }
 
   /**
@@ -303,6 +303,14 @@ export class EpgBox extends EpgElementBase {
   firstUpdated() {
     super.firstUpdated();
 
+    // Manager jetzt instanziieren (nachdem das Element vollständig konstruiert ist)
+    if (!this.updateManager) this.updateManager = new EpgUpdateManager(this);
+    if (!this.scrollManager) this.scrollManager = new EpgScrollManager(this);
+    if (!this.scaleManager) this.scaleManager = new EpgScaleManager(this);
+    if (!this.channelManager) this.channelManager = new EpgChannelManager(this);
+    if (!this.dataManager) this.dataManager = new EpgDataManager(this);
+    if (!this.renderManager) this.renderManager = new EpgRenderManager(this);
+
     // Speichere DOM-Referenzen für einfacheren Zugriff
     this.programBox = this.shadowRoot?.querySelector('.programBox');
     this.channelBox = this.shadowRoot?.querySelector('.channelBox');
@@ -355,7 +363,18 @@ export class EpgBox extends EpgElementBase {
 
     // Registriere als Environment Observer bei CardImpl
     // Registriere mich automatisch für View-Änderungen
-    this._subscribeChangeNotifys('progScrollX,envChanges,viewChanges');
+    this.dispatchEvent(
+      new CustomEvent('registerMeForChanges', {
+        bubbles: true,
+        composed: true,
+        detail: {
+          component: this,
+          callback: this._handleChangeNotifys.bind(this),
+          eventType: 'envChanges,viewChanges,progScrollX',
+          immediately: true,
+        },
+      })
+    );
 
     // this.dispatchEvent(
     //   new CustomEvent('register-observer-client', {
@@ -451,54 +470,68 @@ export class EpgBox extends EpgElementBase {
   /**
    * Behandelt Environment-Änderungen über Events
    */
-  _handle_envchangesFromEvent(eventdata) {
-    // Environment-Änderungen werden hier verarbeitet (falls nötig)
-    const { oldState, newState } = eventdata;
-    this._debug('_handle_envchangesFromEvent(): Environment-Änderung/Update empfangen', {
-      oldState,
-      newState,
-      newStateKeys: newState ? Object.keys(newState) : [],
-      currentEnvSnifferCardWidth: this.envSnifferCardWidth,
-      newCardWidth: newState?.envSnifferCardWidth,
+  _handleChangeNotifys(eventdata) {
+    this._debug('_handleEnvironmentChanged(): Environment-Änderung/Update empfangen', {
+      eventdata,
     });
 
-    // Aktualisiere Environment-Properties dynamisch
-    if (newState) {
-      const oldCardWidth = this.envSnifferCardWidth;
+    // Durchlaufe alle Keys in eventdata
+    for (const eventType of Object.keys(eventdata)) {
+      if (eventType === 'envchanges') {
+        const { oldState, newState } = eventdata[eventType];
+        this._debug('_handleEnvironmentChanged(): Environment-Änderung/Update empfangen', {
+          oldState,
+          newState,
+          newStateKeys: newState ? Object.keys(newState) : [],
+          currentEnvSnifferCardWidth: this.envSnifferCardWidth,
+          newCardWidth: newState?.envSnifferCardWidth,
+        });
 
-      // Durchlaufe alle Keys von newState und aktualisiere entsprechende Properties
-      for (const [key, value] of Object.entries(newState)) {
-        if (this.hasOwnProperty(key)) {
-          this[key] = value;
+        // Aktualisiere Environment-Properties dynamisch
+        if (newState) {
+          const oldCardWidth = this.envSnifferCardWidth;
+
+          // Durchlaufe alle Keys von newState und aktualisiere entsprechende Properties
+          for (const [key, value] of Object.entries(newState)) {
+            if (this.hasOwnProperty(key)) {
+              this[key] = value;
+            }
+          }
+
+          this._debug('_handleEnvironmentChanged(): Properties aktualisiert', {
+            oldCardWidth,
+            newCardWidth: this.envSnifferCardWidth,
+            cardHeight: this.envSnifferCardHeight,
+            updatedKeys: Object.keys(newState),
+          });
+
+          // Berechne Scale neu nach Environment-Änderungen
+          this.scaleManager.calculateScale();
+          this._debug('_handleEnvironmentChanged(): Scale nach Environment-Änderung berechnet', {
+            scale: this.scale,
+            containerWidth: this.containerWidth,
+            channelWidth: this.channelWidth,
+          });
         }
+
+        // Benachrichtige UpdateManager über env-Änderung
+        this.updateManager.handleUpdate(new Map([['env', newState]]));
+      } else if (eventType === 'viewchanges') {
+        // Verarbeitung für viewChanges
+        this._handleViewChanges(eventdata[eventType]);
+      } else if (eventType === 'progscrollx') {
+        // Verarbeitung für progScrollX - Scrollbar-Position setzen
+        this._handleProgScrollX(eventdata[eventType]);
       }
-
-      this._debug('_handle_envchangesFromEvent(): Properties aktualisiert', {
-        oldCardWidth,
-        newCardWidth: this.envSnifferCardWidth,
-        cardHeight: this.envSnifferCardHeight,
-        updatedKeys: Object.keys(newState),
-      });
-
-      // Berechne Scale neu nach Environment-Änderungen
-      this.scaleManager.calculateScale();
-      this._debug('_handle_envchangesFromEvent(): Scale nach Environment-Änderung berechnet', {
-        scale: this.scale,
-        containerWidth: this.containerWidth,
-        channelWidth: this.channelWidth,
-      });
     }
-
-    // Benachrichtige UpdateManager über env-Änderung
-    this.updateManager.handleUpdate(new Map([['env', newState]]));
   }
 
   /**
    * Behandelt View-Änderungen
    * @param {Object} data - View-Änderungsdaten
    */
-  _handle_viewchangesFromEvent(data) {
-    this._debug('_handle_viewchangesFromEvent(): View-Änderungen empfangen', { data });
+  _handleViewChanges(data) {
+    this._debug('_handleViewChanges(): View-Änderungen empfangen', { data });
     // Hier können View-spezifische Änderungen verarbeitet werden
     if (data && data.earliestProgramStart !== undefined && data.latestProgramStop !== undefined) {
       const scrollBarX = this.shadowRoot?.querySelector('.scrollbarx');
@@ -507,14 +540,14 @@ export class EpgBox extends EpgElementBase {
           '--scrollerWidth',
           `${(data.latestProgramStop - data.earliestProgramStart) * this.scale}px`
         );
-        this._debug('_handle_viewchangesFromEvent(): Scrollbar-Breite aktualisiert', {
+        this._debug('_handleViewChanges(): Scrollbar-Breite aktualisiert', {
           earliestProgramStart: data.earliestProgramStart,
           latestProgramStop: data.latestProgramStop,
           scrollerWidth: (data.latestProgramStop - data.earliestProgramStart) * this.scale,
         });
       } else {
         this._debug(
-          '_handle_viewchangesFromEvent(): scrollBarX Element nicht gefunden, überspringe Style-Update'
+          '_handleViewChanges(): scrollBarX Element nicht gefunden, überspringe Style-Update'
         );
       }
     }
@@ -524,7 +557,7 @@ export class EpgBox extends EpgElementBase {
    * Behandelt Program-Scroll-X Events
    * @param {Object} data - Scroll-Daten
    */
-  _handle_progscrollxFromEvent(data) {
+  _handleProgScrollX(data) {
     this._debug('_handleProgScrollX(): Program-Scroll-X Event empfangen', { data });
 
     if (data && typeof data.scrollLeft === 'number') {

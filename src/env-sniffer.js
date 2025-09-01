@@ -6,106 +6,118 @@ import { TgCardHelper } from './tools/tg-card-helper.js';
 export class EnvSniffer extends TgCardHelper {
   static className = 'EnvSniffer';
 
-  constructor(cardElement = null) {
-    super('EnvSniffer', false);
-    this.debugMarker = 'EnvSniffer: ';
-    this.cardElement = cardElement;
-    this.env = {
+  constructor(cardElement, eventTarget) {
+    super();
+    this.dM = `${this.constructor.className}: `; // debugMsgPrefix - Prefix für Debug-Nachrichten
+    this._cardElement = cardElement;
+    this._eventTarget = eventTarget || cardElement;
+    this.envDefault={
+      deviceType: 'unknown',
+      orientation: 'unknown',
+      isTouchscreen: false,
+      typeOfView: 'unknown',
+      screenWidth: 0,
+      screenHeight: 0,
       cardWidth: 0,
       cardHeight: 0,
-      orientation: 'horizontal',
-      deviceType: 'desktop',
-      theme: 'light',
-      viewport: 'desktop',
-      user: null,
+      cardPosition: null,
+      huiViewPosition: null
     };
-    this._debug(this.debugMarker + 'Initialisiert', this.getEnvironmentState());
-    this._lastState = null;
+    this.env = {... this.envDefault};
+    this.oldEnv = {... this.env};
+
     this._resizeObserver = null;
+    this._resizeTimeout = null;
     this._detectionInProgress = false;
-    this._retryCount = 0;
-    this._maxRetries = 10;
-    this._retryDelay = 100;
+    this._maxRetries = 50;
+
+    // Debouncing für Environment-Change-Events
+    this._debounceTimer = null;
+    this._debounceDelay = 150; // 50ms Verzögerung
+
+    this.init();
   }
 
   /**
    * Initialisiert die Umgebungsüberwachung
    */
-  init(cardElement) {
-    this.envSnifferCardElement = cardElement;
+  init(retryCount = 0) {
+
+    if (!this._cardElement || !(this._cardElement instanceof Element)) {
+      this._debug(`${this.dM}Initialisierung verzögert, warte...`, { retryCount });
+      if (retryCount < this._maxRetries) {
+        setTimeout(() => this.init(retryCount + 1), 100);
+      }
+      return;
+    }
+    const rect = this._cardElement.getBoundingClientRect();
+
+    // Prüfe ob gültige Dimensionen vorhanden sind
+    if (rect.width <= 0 || rect.height <= 0) {
+      if (retryCount < this._maxRetries) {
+        this._debug(`${this.dM}Initialisierung verzögert, warte...`, {
+          retryCount });
+
+        setTimeout(() => this.init(retryCount + 1), 100);
+      } else {
+        this._debug(`${this.dM}Max-Versuche erreicht, verwende Fallback-Dimensionen`);
+      }
+      return;
+    }
+    this.setupWindowEventListeners();
+    this.setupCardResizeObserver();
+
     this.detectEnvironment();
-    this.setupEventListeners();
-    this.setupResizeObserver();
-    this.detectEnvironment();
-
-    // Löse initiales Event aus, damit die Karte die Umgebung erkennt
-    const initialState = this.getEnvironmentState();
-    this._debug(this.debugMarker + 'Initialisiert', this.getEnvironmentState());
-    this.dispatchEnvironmentChangeEvent(null, initialState);
-  }
-
-  /**
-   * Event-Listener hinzufügen
-   */
-  addEventListener(type, listener) {
-    this.envSnifferEventTarget.addEventListener(type, listener);
-  }
-
-  /**
-   * Event-Listener entfernen
-   */
-  removeEventListener(type, listener) {
-    this.envSnifferEventTarget.removeEventListener(type, listener);
+    this._debug(`${this.dM}Initialisiert`, this.env);
   }
 
   /**
    * Erkennt die aktuelle Umgebung
    */
-  detectEnvironment() {
+  detectEnvironment(sendEvent= false) {
     // Verhindere mehrfache Aufrufe während Retry-Schleife
     if (this._detectionInProgress) {
-      this._debug(this.debugMarker + 'detectEnvironment bereits in Bearbeitung, überspringe');
+      this._debug(`${this.dM}detectEnvironment bereits in Bearbeitung, überspringe`);
       return;
     }
-
     this._detectionInProgress = true;
+    this.oldEnv = {... this.env};
 
-    const oldState = this.getEnvironmentState();
+    // Touchscreen über CSS Media Queries
+    this.env.isTouchscreen = this.detectTouchscreen();
+
+    // Desktop vs Mobile über CSS Media Queries
+    this.env.deviceType = this.detectDeviceType();
+
+    // Orientierung über CSS Media Queries
+    this.env.orientation = this.detectOrientation();
 
     // Bildschirm-Größe
     this.env.screenWidth = window.innerWidth;
     this.env.screenHeight = window.innerHeight;
 
-    // Desktop vs Mobile über CSS Media Queries
-    this.detectDeviceType();
-
-    // Orientierung über CSS Media Queries
-    this.detectOrientation();
-
-    // Touchscreen
-    this.env.isTouchscreen = this.detectTouchscreen();
-
     // Karten-Größe (mit Retry-Mechanismus)
     this.updateCardDimensions();
 
-    // View-Typ
+    // View-Typ wenn Lovelace-Kontext erkannt
     this.env.typeOfView = this.detectLovelaceContext();
 
-    // Hui-View-Position
-    this.detectHuiViewPosition();
-    this._debug(this.debugMarker + 'View-Typ erkannt', {
-      envSnifferTypeOfView: this.env.typeOfView,
-      cardElement: this.cardElement?.tagName,
-      parentElement: this.cardElement?.parentElement?.tagName,
-      grandParent: this.cardElement?.parentElement?.parentElement?.tagName,
-    });
+    // Hui-View-Position und card position
+    this.updateHuiViewPosition();
 
-    // Prüfe auf Änderungen und sende Event
-    const newState = this.getEnvironmentState();
-    if (this.hasEnvironmentChanged(oldState, newState)) {
-      this.dispatchEnvironmentChangeEvent(oldState, newState);
+    if (sendEvent) {
+      this._debug(`${this.dM}Umgebung geändert, sofortige Event-Benachrichtigung`, { oldEnv: this.oldEnv, newEnv: this.env });
+      this.dispatchEnvironmentChangeEvent(this.oldEnv, this.env);
+      if (this._debounceTimer) {
+        clearTimeout(this._debounceTimer);
+        this._debounceTimer = null;
+      }
+
     }
-
+    if ((!sendEvent) && (this._debounceTimer || this.checkEnvironmentChange())) {
+      this._debug(`${this.dM}Umgebung geändert, mit Verzögerung`, { oldEnv: this.oldEnv, newEnv: this.env });
+      this._debounceEnvironmentChange();
+    }
     this._detectionInProgress = false;
   }
 
@@ -114,19 +126,11 @@ export class EnvSniffer extends TgCardHelper {
    */
   detectDeviceType() {
     // Mobile: Kein Hover + grobe Pointer
-    const isMobile = window.matchMedia('(hover: none) and (pointer: coarse)').matches;
-    // Desktop: Hover + feine Pointer
-    const isDesktop = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
-
-    // Setze Gerätetyp basierend auf Media Queries
-    if (isMobile) {
-      this.env.deviceType = 'mobile';
-    } else if (isDesktop) {
-      this.env.deviceType = 'desktop';
-    } else {
-      // Fallback: Verwende Touchscreen als Indikator
-      this.env.deviceType = this.env.isTouchscreen ? 'mobile' : 'desktop';
-    }
+    return window.matchMedia('(hover: none) and (pointer: coarse)').matches ?
+    'mobile' :
+    window.matchMedia('(hover: hover) and (pointer: fine)').matches ?
+    'desktop' :
+    this.env.isTouchscreen ? 'mobile' : 'unknown';
   }
 
   /**
@@ -134,29 +138,21 @@ export class EnvSniffer extends TgCardHelper {
    */
   detectOrientation() {
     // Portrait: Höhe größer als Breite
-    const isVertical = window.matchMedia('(orientation: portrait)').matches;
-    // Landscape: Breite größer als Höhe
-    const isHorizontal = window.matchMedia('(orientation: landscape)').matches;
-
-    // Setze Orientierung basierend auf Media Queries
-    if (isVertical) {
-      this.env.orientation = 'vertical';
-    } else if (isHorizontal) {
-      this.env.orientation = 'horizontal';
-    } else {
-      // Fallback: Verwende manuelle Berechnung
-      this.env.orientation =
-        this.env.screenWidth > this.env.screenHeight ? 'horizontal' : 'vertical';
-    }
+    return window.matchMedia ?
+      window.matchMedia('(orientation: portrait)').matches ? "portrait" :
+      window.matchMedia('(orientation: landscape)').matches ? "landscape" :
+      "unknown" :
+    window.innerWidth > window.innerHeight ? "landscape" : "portrait";
   }
 
   /**
    * Erkennt Touchscreen
    */
   detectTouchscreen() {
-    return (
-      'ontouchstart' in window || navigator.maxTouchPoints > 0 || navigator.msMaxTouchPoints > 0
-    );
+    // Primär über Media Queries (zuverlässiger)
+    return window.matchMedia ?
+    window.matchMedia('(pointer: coarse)').matches || window.matchMedia('(hover: none)').matches :
+    'ontouchstart' in window || navigator.maxTouchPoints > 0 || navigator.msMaxTouchPoints > 0;
   }
 
   /**
@@ -186,9 +182,9 @@ export class EnvSniffer extends TgCardHelper {
   /**
    * Erkennt die Hui-View-Position und Kartenposition
    */
-  detectHuiViewPosition() {
-    if (!this.envSnifferCardElement) {
-      this._debug(this.debugMarker + 'Kein Card-Element für Hui-View-Erkennung');
+  updateHuiViewPosition() {
+    if (!this._cardElement) {
+      this._debug(`${this.dM}Kein Card-Element für Hui-View-Erkennung`);
       return;
     }
 
@@ -198,7 +194,7 @@ export class EnvSniffer extends TgCardHelper {
     if (huiView) {
       // Hui-View Position relativ zum Viewport
       const huiViewRect = huiView.getBoundingClientRect();
-      this.huiViewPosition = {
+      this.env.huiViewPosition = {
         left: huiViewRect.left,
         top: huiViewRect.top,
         width: huiViewRect.width,
@@ -206,85 +202,35 @@ export class EnvSniffer extends TgCardHelper {
       };
 
       // Kartenposition relativ zum Hui-View
-      const cardRect = this.envSnifferCardElement.getBoundingClientRect();
-      this.cardPosition = {
+      const cardRect = this._cardElement.getBoundingClientRect();
+      this.env.cardPosition = {
         left: cardRect.left - huiViewRect.left,
         top: cardRect.top - huiViewRect.top,
       };
 
-      this._debug(this.debugMarker + 'Hui-View-Position erkannt', {
-        huiViewPosition: this.huiViewPosition,
-        cardPosition: this.cardPosition,
+      this._debug(`${this.dM}Hui-View-Position erkannt`, {
+        huiViewPosition: this.env.huiViewPosition,
+        cardPosition: this.env.cardPosition,
       });
     } else {
       // Fallback: Verwende Viewport als Hui-View
-      this.huiViewPosition = {
+      this.env.huiViewPosition = {
         left: 0,
         top: 0,
         width: window.innerWidth,
         height: window.innerHeight,
       };
 
-      const cardRect = this.envSnifferCardElement.getBoundingClientRect();
-      this.cardPosition = {
+      const cardRect = this._cardElement.getBoundingClientRect();
+      this.env.cardPosition = {
         left: cardRect.left,
         top: cardRect.top,
       };
 
-      this._debug(this.debugMarker + 'Hui-View nicht gefunden, verwende Viewport', {
-        huiViewPosition: this.huiViewPosition,
-        cardPosition: this.cardPosition,
+      this._debug(`${this.dM}Hui-View nicht gefunden, verwende Viewport`, {
+        huiViewPosition: this.env.huiViewPosition,
+        cardPosition: this.env.cardPosition,
       });
-    }
-  }
-
-  /**
-   * Ermittelt das aktuelle Theme
-   * @returns {string} Theme (light/dark)
-   */
-  _getCurrentTheme() {
-    try {
-      // Prüfe ob wir in einer Browser-Umgebung sind
-      if (typeof document === 'undefined' || typeof getComputedStyle === 'undefined') {
-        this._debug(this.debugMarker + 'Nicht in Browser-Umgebung, verwende Standard-Theme');
-        return 'light';
-      }
-
-      // Einfache Theme-Erkennung über CSS-Variablen
-      const computedStyle = getComputedStyle(document.documentElement);
-      const backgroundColor = computedStyle.getPropertyValue('--primary-background-color');
-
-      // Dunkle Hintergrundfarbe deutet auf dunkles Theme hin
-      if (backgroundColor && backgroundColor.includes('rgb(0, 0, 0)')) {
-        return 'dark';
-      }
-      return 'light';
-    } catch (error) {
-      this._debug(this.debugMarker + 'Fehler bei Theme-Erkennung, verwende Standard-Theme', {
-        error,
-      });
-      return 'light';
-    }
-  }
-
-  /**
-   * Ermittelt den aktuellen Viewport-Typ
-   * @returns {string} Viewport-Typ (mobile/desktop)
-   */
-  _getViewportType() {
-    try {
-      // Prüfe ob wir in einer Browser-Umgebung sind
-      if (typeof window === 'undefined') {
-        this._debug(this.debugMarker + 'Nicht in Browser-Umgebung, verwende Standard-Viewport');
-        return 'desktop';
-      }
-
-      return window.innerWidth < 768 ? 'mobile' : 'desktop';
-    } catch (error) {
-      this._debug(this.debugMarker + 'Fehler bei Viewport-Erkennung, verwende Standard-Viewport', {
-        error,
-      });
-      return 'desktop';
     }
   }
 
@@ -292,7 +238,7 @@ export class EnvSniffer extends TgCardHelper {
    * Findet einen Ancestor-Element durch Shadow DOMs hindurch
    */
   _findAncestorThroughShadowDOM(selector) {
-    let element = this.envSnifferCardElement;
+    let element = this._cardElement;
 
     while (element) {
       // Prüfe ob das aktuelle Element dem Selector entspricht
@@ -318,289 +264,140 @@ export class EnvSniffer extends TgCardHelper {
    * Aktualisiert Karten-Dimensionen
    */
   updateCardDimensions() {
-    this._updateCardDimensionsWithRetry();
-  }
-
-  /**
-   * Aktualisiert Karten-Dimensionen mit Retry-Mechanismus
-   */
-  _updateCardDimensionsWithRetry(retryCount = 0) {
-    const maxRetries = 50; // 5 Sekunden (50 * 100ms)
-
-    if (!this.envSnifferCardElement) {
-      this._debug(this.debugMarker + 'cardElement nicht verfügbar, warte...', { retryCount });
-      if (retryCount < maxRetries) {
-        setTimeout(() => this._updateCardDimensionsWithRetry(retryCount + 1), 100);
-      }
+    if (!this._cardElement) {
+      this._debug(`${this.dM}Kein Card-Element für Karten-Dimensionen`);
       return;
     }
 
-    const rect = this.envSnifferCardElement.getBoundingClientRect();
-
-    // Prüfe ob gültige Dimensionen vorhanden sind
-    if (rect.width <= 0 || rect.height <= 0) {
-      this._debug(this.debugMarker + 'Karten-Dimensionen noch 0, warte...', {
-        width: rect.width,
-        height: rect.height,
-        retryCount,
-      });
-
-      if (retryCount < maxRetries) {
-        setTimeout(() => this._updateCardDimensionsWithRetry(retryCount + 1), 100);
-      } else {
-        this._debug(this.debugMarker + 'Max-Versuche erreicht, verwende Fallback-Dimensionen');
-        // Verwende Fallback-Dimensionen
-        this.env.cardWidth = 0;
-        this.env.cardHeight = 0;
-        // Löse Event aus mit Fallback-Werten
-        this._triggerEnvironmentUpdate();
-      }
-      return;
-    }
+    const rect = this._cardElement.getBoundingClientRect();
 
     // Gültige Dimensionen gefunden
-    this.env.cardWidth = rect.width;
-    this.env.cardHeight = rect.height;
+    this.env.cardWidth = rect.width || 0;
+    this.env.cardHeight = rect.height || 0;
 
-    if (retryCount > 0) {
-      this._debug(this.debugMarker + 'Karten-Dimensionen erfolgreich aktualisiert', {
-        width: this.env.cardWidth,
-        height: this.env.cardHeight,
-        retryCount,
-      });
-      // Löse Event aus mit neuen Werten
-      this._triggerEnvironmentUpdate();
     }
+
+
+  /**
+   * Fügt benutzerdefinierte Umgebungsvariablen hinzu
+   */
+  addSnifferVariables(envVariables) {
+    this.env = { ...this.env, ...envVariables };
+    this.detectEnvironment();
   }
 
   /**
-   * Löst ein Environment-Update-Event aus
+   * Löst manuell eine Umgebungsaktualisierung aus
    */
-  _triggerEnvironmentUpdate() {
-    // oldState vor der Änderung speichern
-    this.oldState = { ...this.env };
-
-    // Neuen Zustand ermitteln (kann sich von this.env unterscheiden)
-    this.newState = this.getEnvironmentState();
-
-    // Prüfe ob sich tatsächlich etwas geändert hat
-    if (this.hasEnvironmentChanged(this.oldState, this.newState)) {
-      // Aktualisiere this.env mit den neuen Werten
-      this.env = { ...this.newState };
-
-      this._debug(this.debugMarker + 'Environment-Update ausgelöst', {
-        oldState: this.oldState,
-        newState: this.newState,
-        changed: true,
-      });
-
-      this.dispatchEnvironmentChangeEvent(this.oldState, this.newState);
-    } else {
-      this._debug(this.debugMarker + 'Keine Änderungen erkannt, kein Event gesendet', {
-        oldState: this.oldState,
-        newState: this.newState,
-        changed: false,
-      });
-    }
+  triggerSnifferUpdate() {
+    this.detectEnvironment(true);
   }
 
   /**
    * Gibt den aktuellen Umgebungszustand zurück
    */
-  getEnvironmentState() {
-    // Hole den aktuellen Zustand der Umgebung (nicht nur this.env kopieren)
-    return {
-      deviceType: this.env.deviceType,
-      orientation: this.env.orientation,
-      cardWidth: this.env.cardWidth,
-      cardHeight: this.env.cardHeight,
-      isTouchscreen: this.env.isTouchscreen,
-      typeOfView: this.env.typeOfView,
-      screenWidth: this.env.screenWidth,
-      screenHeight: this.env.screenHeight,
-      huiViewPosition: this.huiViewPosition,
-      cardPosition: this.cardPosition,
-      // Benutzerdefinierte Variablen beibehalten
-      ...Object.fromEntries(
-        Object.entries(this.env).filter(
-          ([key]) =>
-            ![
-              'deviceType',
-              'orientation',
-              'cardWidth',
-              'cardHeight',
-              'isTouchscreen',
-              'typeOfView',
-              'screenWidth',
-              'screenHeight',
-            ].includes(key)
-        )
-      ),
-    };
+  getSnifferState() {
+    return this.env;
   }
 
   /**
-   * Prüft, ob sich die Umgebung geändert hat
+   * Bereinigt den Sniffer und setzt alle Werte zurück
    */
-  hasEnvironmentChanged(oldState, newState) {
-    // Fallback für null/undefined
-    if (!oldState || !newState) {
-      return true;
+  cleanSniffer() {
+    this.cleanupEventListeners();
+    this.cleanupResizeObserver();
+
+    // Debounce-Timer bereinigen
+    if (this._debounceTimer) {
+      clearTimeout(this._debounceTimer);
+      this._debounceTimer = null;
     }
 
-    // Vergleiche alle Properties einzeln
-    const keys = new Set([...Object.keys(oldState), ...Object.keys(newState)]);
+    this.env = { ...this.envDefault };
+    this.oldEnv = { ...this.env };  // Kopie des leeren Objekts
+    this._cardElement = null;
+    this._eventTarget = null;
+  }
 
-    for (const key of keys) {
-      const oldValue = oldState[key];
-      const newValue = newState[key];
 
-      // Primitive Werte direkt vergleichen
-      if (typeof oldValue !== 'object' || typeof newValue !== 'object') {
-        if (oldValue !== newValue) {
-          return true;
-        }
-      } else {
-        // Objekte (huiViewPosition, cardPosition) deep vergleichen
-        if (!this._deepEqual(oldValue, newValue)) {
-          return true;
-        }
+  checkEnvironmentChange() {
+    let changed = false;
+    for (const key in this.env) {
+      if (!this.oldEnv[key] || this.env[key] !== this.oldEnv[key]) {
+        changed = true;
+        break;
       }
     }
-
-    return false;
+    return changed
   }
 
   /**
-   * Deep Equality Check für Objekte
+   * Debouncing für Environment-Change-Events
+   * Verhindert Event-Spam während der Initialisierung
    */
-  _deepEqual(obj1, obj2) {
-    if (obj1 === obj2) return true;
-    if (!obj1 || !obj2) return false;
-    if (typeof obj1 !== 'object' || typeof obj2 !== 'object') return obj1 === obj2;
-
-    const keys1 = Object.keys(obj1);
-    const keys2 = Object.keys(obj2);
-
-    if (keys1.length !== keys2.length) return false;
-
-    for (const key of keys1) {
-      if (!keys2.includes(key)) return false;
-      if (!this._deepEqual(obj1[key], obj2[key])) return false;
+  _debounceEnvironmentChange() {
+    // Vorherigen Timer löschen
+    if (this._debounceTimer) {
+      clearTimeout(this._debounceTimer);
+      this._debounceTimer = null;
     }
 
-    return true;
+    // Neuen Timer setzen
+    this._debounceTimer = setTimeout(() => {
+      this.dispatchEnvironmentChangeEvent(this.oldEnv, this.env);
+      this._debounceTimer = null;
+    }, this._debounceDelay);
   }
 
   /**
    * Sendet ein Event bei Umgebungsänderungen
    */
   dispatchEnvironmentChangeEvent(oldState, newState) {
-    // Prüfe ob der EnvSniffer vollständig initialisiert ist
-    if (!this.envSnifferCardElement || !this.env) {
-      this._debug(
-        this.debugMarker +
-          'dispatchEnvironmentChangeEvent: EnvSniffer noch nicht vollständig initialisiert, überspringe Event'
-      );
-      return;
-    }
-
     // Aktualisiere die öffentliche env-Property
-    this.env = newState;
+    this._debug(`${this.dM}Umgebungsänderung, Event-Benachrichtigung`, { oldState: oldState, newState: newState });
 
     const event = new CustomEvent('envchanges-event', {
       detail: {
         oldState,
         newState,
-        currentState: newState,
       },
       bubbles: true,
       composed: true,
     });
 
-    this.envSnifferEventTarget.dispatchEvent(event);
+    this._eventTarget.dispatchEvent(event);
 
-    // Optional: Event auch auf dem Karten-Element auslösen
-    if (this.envSnifferCardElement) {
-      this.envSnifferCardElement.dispatchEvent(event);
-    }
   }
 
-  /**
-   * Setter für Umgebungsvariablen
-   * @param {Object} newEnvVars - Neue Umgebungsvariablen (z.B. {user: 'fritz'})
-   */
-  setEnvVariables(newEnvVars) {
-    if (!newEnvVars || typeof newEnvVars !== 'object') {
-      this._debug(this.debugMarker + 'setEnvVariables: Ungültige Parameter', { newEnvVars });
-      return;
-    }
-
-    this.oldState = { ...this.env };
-    let hasChanges = false;
-
-    // Neue Variablen setzen oder bestehende ändern
-    for (const [key, value] of Object.entries(newEnvVars)) {
-      if (this.env[key] !== value) {
-        this.env[key] = value;
-        hasChanges = true;
-        this._debug(this.debugMarker + 'setEnvVariables: Variable gesetzt/geändert', {
-          key,
-          value,
-        });
-      }
-    }
-
-    // Event auslösen falls sich etwas geändert hat
-    if (hasChanges) {
-      this.newState = { ...this.env };
-      this._debug(
-        this.debugMarker + 'setEnvVariables: Änderungen erkannt, löse envchanges-event aus',
-        {
-          oldState: this.oldState,
-          newState: this.newState,
-        }
-      );
-      this.dispatchEnvironmentChangeEvent(this.oldState, this.newState);
-    } else {
-      this._debug(this.debugMarker + 'setEnvVariables: Keine Änderungen, kein Event ausgelöst');
-    }
-  }
   /**
    * Richtet Event-Listener ein
    */
-  setupEventListeners() {
+  setupWindowEventListeners() {
     // Window Resize
-    window.addEventListener('resize', this.handleResize.bind(this));
+    window.addEventListener('resize', this.handleWindowResize.bind(this));
 
     // Orientation Change
     window.addEventListener('orientationchange', this.handleOrientationChange.bind(this));
-
-    // Touch Events für Touchscreen-Erkennung
-    if ('ontouchstart' in window) {
-      document.addEventListener('touchstart', this.handleTouchStart.bind(this), { once: true });
-    }
   }
 
   /**
    * Bereinigt Event-Listener
    */
   cleanupEventListeners() {
-    window.removeEventListener('resize', this.handleResize.bind(this));
+    window.removeEventListener('resize', this.handleWindowResize.bind(this));
     window.removeEventListener('orientationchange', this.handleOrientationChange.bind(this));
-    document.removeEventListener('touchstart', this.handleTouchStart.bind(this));
   }
 
   /**
    * Richtet Resize Observer ein
    */
-  setupResizeObserver() {
-    if (this.envSnifferCardElement && window.ResizeObserver) {
-      this.envSnifferResizeObserver = new ResizeObserver(this.handleCardResize.bind(this));
-      this.envSnifferResizeObserver.observe(this.envSnifferCardElement);
+  setupCardResizeObserver() {
+    if (this._cardElement && window.ResizeObserver) {
+      this._resizeObserver = new ResizeObserver(this.handleCardResize.bind(this));
+      this._resizeObserver.observe(this._cardElement);
     } else {
-      this._debug(this.debugMarker + 'ResizeObserver nicht verfügbar', {
-        cardElement: this.envSnifferCardElement,
+      this._debug(`${this.dM}ResizeObserver nicht verfügbar`, {
+        cardElement: this._cardElement,
         window: window,
         ResizeObserver: window.ResizeObserver,
       });
@@ -611,22 +408,22 @@ export class EnvSniffer extends TgCardHelper {
    * Bereinigt Resize Observer
    */
   cleanupResizeObserver() {
-    if (this.envSnifferResizeObserver) {
-      this.envSnifferResizeObserver.disconnect();
-      this.envSnifferResizeObserver = null;
+    if (this._resizeObserver) {
+      this._resizeObserver.disconnect();
+      this._resizeObserver = null;
     }
   }
 
   /**
    * Handler für Window Resize
    */
-  handleResize() {
+  handleWindowResize() {
     // Debounce Resize-Events
-    if (this.envSnifferResizeTimeout) {
-      clearTimeout(this.envSnifferResizeTimeout);
+    if (this._resizeTimeout) {
+      clearTimeout(this._resizeTimeout);
     }
 
-    this.envSnifferResizeTimeout = setTimeout(() => {
+    this._resizeTimeout = setTimeout(() => {
       this.detectEnvironment();
     }, 100);
   }
@@ -641,64 +438,12 @@ export class EnvSniffer extends TgCardHelper {
     }, 200);
   }
 
-  /**
-   * Handler für Touch Start
-   */
-  handleTouchStart() {
-    this.env.isTouchscreen = true;
-    this.detectEnvironment();
-  }
 
   /**
    * Handler für Karten-Resize
    */
   handleCardResize() {
-    this.updateCardDimensions();
-    this.detectHuiViewPosition(); // Aktualisiere Hui-View-Position bei Kartenänderungen
     this.detectEnvironment();
   }
 
-  /**
-   * Gibt Umgebungsinformationen als Objekt zurück
-   */
-  getEnvironmentInfo() {
-    return this.getEnvironmentState();
-  }
-
-  /**
-   * Prüft, ob eine bestimmte Umgebungsbedingung erfüllt ist
-   */
-  matchesCondition(condition) {
-    switch (condition) {
-      case 'desktop':
-        return this.env.deviceType === 'desktop';
-      case 'mobile':
-        return this.env.deviceType === 'mobile';
-      case 'horizontal':
-        return this.env.orientation === 'horizontal';
-      case 'vertical':
-        return this.env.orientation === 'vertical';
-      case 'touchscreen':
-        return this.env.isTouchscreen;
-      case 'sidebar':
-        return this.env.typeOfView === 'sidebar';
-      case 'panel':
-        return this.env.typeOfView === 'panel';
-      case 'tile':
-        return this.env.typeOfView === 'tile';
-      case 'abschnitt':
-        return this.env.typeOfView === 'abschnitt';
-      default:
-        return false;
-    }
-  }
-
-  /**
-   * Bereinigt alle Ressourcen
-   */
-  destroy() {
-    this.cleanupEventListeners();
-    this.cleanupResizeObserver();
-    this.envSnifferCardElement = null;
-  }
 }

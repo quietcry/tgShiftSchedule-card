@@ -35,6 +35,7 @@ export class EpgProgramBox extends EpgElementBase {
 
   constructor() {
     super();
+    this.dM = `${this.constructor.className||"?"}: `; // debugMsgPrefix - Prefix für Debug-Nachrichten
 
     // Initialisiere Properties
     this.programs = [];
@@ -43,7 +44,7 @@ export class EpgProgramBox extends EpgElementBase {
     this.scrollTop = 0;
     this.containerWidth = 0;
     this.channelWidth = 180;
-    this.env = {};
+    this.env = null;
     this.scrollPositionSeconds = 0;
     this.programaticalScroll = false;
 
@@ -61,28 +62,31 @@ export class EpgProgramBox extends EpgElementBase {
   firstUpdated() {
     super.firstUpdated();
 
-    this._debug('ProgramBox: firstUpdated');
+    this._debug(`${this.dM}firstUpdated`);
 
     // Initialisiere RenderManager
     this.renderManager = new EpgRenderManager(this);
-    this._subscribeChangeNotifys('progScrollX,envChanges,viewChanges');
 
-    this._debug('ProgramBox: Registrierung für Environment-Änderungen abgeschlossen');
+    // Registriere mich für Environment-Änderungen
+    this.registerMeForChangeNotifys('progScrollX,envChanges,viewChanges');
+
+    this._debug(`${this.dM}Registrierung für Environment-Änderungen abgeschlossen`);
   }
 
-  _handle_viewchangesFromEvent(eventdata) {}
-  _handle_envchangesFromEvent(eventdata) {
-    // Environment-Änderungen werden hier verarbeitet (falls nötig)
+  _handleOnChangeNotify_Envchanges(eventdata) {
+    const dM= `${this.dM||"?: "}_handleOnChangeNotify_Envchanges()`
     const { oldState, newState } = eventdata;
-
-    this._debug('ProgramBox: Environment-Änderungen empfangen', {
+    this._debug(`${dM}Environment-Änderungen empfangen`, {
       oldState,
       newState,
     });
-
     // Update Environment-Properties
     if (newState) {
       let updated = false;
+      if (!this.env) {
+        this.env = { ...newState };
+        updated = true;
+      }
 
       if (newState.cardWidth !== undefined && this.containerWidth !== newState.cardWidth) {
         this.containerWidth = newState.cardWidth;
@@ -100,22 +104,31 @@ export class EpgProgramBox extends EpgElementBase {
       }
 
       if (updated) {
-        this._debug('ProgramBox: Environment-Properties aktualisiert', {
+        this._debug(`${dM}Environment-Properties aktualisiert`, {
           containerWidth: this.containerWidth,
           env: this.env,
         });
       }
     }
   }
-  _handle_progscrollxFromEvent(eventdata) {
+
+  _handleOnChangeNotify_Progscrollx(eventdata) {
+    const dM= `${this.dM||"?: "}_handleOnChangeNotify_Progscrollx()`
     const scrollevent = eventdata;
     this.programaticalScroll = true;
     this.programBox.scrollLeft = scrollevent.scrollLeft;
-    this._debug('ProgramBox: progscrollx event empfangen', {
+    this._debug(`${dM}progscrollx event empfangen`, {
       element: this.programBox,
       scrollLeft: scrollevent.scrollLeft,
       scrollLeftReal: this.programBox.scrollLeft,
       scrollevent,
+    });
+  }
+  _handleOnChangeNotify_Viewchanges(eventdata) {
+    const dM= `${this.dM||"?: "}_handleOnChangeNotify_Viewchanges()`
+    this._debug(`${dM}viewchanges event empfangen`, {
+      element: this,
+      eventdata: eventdata,
     });
   }
 

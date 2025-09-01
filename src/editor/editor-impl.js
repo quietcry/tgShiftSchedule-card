@@ -23,8 +23,6 @@ export class EditorImpl extends EditorBase {
     _groupOrderError: { type: String },
   };
 
-  static className = 'EditorImpl';
-
   constructor() {
     super({
       entity: '',
@@ -44,16 +42,14 @@ export class EditorImpl extends EditorBase {
       epgShowPastTime: DefaultEpgShowPastTime,
       channelWidth: 180,
     });
-    this.debugMarker = 'EditorImpl: ';
-    this._debug(this.debugMarker + 'Modul wird geladen');
-    this._debug(this.debugMarker + 'Modul wird geladen');
+    this._debug(`EditorImpl-Modul wird geladen`);
     this._selectedTab = 0;
     this._yamlError = '';
     this._groupOrderError = '';
   }
 
   async firstUpdated() {
-    this._debug(this.debugMarker + 'firstUpdated wird aufgerufen');
+    this._debug(`EditorImpl firstUpdated wird aufgerufen`);
     await super.firstUpdated();
 
     // Initialisiere group_order als YAML-String, falls es als Array vorliegt
@@ -61,19 +57,19 @@ export class EditorImpl extends EditorBase {
       const yamlString = this._convertArrayToYaml(this.config.group_order);
       this.config.group_order = yamlString;
       this.config.group_order_parsed = this.config.group_order;
-      this._debug(this.debugMarker + 'group_order beim ersten Laden initialisiert:', yamlString);
+      this._debug('EditorImpl: group_order beim ersten Laden initialisiert:', yamlString);
     }
-    this._debug(this.debugMarker + 'firstUpdated abgeschlossen');
+    this._debug(`EditorImpl firstUpdated abgeschlossen`);
   }
 
   render() {
-    this._debug(this.debugMarker + 'render wird aufgerufen');
+    this._debug('EditorImpl render wird aufgerufen');
     if (!this.hass) {
-      this._debug(this.debugMarker + 'render: Kein hass');
+      this._debug(`EditorImpl render: Kein hass`);
       return html`<div>Loading...</div>`;
     }
 
-    this._debug(this.debugMarker + 'render mit config:', this.config);
+    this._debug(`EditorImpl render mit config:`, this.config);
     return html`
       <div class="card-config">
         <ha-form
@@ -327,17 +323,17 @@ export class EditorImpl extends EditorBase {
         return 'EPG Anzeigebreite (Minuten)';
       case 'epgShowPastTime':
         return 'EPG Rückblick (Minuten)';
-      case 'epgExtendConfig':
-        return 'Erweiterte Konfiguration (YAML)';
       // case 'useDummyData':
       //   return 'Dummy-Daten verwenden';
+      case 'show_shorttext':
+        return 'Kurztext anzeigen';
       default:
         return schema.name;
     }
   }
 
   _valueChanged(ev) {
-    this._debug(this.debugMarker + '_valueChanged wird aufgerufen mit:', ev.detail);
+    this._debug('EditorImpl _valueChanged wird aufgerufen mit:', ev.detail);
 
     const newValue = ev.detail.value;
 
@@ -345,15 +341,12 @@ export class EditorImpl extends EditorBase {
     if (newValue.group_order !== undefined) {
       const validationResult = this._validateYaml(newValue.group_order);
       if (!validationResult.isValid) {
-        this._debug(
-          this.debugMarker + 'group_order YAML-Validierungsfehler:',
-          validationResult.error
-        );
+        this._debug('EditorImpl: group_order YAML-Validierungsfehler:', validationResult.error);
         console.warn('group_order YAML-Validierungsfehler:', validationResult.error);
         this._groupOrderError = validationResult.error;
         this.requestUpdate();
       } else {
-        this._debug(this.debugMarker + 'group_order YAML ist gültig');
+        this._debug('EditorImpl: group_order YAML ist gültig');
         if (this._groupOrderError) {
           this._groupOrderError = '';
           this.requestUpdate();
@@ -362,10 +355,10 @@ export class EditorImpl extends EditorBase {
         // Parse den String als YAML für die Verwendung
         try {
           const groupOrder = yaml.load(newValue.group_order);
-          this._debug(this.debugMarker + 'group_order YAML geparst:', groupOrder);
+          this._debug('EditorImpl: group_order YAML geparst:', groupOrder);
           this.config.group_order_parsed = groupOrder;
         } catch (error) {
-          this._debug(this.debugMarker + 'Fehler beim Parsen der group_order:', error);
+          this._debug('EditorImpl: Fehler beim Parsen der group_order:', error);
           this.config.group_order_parsed = [];
         }
       }
@@ -375,7 +368,7 @@ export class EditorImpl extends EditorBase {
       ...this.config,
       ...newValue,
     };
-    this._debug(this.debugMarker + 'config nach _valueChanged:', this.config);
+    this._debug('EditorImpl config nach _valueChanged:', this.config);
     this.dispatchEvent(
       new CustomEvent('config-changed', {
         detail: { config: this.config },
@@ -387,11 +380,11 @@ export class EditorImpl extends EditorBase {
 
   _parseGroupOrderYaml(yamlString) {
     if (!yamlString || !yamlString.trim()) {
-      this._debug(this.debugMarker + 'Leere YAML-String, gebe leeres Array zurück');
+      this._debug('EditorImpl: Leere YAML-String, gebe leeres Array zurück');
       return [];
     }
 
-    this._debug(this.debugMarker + 'Parse YAML-String:', yamlString);
+    this._debug('EditorImpl: Parse YAML-String:', yamlString);
 
     const lines = yamlString
       .split('\n')
@@ -401,13 +394,13 @@ export class EditorImpl extends EditorBase {
     let currentGroup = null;
 
     for (const line of lines) {
-      this._debug(this.debugMarker + 'Verarbeite Zeile:', line);
+      this._debug('EditorImpl: Verarbeite Zeile:', line);
 
       // Prüfe ob es eine Gruppe ist (beginnt mit - und hat keine Unterpunkte)
       if (line.startsWith('- ') && !line.includes('  - ') && !line.includes('name:')) {
         const groupName = line.substring(2).trim();
         if (groupName) {
-          this._debug(this.debugMarker + 'Neue Gruppe gefunden:', groupName);
+          this._debug('EditorImpl: Neue Gruppe gefunden:', groupName);
           currentGroup = {
             name: groupName,
             channels: [],
@@ -419,7 +412,7 @@ export class EditorImpl extends EditorBase {
       else if (line.startsWith('  - ') && currentGroup) {
         const channelName = line.substring(4).trim();
         if (channelName) {
-          this._debug(this.debugMarker + 'Kanal zu Gruppe hinzugefügt:', channelName);
+          this._debug('EditorImpl: Kanal zu Gruppe hinzugefügt:', channelName);
           currentGroup.channels.push({
             name: channelName,
           });
@@ -427,15 +420,15 @@ export class EditorImpl extends EditorBase {
       }
       // Ignoriere andere Zeilen (tolerant)
       else {
-        this._debug(this.debugMarker + 'Ignoriere Zeile:', line);
+        this._debug('EditorImpl: Ignoriere Zeile:', line);
       }
     }
 
-    this._debug(this.debugMarker + 'YAML geparst:', { yamlString, result: groups });
+    this._debug('EditorImpl: YAML geparst:', { yamlString, result: groups });
 
     // Sicherheitscheck: Stelle sicher, dass es ein Array ist
     if (!Array.isArray(groups)) {
-      this._debug(this.debugMarker + 'Fehler - Ergebnis ist kein Array:', groups);
+      this._debug('EditorImpl: Fehler - Ergebnis ist kein Array:', groups);
       return [];
     }
 
@@ -465,7 +458,7 @@ export class EditorImpl extends EditorBase {
   }
 
   _handleViewModeChange(mode, event) {
-    this._debug(this.debugMarker + '_handleViewModeChange wird aufgerufen mit:', mode, event);
+    this._debug('EditorImpl _handleViewModeChange wird aufgerufen mit:', mode, event);
 
     // Nur wenn der Schalter aktiviert wird, ändern wir den view_mode
     if (event.target.checked) {
@@ -713,16 +706,6 @@ export class EditorImpl extends EditorBase {
             unit_of_measurement: 'Minuten',
           },
         },
-      },
-      {
-        name: 'epgExtendConfig',
-        selector: {
-          text: {
-            multiline: true,
-            rows: 10,
-          },
-        },
-        description: 'Erweiterte Konfiguration mit bedingten Einstellungen (YAML)',
       },
     ];
   }

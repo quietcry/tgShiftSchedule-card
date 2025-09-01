@@ -43,6 +43,7 @@ export class EpgProgramItem extends EpgElementBase {
     this._lastTooltipAction = null;
     this._tooltipTimer = null;
     this._isTooltipVisible = false; // Tracke den aktuellen Tooltip-Status
+    this._isUpdating = false; // Verhindert Events während Lit-Updates
   }
 
   // Getter für Kompatibilität
@@ -207,19 +208,44 @@ export class EpgProgramItem extends EpgElementBase {
     );
   }
 
+  /**
+   * Lifecycle: Wird aufgerufen, wenn das Element aktualisiert wird
+   */
+  updated(changedProperties) {
+    super.updated(changedProperties);
+
+    // Markiere Update als abgeschlossen
+    this._isUpdating = false;
+  }
+
   _onMouseEnter() {
     // Gap-Elemente haben keine Hover-Effekte
     if (this.isGap) {
       return;
     }
 
-    // Nur senden wenn der Tooltip noch nicht sichtbar ist
-    if (!this._isTooltipVisible) {
+    // Verhindere Events während Lit-Updates
+    if (this._isUpdating) {
+      this._debug('EpgProgramItem: Tooltip-Event übersprungen - Lit-Update läuft', {
+        title: this.title,
+      });
+      return;
+    }
+
+    // Nur senden wenn der Tooltip noch nicht sichtbar ist UND kein Timer läuft
+    if (!this._isTooltipVisible && !this._tooltipTimer) {
+      this._isUpdating = true; // Markiere Update als gestartet
       this._sendDelayedTooltipEvent('show');
       this._debug('EpgProgramItem: Tooltip-Event geplant (show)', {
         title: this.title,
         isGap: this.isGap,
         isGroup: this.isGroup,
+      });
+    } else {
+      this._debug('EpgProgramItem: Tooltip-Event übersprungen - bereits geplant oder sichtbar', {
+        title: this.title,
+        isTooltipVisible: this._isTooltipVisible,
+        hasTimer: !!this._tooltipTimer,
       });
     }
   }
@@ -325,10 +351,10 @@ export class EpgProgramItem extends EpgElementBase {
       clearTimeout(this._tooltipTimer);
     }
 
-    // Verzögertes Event nach 200ms senden
+    // Längere Verzögerung für besseres Debouncing (500ms statt 200ms)
     this._tooltipTimer = setTimeout(() => {
       this._sendTooltipEvent(action);
-    }, 200);
+    }, 500);
   }
 
   /**

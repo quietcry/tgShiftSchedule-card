@@ -16,6 +16,11 @@ export class EpgRenderManager extends TgCardHelper {
     this.epgBox = epgBox;
     this.endgapUpdateTimeout = null; // Timeout für verzögerte Endgap-Updates
     this.startgapUpdateTimeout = null; // Timeout für verzögerte Startgap-Updates
+
+    // Debouncing für viewChanges-Events
+    this._viewChangesDebounceTimer = null;
+    this._viewChangesDebounceDelay = 100; // 30ms für UI-Updates
+
     this._debug('EpgRenderManager initialisiert');
   }
 
@@ -510,6 +515,34 @@ export class EpgRenderManager extends TgCardHelper {
         this.epgBox[propertyName] = newValue;
       }
 
+      // Debounced Event-Benachrichtigung
+      this._debounceViewChanges(properties);
+
+      this._debug(`EpgRenderManager: viewChanges Event geplant`, {
+        properties,
+        epgBox: this.epgBox ? 'verfügbar' : 'nicht verfügbar',
+      });
+    } else {
+      this._debug(`EpgRenderManager: EpgBox nicht verfügbar für viewChanges`, {
+        properties,
+        epgBox: this.epgBox ? 'verfügbar' : 'nicht verfügbar',
+      });
+    }
+  }
+
+  /**
+   * Debouncing für viewChanges-Events
+   * Verhindert Event-Spam beim Scrollen/Resizing
+   */
+  _debounceViewChanges(properties) {
+    // Vorherigen Timer löschen
+    if (this._viewChangesDebounceTimer) {
+      clearTimeout(this._viewChangesDebounceTimer);
+      this._viewChangesDebounceTimer = null;
+    }
+
+    // Neuen Timer setzen
+    this._viewChangesDebounceTimer = setTimeout(() => {
       // Benachrichtige alle registrierten Komponenten über die Änderung
       this.epgBox.dispatchEvent(
         new CustomEvent('viewchanges-event', {
@@ -523,11 +556,8 @@ export class EpgRenderManager extends TgCardHelper {
         properties,
         epgBox: this.epgBox ? 'verfügbar' : 'nicht verfügbar',
       });
-    } else {
-      this._debug(`EpgRenderManager: EpgBox nicht verfügbar für viewChanges`, {
-        properties,
-        epgBox: this.epgBox ? 'verfügbar' : 'nicht verfügbar',
-      });
-    }
+
+      this._viewChangesDebounceTimer = null;
+    }, this._viewChangesDebounceDelay);
   }
 }

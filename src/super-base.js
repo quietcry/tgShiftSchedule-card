@@ -1,19 +1,9 @@
 import { LitElement, css } from 'lit';
-import {
-  CardName,
-  CardRegname,
-  CardDescription,
-  Version,
-  DebugMode,
-  showVersion,
-  UseDummyData,
-} from './card-config.js';
+import { CardName, Version, DebugMode, showVersion, UseDummyData } from './card-config.js';
 import { TgCardHelper } from './tools/tg-card-helper.js';
 
 export class SuperBase extends LitElement {
   static cardName = CardName;
-  static cardRegname = CardRegname;
-  static cardDescription = CardDescription;
   static version = Version;
   static debugMode = DebugMode;
   static useDummyData = UseDummyData;
@@ -35,14 +25,46 @@ export class SuperBase extends LitElement {
 
   constructor() {
     super();
+    this.dM = `${this.constructor.className}: `; // debugMsgPrefix - Prefix für Debug-Nachrichten
+
     this.cardName = this.constructor.cardName;
     this.version = this.constructor.version;
     this.debugMode = this.constructor.debugMode;
     this.useDummyData = this.constructor.useDummyData;
     this.showVersion = this.constructor.showVersion;
     this.tgCardHelper = new TgCardHelper(this.constructor.cardName, this.constructor.debugMode);
-    this.debugMarker = 'SuperBase: ';
-    this._debug(this.debugMarker + 'Konstruktor wird aufgerufen');
+    this._debug('SuperBase-Konstruktor wird aufgerufen');
+  }
+
+  registerMeForChangeNotifys(eventTypes = '', that=this) {
+    const dM= `${this.dM||"?: "}registerMeForChangeNotifys() `
+    this._debug(`${dM} Aufruf`, { eventTypes, that });
+    this.dispatchEvent(
+      new CustomEvent('registerMeForChanges', {
+        bubbles: true,
+        composed: true,
+        detail: {
+          component: that,
+          callback: this._handleOnChangeNotifys.bind(this),
+          eventType: eventTypes,
+          immediately: true,
+        },
+      })
+    );
+  }
+
+  _handleOnChangeNotifys(eventdata) {
+    const dM= `${this.dM||"?: "}_handleOnChangeNotifys() `
+    this._debug(`${dM}aufgerufen`, { eventdata });
+    for (const eventType of Object.keys(eventdata)) {
+      const fkt = '_handleOnChangeNotify_' + eventType.charAt(0).toUpperCase() + eventType.slice(1);
+      if (typeof this[fkt] === 'function') {
+        this._debug(`${dM} ${fkt} aufgerufen`, { eventdata: eventdata[eventType] });
+        this[fkt](eventdata[eventType]);
+      } else {
+        this._debug(`${dM} ${fkt} nicht gefunden`, { eventdata: eventdata[eventType] });
+      }
+    }
   }
 
   _debug(message, data = null) {
@@ -98,56 +120,5 @@ export class SuperBase extends LitElement {
     };
     // this.tgCardHelper.className = className;
     this.tgCardHelper._debug(path, message, data);
-  }
-
-  /**
-   * Behandelt Änderungen von anderen Komponenten
-   * @param {Object} eventdata - Event-Daten mit verschiedenen Event-Typen
-   */
-  _handleChangeNotifys(eventdata) {
-    this._debug(this.debugMarker + 'ChangeNotifysSystem: _handleChangeNotifys() aufgerufen', {
-      eventdata,
-    });
-
-    for (const eventType of Object.keys(eventdata)) {
-      const fktName = '_handle_' + eventType + 'FromEvent';
-      const res =
-        typeof super[fktName] === 'function' ? super[fktName](eventdata[eventType]) : true;
-      if (typeof this[fktName] === 'function' && res) {
-        this._debug(
-          this.debugMarker +
-            `ChangeNotifysSystem: _handleChangeNotifys() event ${eventType} wird ausgewertet`,
-          { eventdata, element: this }
-        );
-        this[fktName](eventdata[eventType], res);
-        continue;
-      } else {
-        this._debug(
-          this.debugMarker +
-            `ChangeNotifysSystem: _handleChangeNotifys() event ${eventType} wird nicht ausgewertet`,
-          { eventdata, element: this }
-        );
-      }
-    }
-  }
-
-  _subscribeChangeNotifys(events = '') {
-    // Registriere mich für Environment-Änderungen
-    this._debug(this.debugMarker + 'ChangeNotifysSystem: _subscribeChangeNotifys() aufgerufen', {
-      events: events.split(','),
-    });
-
-    this.dispatchEvent(
-      new CustomEvent('registerMeForChanges', {
-        bubbles: true,
-        composed: true,
-        detail: {
-          component: this,
-          callback: this._handleChangeNotifys.bind(this),
-          eventType: events,
-          immediately: true,
-        },
-      })
-    );
   }
 }

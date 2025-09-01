@@ -9,7 +9,6 @@ export class EpgTooltip extends SuperBase {
   static className = 'EpgTooltip';
 
   static properties = {
-    visible: { type: Boolean, reflect: true },
     data: { type: Object },
     position: { type: String, reflect: true },
     margin: { type: Number },
@@ -31,7 +30,7 @@ export class EpgTooltip extends SuperBase {
       pointer-events: none;
     }
 
-    :host([visible]) {
+    :host(.visible) {
       opacity: 1;
       visibility: visible;
       pointer-events: auto;
@@ -167,20 +166,7 @@ export class EpgTooltip extends SuperBase {
     `;
   }
 
-  /**
-   * Lifecycle: Wird aufgerufen, wenn das Element aktualisiert wird
-   */
-  updated(changedProperties) {
-    super.updated(changedProperties);
 
-    if (changedProperties.has('visible') && this.visible) {
-      // Starte automatisches Scrollen nach Verzögerung
-      this._startAutoScrollTimer();
-    } else if (changedProperties.has('visible') && !this.visible) {
-      // Stoppe automatisches Scrollen
-      this._stopAutoScroll();
-    }
-  }
 
   /**
    * Lifecycle: Wird aufgerufen, wenn das Element entfernt wird
@@ -282,9 +268,6 @@ export class EpgTooltip extends SuperBase {
     } else if (detail.action === 'hide') {
       this.hide();
     }
-
-    // Trigger re-render
-    this.requestUpdate();
   }
 
   /**
@@ -294,13 +277,22 @@ export class EpgTooltip extends SuperBase {
     this._debug('EpgTooltip: show aufgerufen', { data });
 
     this.data = data;
-    this.visible = true;
+    this.visible = false;
+
+    // Explizit Update auslösen für neue Daten
+    this.requestUpdate();
 
     // Berechne optimale Position
     this._calculateOptimalPosition();
 
-    // Starte Auto-Scroll Timer
-    this._startAutoScrollTimer();
+    // Tooltip mit neuer Position einblenden
+    this.visible = true;
+
+    // CSS-Klasse setzen und Auto-Scroll starten
+    this.classList.toggle('visible', this.visible);
+    if (this.visible) {
+      this._startAutoScrollTimer();
+    }
   }
 
   /**
@@ -310,6 +302,9 @@ export class EpgTooltip extends SuperBase {
     this._debug('EpgTooltip: hide aufgerufen');
 
     this.visible = false;
+
+    // CSS-Klasse entfernen
+    this.classList.remove('visible');
 
     // Stoppe Auto-Scroll
     this._stopAutoScroll();
@@ -326,6 +321,7 @@ export class EpgTooltip extends SuperBase {
 
     const hostRect = this.hostElement.getBoundingClientRect();
     const tooltipRect = this.getBoundingClientRect();
+    this._debug('EpgTooltip: tooltipRect', { tooltipRect });
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
 

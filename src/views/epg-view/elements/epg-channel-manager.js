@@ -3,9 +3,13 @@
  * Verwaltet alle kanal-bezogenen Funktionen für die EPG-Box
  */
 import yaml from 'js-yaml';
+import { TgCardHelper } from '../../../tools/tg-card-helper.js';
 
-export class EpgChannelManager {
+export class EpgChannelManager extends TgCardHelper{
   constructor(epgBox) {
+    super();
+    this.dM = `${this.constructor.className}: `; // debugMsgPrefix - Prefix für Debug-Nachrichten
+
     this.epgBox = epgBox;
   }
 
@@ -240,6 +244,7 @@ export class EpgChannelManager {
    * Sortiert einen Kanal in die Struktur ein
    */
   sortChannelIntoStructure(channel) {
+    const dM= `${this.dM||"?: "}sortChannelIntoStructure() `
     this.epgBox._debug('EpgChannelManager: Sortiere Kanal in die Struktur ein', {
       channel: channel,
     });
@@ -252,7 +257,7 @@ export class EpgChannelManager {
             if (!patternObj.channels.find(c => c.id === channel.id)) {
               patternObj.channels.push(channel);
               // Debug-Ausgabe: Was wird in die Gruppe einsortiert?
-              this._debug('DEBUG: Kanal in Gruppe einsortiert', {
+              this._debug(`${dM}Kanal in Gruppe einsortiert`, {
                 gruppe: item.name,
                 pattern: patternObj.pattern,
                 kanal: channel,
