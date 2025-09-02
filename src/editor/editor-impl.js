@@ -8,10 +8,7 @@ import {
   Version,
   DebugMode,
   showVersion,
-  DefaultEpgPastTime,
-  DefaultEpgFutureTime,
-  DefaultEpgShowFutureTime,
-  DefaultEpgShowPastTime,
+  DefaultConfig,
 } from '../card-config.js';
 import yaml from 'js-yaml';
 
@@ -19,33 +16,41 @@ export class EditorImpl extends EditorBase {
   static properties = {
     ...super.properties,
     _selectedTab: { type: Number },
+    _selectedEpgTab: { type: Number },
     _yamlError: { type: String },
     _groupOrderError: { type: String },
+    _viewModeDropdownOpen: { type: Boolean },
   };
 
   constructor() {
     super({
-      entity: '',
-      time_window: 'C',
-      date: '',
-      max_items: 10,
-      show_channel: true,
-      show_channel_groups: true,
-      show_time: true,
-      show_duration: true,
-      show_shorttext: false,
-      show_description: true,
-      view_mode: 'Liste',
-      epgPastTime: DefaultEpgPastTime,
-      epgFutureTime: DefaultEpgFutureTime,
-      epgShowFutureTime: DefaultEpgShowFutureTime,
-      epgShowPastTime: DefaultEpgShowPastTime,
-      channelWidth: 180,
+      ...DefaultConfig,
+      ...{
+        entity: '',
+        time_window: 'C',
+        date: '',
+        max_items: 10,
+        show_channel: true,
+        show_channel_groups: true,
+        show_time: true,
+        show_duration: true,
+        show_shorttext: false,
+        show_description: true,
+        view_mode: 'Liste',
+        channelWidth: 180,
+        epgShowPastTime: 60, // Minuten für Rückblick (Backview)
+        epgShowFutureTime: 180, // Minuten sichtbar in der Ansicht
+        epgPastTime: 30, // Minuten in die Vergangenheit
+        epgFutureTime: 120, // Minuten in die Zukunft
+      },
     });
+
     this._debug(`EditorImpl-Modul wird geladen`);
     this._selectedTab = 0;
+    this._selectedEpgTab = 0;
     this._yamlError = '';
     this._groupOrderError = '';
+    this._viewModeDropdownOpen = false;
   }
 
   async firstUpdated() {
@@ -72,190 +77,255 @@ export class EditorImpl extends EditorBase {
     this._debug(`EditorImpl render mit config:`, this.config);
     return html`
       <div class="card-config">
+        <!-- Tab-Navigation -->
+        <div class="tab-navigation">
+          <button
+            class="tab-button ${this._selectedTab === 0 ? 'active' : ''}"
+            @click=${() => (this._selectedTab = 0)}
+          >
+            Basic
+          </button>
+          <div class="tab-button-split ${this._selectedTab === 1 ? 'active' : ''}">
+            <div class="tab-button-text" @click=${() => (this._selectedTab = 1)}>
+              View [${this.config.view_mode}]
+            </div>
+            <div
+              class="tab-button-chevron"
+              @click=${e => {
+                e.stopPropagation();
+                this._toggleViewModeDropdown();
+              }}
+            >
+              <ha-icon
+                icon="mdi:chevron-down"
+                class="chevron ${this._viewModeDropdownOpen ? 'open' : ''}"
+              ></ha-icon>
+            </div>
+
+            ${this._viewModeDropdownOpen
+              ? html`
+                  <div class="view-mode-dropdown-panel">
+                    <div
+                      class="view-mode-option ${this.config.view_mode === 'Liste'
+                        ? 'selected'
+                        : ''}"
+                      @click=${() => this._selectViewMode('Liste')}
+                    >
+                      <div
+                        class="option-indicator ${this.config.view_mode === 'Liste'
+                          ? 'selected'
+                          : ''}"
+                      ></div>
+                      Liste
+                    </div>
+                    <div
+                      class="view-mode-option ${this.config.view_mode === 'epg' ? 'selected' : ''}"
+                      @click=${() => this._selectViewMode('epg')}
+                    >
+                      <div
+                        class="option-indicator ${this.config.view_mode === 'epg'
+                          ? 'selected'
+                          : ''}"
+                      ></div>
+                      EPG
+                    </div>
+                    <div
+                      class="view-mode-option ${this.config.view_mode === 'Tabelle'
+                        ? 'selected'
+                        : ''}"
+                      @click=${() => this._selectViewMode('Tabelle')}
+                    >
+                      <div
+                        class="option-indicator ${this.config.view_mode === 'Tabelle'
+                          ? 'selected'
+                          : ''}"
+                      ></div>
+                      Tabelle
+                    </div>
+                  </div>
+                `
+              : ''}
+          </div>
+        </div>
+
+        <!-- Tab Content -->
+        <div class="tab-content">
+          ${this._selectedTab === 0 ? this._renderBasicTab() : this._renderViewTab()}
+        </div>
+      </div>
+    `;
+  }
+
+  _renderBasicTab() {
+    return html`
+      <ha-form
+        .hass=${this.hass}
+        .data=${this.config}
+        .schema=${this._getBasicSchema()}
+        .computeLabel=${this._computeLabel}
+        @value-changed=${this._valueChanged}
+        class=${this._yamlError ? 'yaml-error-input' : ''}
+      ></ha-form>
+
+      ${this._yamlError
+        ? html`
+            <div class="yaml-error">
+              <ha-icon icon="mdi:alert-circle"></ha-icon>
+              <span>YAML-Fehler: ${this._yamlError}</span>
+            </div>
+          `
+        : ''}
+    `;
+  }
+
+  _renderViewTab() {
+    return html` ${this._renderViewModePanel()} `;
+  }
+
+  _renderViewModePanel() {
+    switch (this.config.view_mode) {
+      case 'epg':
+        return this._renderEpgViewPanel();
+      case 'Liste':
+        return this._renderListViewPanel();
+      case 'Tabelle':
+        return this._renderGridViewPanel();
+      default:
+        return this._renderEpgViewPanel();
+    }
+  }
+
+  _renderEpgViewPanel() {
+    return html`
+      <div class="view-mode-panel">
+        <!-- EPG Tab-Navigation -->
+        <div class="epg-tab-navigation">
+          <button
+            class="epg-tab-button ${this._selectedEpgTab === 0 ? 'active' : ''}"
+            @click=${() => (this._selectedEpgTab = 0)}
+          >
+            Anzeige
+          </button>
+          <button
+            class="epg-tab-button ${this._selectedEpgTab === 1 ? 'active' : ''}"
+            @click=${() => (this._selectedEpgTab = 1)}
+          >
+            Daten
+          </button>
+          <button
+            class="epg-tab-button ${this._selectedEpgTab === 2 ? 'active' : ''}"
+            @click=${() => (this._selectedEpgTab = 2)}
+          >
+            Zeit
+          </button>
+          <button
+            class="epg-tab-button ${this._selectedEpgTab === 3 ? 'active' : ''}"
+            @click=${() => (this._selectedEpgTab = 3)}
+          >
+            Layout
+          </button>
+        </div>
+
+        <!-- EPG Tab Content -->
+        <div class="epg-tab-content">${this._renderEpgTabContent()}</div>
+      </div>
+    `;
+  }
+
+  _renderEpgTabContent() {
+    switch (this._selectedEpgTab) {
+      case 0:
+        return this._renderEpgDisplayTab();
+      case 1:
+        return this._renderEpgDataTab();
+      case 2:
+        return this._renderEpgTimeTab();
+      case 3:
+        return this._renderEpgLayoutTab();
+      default:
+        return this._renderEpgDisplayTab();
+    }
+  }
+
+  _renderEpgDisplayTab() {
+    return html`
+      <ha-form
+        .hass=${this.hass}
+        .data=${this.config}
+        .schema=${this._getEpgDisplaySchema()}
+        .computeLabel=${this._computeLabel}
+        @value-changed=${this._valueChanged}
+      ></ha-form>
+    `;
+  }
+
+  _renderEpgDataTab() {
+    return html`
+      <ha-form
+        .hass=${this.hass}
+        .data=${this.config}
+        .schema=${this._getEpgDataSchema()}
+        .computeLabel=${this._computeLabel}
+        @value-changed=${this._valueChanged}
+      ></ha-form>
+    `;
+  }
+
+  _renderEpgTimeTab() {
+    return html`
+      <ha-form
+        .hass=${this.hass}
+        .data=${this.config}
+        .schema=${this._getEpgTimeSchema()}
+        .computeLabel=${this._computeLabel}
+        @value-changed=${this._valueChanged}
+      ></ha-form>
+    `;
+  }
+
+  _renderEpgLayoutTab() {
+    return html`
+      <ha-form
+        .hass=${this.hass}
+        .data=${this.config}
+        .schema=${this._getEpgLayoutSchema()}
+        .computeLabel=${this._computeLabel}
+        @value-changed=${this._valueChanged}
+        class=${this._groupOrderError ? 'yaml-error-input' : ''}
+      ></ha-form>
+
+      ${this._groupOrderError
+        ? html`
+            <div class="yaml-error">
+              <ha-icon icon="mdi:alert-circle"></ha-icon>
+              <span>group_order YAML-Fehler: ${this._groupOrderError}</span>
+            </div>
+          `
+        : ''}
+    `;
+  }
+
+  _renderListViewPanel() {
+    return html`
+      <div class="view-mode-panel">
+        <h3>Liste View Konfiguration</h3>
+        <p>Hier werden die Konfigurationsoptionen für die Listenansicht angezeigt.</p>
+        <p>Diese Ansicht zeigt die Programme in einer kompakten Liste an.</p>
+      </div>
+    `;
+  }
+
+  _renderGridViewPanel() {
+    return html`
+      <div class="view-mode-panel">
+        <h3>Tabelle View Konfiguration</h3>
         <ha-form
           .hass=${this.hass}
           .data=${this.config}
-          .schema=${this._getFormSchema()}
+          .schema=${this._getTableSchema()}
           .computeLabel=${this._computeLabel}
           @value-changed=${this._valueChanged}
-          class=${this._yamlError ? 'yaml-error-input' : ''}
         ></ha-form>
-
-        ${this._yamlError
-          ? html`
-              <div class="yaml-error">
-                <ha-icon icon="mdi:alert-circle"></ha-icon>
-                <span>YAML-Fehler: ${this._yamlError}</span>
-              </div>
-            `
-          : ''}
-
-        <ha-expansion-panel>
-          <span slot="header">Anzeige</span>
-          <div class="expander-content">
-            <ha-expansion-panel>
-              <div slot="header" class="expander-header">
-                <ha-switch
-                  .checked=${this.config.view_mode === 'Liste'}
-                  @change=${e => this._handleViewModeChange('Liste', e)}
-                  @click=${e => e.stopPropagation()}
-                ></ha-switch>
-                <span>Liste</span>
-              </div>
-              <ha-form
-                .hass=${this.hass}
-                .data=${this.config}
-                .schema=${[
-                  {
-                    name: 'show_channel',
-                    selector: { boolean: {} },
-                  },
-                  {
-                    name: 'show_time',
-                    selector: { boolean: {} },
-                  },
-                  {
-                    name: 'show_duration',
-                    selector: { boolean: {} },
-                  },
-                  {
-                    name: 'show_shorttext',
-                    selector: { boolean: {} },
-                  },
-                  {
-                    name: 'show_description',
-                    selector: { boolean: {} },
-                  },
-                ]}
-                .computeLabel=${this._computeLabel}
-                @value-changed=${this._valueChanged}
-              ></ha-form>
-            </ha-expansion-panel>
-
-            <ha-expansion-panel>
-              <div slot="header" class="expander-header">
-                <ha-switch
-                  .checked=${this.config.view_mode === 'epg'}
-                  @change=${e => this._handleViewModeChange('epg', e)}
-                  @click=${e => e.stopPropagation()}
-                ></ha-switch>
-                <span>epg</span>
-              </div>
-              <ha-form
-                .hass=${this.hass}
-                .data=${this.config}
-                .schema=${this._getEpgSchema()}
-                .computeLabel=${this._computeLabel}
-                @value-changed=${this._valueChanged}
-                class=${this._groupOrderError ? 'yaml-error-input' : ''}
-              ></ha-form>
-
-              ${this._groupOrderError
-                ? html`
-                    <div class="yaml-error">
-                      <ha-icon icon="mdi:alert-circle"></ha-icon>
-                      <span>group_order YAML-Fehler: ${this._groupOrderError}</span>
-                    </div>
-                  `
-                : ''}
-            </ha-expansion-panel>
-
-            <ha-expansion-panel>
-              <div slot="header" class="expander-header">
-                <ha-switch
-                  .checked=${this.config.view_mode === 'Tabelle'}
-                  @change=${e => this._handleViewModeChange('Tabelle', e)}
-                  @click=${e => e.stopPropagation()}
-                ></ha-switch>
-                <span>Tabelle</span>
-              </div>
-              <ha-form
-                .hass=${this.hass}
-                .data=${this.config}
-                .schema=${[
-                  {
-                    name: 'show_channel',
-                    selector: { boolean: {} },
-                  },
-                  {
-                    name: 'show_time',
-                    selector: { boolean: {} },
-                  },
-                  {
-                    name: 'show_duration',
-                    selector: { boolean: {} },
-                  },
-                  {
-                    name: 'show_shorttext',
-                    selector: { boolean: {} },
-                  },
-                  {
-                    name: 'show_description',
-                    selector: { boolean: {} },
-                  },
-                  {
-                    name: 'time_window',
-                    selector: {
-                      select: {
-                        options: [
-                          { value: 'C', label: 'Aktuell' },
-                          { value: 'D', label: 'Heute' },
-                          { value: 'W', label: 'Diese Woche' },
-                        ],
-                      },
-                    },
-                  },
-                  {
-                    name: 'date',
-                    selector: {
-                      text: {},
-                    },
-                  },
-                  {
-                    name: 'max_items',
-                    selector: {
-                      number: {
-                        min: 1,
-                        max: 100,
-                        mode: 'box',
-                      },
-                    },
-                  },
-                ]}
-                .computeLabel=${this._computeLabel}
-                @value-changed=${this._valueChanged}
-              ></ha-form>
-            </ha-expansion-panel>
-          </div>
-        </ha-expansion-panel>
-
-        <ha-expansion-panel>
-          <span slot="header">Filter</span>
-          <ha-form
-            .hass=${this.hass}
-            .data=${this.config}
-            .schema=${[
-              {
-                name: 'whitelist',
-                selector: {
-                  text: {
-                    multiline: true,
-                  },
-                },
-              },
-              {
-                name: 'blacklist',
-                selector: {
-                  text: {
-                    multiline: true,
-                  },
-                },
-              },
-            ]}
-            .computeLabel=${this._computeLabel}
-            @value-changed=${this._valueChanged}
-          ></ha-form>
-        </ha-expansion-panel>
       </div>
     `;
   }
@@ -457,24 +527,31 @@ export class EditorImpl extends EditorBase {
     return yamlString.trim();
   }
 
-  _handleViewModeChange(mode, event) {
-    this._debug('EditorImpl _handleViewModeChange wird aufgerufen mit:', mode, event);
+  _toggleViewModeDropdown() {
+    this._viewModeDropdownOpen = !this._viewModeDropdownOpen;
 
-    // Nur wenn der Schalter aktiviert wird, ändern wir den view_mode
-    if (event.target.checked) {
-      this.config.view_mode = mode;
-      this.requestUpdate();
-      this.dispatchEvent(
-        new CustomEvent('config-changed', {
-          detail: { config: this.config },
-          bubbles: true,
-          composed: true,
-        })
-      );
-    } else {
-      // Wenn der Schalter deaktiviert werden soll, setzen wir ihn wieder auf checked
-      event.target.checked = true;
+    // Wenn Dropdown geöffnet wird, automatisch zum View-Tab wechseln
+    if (this._viewModeDropdownOpen) {
+      this._selectedTab = 1;
     }
+
+    this.requestUpdate();
+  }
+
+  _selectViewMode(mode) {
+    this._debug('EditorImpl _selectViewMode wird aufgerufen mit:', mode);
+
+    this.config.view_mode = mode;
+    this._selectedTab = 1; // Automatisch zum View-Tab wechseln
+    this._viewModeDropdownOpen = false; // Dropdown schließen nach Auswahl
+    this.requestUpdate();
+    this.dispatchEvent(
+      new CustomEvent('config-changed', {
+        detail: { config: this.config },
+        bubbles: true,
+        composed: true,
+      })
+    );
   }
 
   _validateYaml(yamlString) {
@@ -495,77 +572,285 @@ export class EditorImpl extends EditorBase {
     }
   }
 
-  static styles = css`
-    .card-config {
-      padding: 16px;
-    }
-    .expander-content {
-      padding: 16px;
-    }
-    .expander-header {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    ha-expansion-panel {
-      --expansion-panel-header-color: var(--primary-color);
-      --expansion-panel-header-background: var(--primary-background-color);
-      --expansion-panel-header-padding: 16px;
-      --expansion-panel-header-border-radius: 4px;
-      --expansion-panel-header-margin: 8px 0;
-    }
-    ha-expansion-panel[expanded] {
-      --expansion-panel-header-background: var(--secondary-background-color);
-    }
-    ha-expansion-panel:not([expanded]) {
-      --expansion-panel-header-background: var(--primary-background-color);
-    }
-    .yaml-error {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin: 8px 0;
-      padding: 12px;
-      background-color: var(--error-color);
-      color: white;
-      border-radius: 4px;
-      font-size: 14px;
-    }
-    .yaml-error ha-icon {
-      color: white;
-    }
-    .yaml-error-input,
-    .yaml-error-input ha-textarea,
-    .yaml-error-input ha-textfield,
-    .yaml-error-input mwc-textarea,
-    .yaml-error-input mwc-textfield {
-      --mdc-text-field-outline-color: var(--error-color) !important;
-      --mdc-text-field-focus-outline-color: var(--error-color) !important;
-      --mdc-text-field-hover-outline-color: var(--error-color) !important;
-      --mdc-text-field-label-ink-color: var(--error-color) !important;
-      --mdc-text-field-ink-color: var(--error-color) !important;
-    }
-    .yaml-error-input ha-textarea {
-      --mdc-text-field-outline-color: var(--error-color) !important;
-      --mdc-text-field-focus-outline-color: var(--error-color) !important;
-      --mdc-text-field-hover-outline-color: var(--error-color) !important;
-    }
-    .yaml-error-input ha-textfield {
-      --mdc-text-field-outline-color: var(--error-color) !important;
-      --mdc-text-field-focus-outline-color: var(--error-color) !important;
-      --mdc-text-field-hover-outline-color: var(--error-color) !important;
-    }
-    .yaml-error-input mwc-textarea {
-      --mdc-text-field-outline-color: var(--error-color) !important;
-      --mdc-text-field-focus-outline-color: var(--error-color) !important;
-      --mdc-text-field-hover-outline-color: var(--error-color) !important;
-    }
-    .yaml-error-input mwc-textfield {
-      --mdc-text-field-outline-color: var(--error-color) !important;
-      --mdc-text-field-focus-outline-color: var(--error-color) !important;
-      --mdc-text-field-hover-outline-color: var(--error-color) !important;
-    }
-  `;
+  static styles = [
+    super.styles,
+    css`
+      :host {
+      }
+
+      .card-config {
+        padding: 10px;
+      }
+
+      /* Tab Navigation */
+      .tab-navigation {
+        display: flex;
+        border-bottom: 1px solid var(--divider-color);
+        margin-bottom: 16px;
+      }
+
+      .tab-button {
+        background: var(--card-background-color);
+        border: 1px solid var(--divider-color);
+        border-bottom: none;
+        padding: 12px 24px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--secondary-text-color);
+        border-radius: 8px 8px 0 0;
+        transition: all 0.2s ease;
+        flex-shrink: 0; /* Verhindert, dass Tab-Buttons zu viel Platz einnehmen */
+        margin-right: 2px;
+      }
+
+      .tab-button:hover {
+        color: var(--primary-text-color);
+        background-color: var(--primary-background-color);
+        border-color: var(--primary-color);
+      }
+
+      .tab-button.active {
+        color: var(--primary-color);
+        background-color: var(--primary-background-color);
+        border-color: var(--primary-color);
+        border-bottom-color: var(--primary-background-color);
+        z-index: 1;
+        position: relative;
+      }
+
+      /* Split Tab-Button */
+      .tab-button-split {
+        display: flex;
+        border: 1px solid var(--divider-color);
+        border-bottom: none;
+        transition: all 0.2s ease;
+        background: var(--card-background-color);
+        padding: 0;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--secondary-text-color);
+        flex-shrink: 0; /* Verhindert, dass er die gesamte Breite einnimmt */
+        position: relative; /* Wichtig für absolute Positionierung des Dropdowns */
+        border-radius: 8px 8px 0 0;
+        margin-right: 2px;
+      }
+
+      .tab-button-split:hover {
+        color: var(--primary-text-color);
+        background-color: var(--primary-background-color);
+        border-color: var(--primary-color);
+      }
+
+      .tab-button-split.active {
+        border: 1px solid var(--primary-color);
+        border-bottom-color: var(--primary-background-color);
+        background-color: var(--primary-background-color);
+        color: var(--primary-color);
+        z-index: 1;
+      }
+
+      .tab-button-text {
+        padding: 12px 16px 12px 24px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        flex-shrink: 0; /* Verhindert, dass er die gesamte Breite einnimmt */
+      }
+
+      .tab-button-split.active .tab-button-text {
+        color: var(--primary-color);
+      }
+
+      .tab-button-text:hover {
+        color: var(--primary-color);
+      }
+
+      .tab-button-chevron {
+        padding: 12px 16px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        border-left: 1px solid var(--divider-color);
+      }
+
+      .tab-button-split.active .tab-button-chevron {
+        color: var(--primary-color);
+      }
+
+      .tab-button-chevron:hover {
+        color: var(--primary-color);
+      }
+
+      .chevron {
+        transition: transform 0.2s ease;
+      }
+
+      .chevron.open {
+        transform: rotate(180deg);
+      }
+
+      .tab-content {
+        min-height: 400px;
+      }
+
+      /* View Mode Panels */
+      .view-mode-panel {
+        padding: 5px;
+        background-color: var(--card-background-color);
+        border-radius: 8px;
+        margin: 10px 0;
+      }
+
+      .view-mode-panel h3 {
+        margin: 0 0 16px 0;
+        color: var(--primary-text-color);
+        font-size: 18px;
+        font-weight: 500;
+      }
+
+      .view-mode-panel p {
+        margin: 8px 0;
+        color: var(--secondary-text-color);
+        line-height: 1.5;
+      }
+
+      /* EPG Tab Navigation */
+      .epg-tab-navigation {
+        display: flex;
+        border-bottom: 1px solid var(--divider-color);
+        margin: 16px 0;
+      }
+
+      .epg-tab-button {
+        background: var(--card-background-color);
+        border: 1px solid var(--divider-color);
+        border-bottom: none;
+        padding: 8px 16px;
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--secondary-text-color);
+        border-radius: 6px 6px 0 0;
+        transition: all 0.2s ease;
+        margin-right: 2px;
+      }
+
+      .epg-tab-button:hover {
+        color: var(--primary-text-color);
+        background-color: var(--primary-background-color);
+        border-color: var(--primary-color);
+      }
+
+      .epg-tab-button.active {
+        color: var(--primary-color);
+        background-color: var(--primary-background-color);
+        border-color: var(--primary-color);
+        border-bottom-color: var(--primary-background-color);
+        z-index: 1;
+        position: relative;
+      }
+
+      .epg-tab-content {
+        padding: 16px 0;
+      }
+
+      /* Dropdown Panel */
+      .view-mode-dropdown-panel {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background-color: red !important; /* Test-Style */
+        border: 1px solid var(--divider-color);
+        border-top: none;
+        border-radius: 0 0 6px 6px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        z-index: 1000;
+        min-width: 200px; /* Mindestbreite */
+      }
+
+      .view-mode-option {
+        padding: 12px 16px;
+        cursor: pointer;
+        font-size: 14px;
+        color: var(--primary-text-color);
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        transition: background-color 0.2s ease;
+      }
+
+      .view-mode-option:hover {
+        background-color: var(--secondary-background-color);
+      }
+
+      .view-mode-option.selected {
+        background-color: var(--primary-color);
+        color: white;
+      }
+
+      .option-indicator {
+        width: 16px;
+        height: 16px;
+        border: 2px solid var(--divider-color);
+        border-radius: 50%;
+        transition: all 0.2s ease;
+      }
+
+      .option-indicator.selected {
+        border-color: white;
+        background-color: white;
+      }
+
+      .yaml-error {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin: 8px 0;
+        padding: 12px;
+        background-color: var(--error-color);
+        color: white;
+        border-radius: 4px;
+        font-size: 14px;
+      }
+      .yaml-error ha-icon {
+        color: white;
+      }
+      .yaml-error-input,
+      .yaml-error-input ha-textarea,
+      .yaml-error-input ha-textfield,
+      .yaml-error-input mwc-textarea,
+      .yaml-error-input mwc-textfield {
+        --mdc-text-field-outline-color: var(--error-color) !important;
+        --mdc-text-field-focus-outline-color: var(--error-color) !important;
+        --mdc-text-field-hover-outline-color: var(--error-color) !important;
+        --mdc-text-field-label-ink-color: var(--error-color) !important;
+        --mdc-text-field-ink-color: var(--error-color) !important;
+      }
+      .yaml-error-input ha-textarea {
+        --mdc-text-field-outline-color: var(--error-color) !important;
+        --mdc-text-field-focus-outline-color: var(--error-color) !important;
+        --mdc-text-field-hover-outline-color: var(--error-color) !important;
+      }
+      .yaml-error-input ha-textfield {
+        --mdc-text-field-outline-color: var(--error-color) !important;
+        --mdc-text-field-focus-outline-color: var(--error-color) !important;
+        --mdc-text-field-hover-outline-color: var(--error-color) !important;
+      }
+      .yaml-error-input mwc-textarea {
+        --mdc-text-field-outline-color: var(--error-color) !important;
+        --mdc-text-field-focus-outline-color: var(--error-color) !important;
+        --mdc-text-field-hover-outline-color: var(--error-color) !important;
+      }
+      .yaml-error-input mwc-textfield {
+        --mdc-text-field-outline-color: var(--error-color) !important;
+        --mdc-text-field-focus-outline-color: var(--error-color) !important;
+        --mdc-text-field-hover-outline-color: var(--error-color) !important;
+      }
+    `,
+  ];
 
   static getConfigElement() {
     return document.createElement(`${CardRegname}-editor`);
@@ -586,10 +871,10 @@ export class EditorImpl extends EditorBase {
       blacklist: '',
       whitelist: '',
       importantlist: '',
-      epgPastTime: DefaultEpgPastTime,
-      epgFutureTime: DefaultEpgFutureTime,
-      epgShowFutureTime: DefaultEpgShowFutureTime,
-      epgShowPastTime: DefaultEpgShowPastTime,
+      epgPastTime: DefaultConfig.epgPastTime,
+      epgFutureTime: DefaultConfig.epgFutureTime,
+      epgShowFutureTime: DefaultConfig.epgShowFutureTime,
+      epgShowPastTime: DefaultConfig.epgShowPastTime,
     };
   }
 
@@ -624,33 +909,33 @@ export class EditorImpl extends EditorBase {
         name: 'epgPastTime',
         label: 'EPG Vergangenheit (Minuten)',
         description: 'Anzahl der Minuten in die Vergangenheit',
-        default: DefaultEpgPastTime,
+        default: DefaultConfig.epgPastTime,
       },
       {
         type: 'number',
         name: 'epgFutureTime',
         label: 'EPG Zukunft (Minuten)',
         description: 'Anzahl der Minuten in die Zukunft',
-        default: DefaultEpgFutureTime,
+        default: DefaultConfig.epgFutureTime,
       },
       {
         type: 'number',
         name: 'epgShowFutureTime',
         label: 'EPG Anzeigebreite (Minuten)',
         description: 'Anzahl der sichtbaren Minuten in der Ansicht',
-        default: DefaultEpgShowFutureTime,
+        default: DefaultConfig.epgShowFutureTime,
       },
       {
         type: 'number',
         name: 'epgShowPastTime',
         label: 'EPG Rückblick (Minuten)',
         description: 'Anzahl der Minuten für Rückblick (0-180)',
-        default: DefaultEpgShowPastTime,
+        default: DefaultConfig.epgShowPastTime,
       },
     ];
   }
 
-  _getFormSchema() {
+  _getBasicSchema() {
     return [
       {
         name: 'entity',
@@ -664,13 +949,79 @@ export class EditorImpl extends EditorBase {
         },
       },
       {
+        name: 'whitelist',
+        selector: {
+          text: {
+            multiline: true,
+          },
+        },
+      },
+      {
+        name: 'blacklist',
+        selector: {
+          text: {
+            multiline: true,
+          },
+        },
+      },
+    ];
+  }
+
+  _getViewSchema() {
+    return [
+      {
+        name: 'show_channel',
+        selector: { boolean: {} },
+      },
+      {
+        name: 'show_time',
+        selector: { boolean: {} },
+      },
+      {
+        name: 'show_duration',
+        selector: { boolean: {} },
+      },
+      {
+        name: 'show_shorttext',
+        selector: { boolean: {} },
+      },
+      {
+        name: 'show_description',
+        selector: { boolean: {} },
+      },
+      {
+        name: 'show_channel_groups',
+        selector: { boolean: {} },
+      },
+      {
+        name: 'channelWidth',
+        selector: {
+          number: {
+            min: 50,
+            max: 500,
+            step: 10,
+            mode: 'slider',
+            unit_of_measurement: 'px',
+          },
+        },
+      },
+      {
+        name: 'group_order',
+        selector: {
+          text: {
+            multiline: true,
+          },
+        },
+      },
+      {
         name: 'epgPastTime',
         selector: {
           number: {
             min: 0,
             max: 1440,
-            step: 5,
-            unit_of_measurement: 'Minuten',
+            step: 10,
+            mode: 'slider',
+            unit_of_measurement: 'min',
           },
         },
       },
@@ -680,8 +1031,9 @@ export class EditorImpl extends EditorBase {
           number: {
             min: 0,
             max: 1440,
-            step: 5,
-            unit_of_measurement: 'Minuten',
+            step: 10,
+            mode: 'slider',
+            unit_of_measurement: 'min',
           },
         },
       },
@@ -691,8 +1043,9 @@ export class EditorImpl extends EditorBase {
           number: {
             min: 30,
             max: 1440,
-            step: 5,
-            unit_of_measurement: 'Minuten',
+            step: 10,
+            mode: 'slider',
+            unit_of_measurement: 'min',
           },
         },
       },
@@ -702,34 +1055,50 @@ export class EditorImpl extends EditorBase {
           number: {
             min: 0,
             max: 180,
-            step: 5,
-            unit_of_measurement: 'Minuten',
+            step: 10,
+            mode: 'slider',
+            unit_of_measurement: 'min',
           },
         },
       },
     ];
   }
 
-  _getEpgSchema() {
-    const schema = [
+  _getTableSchema() {
+    return [
       {
-        name: 'group_order',
+        name: 'time_window',
         selector: {
-          text: {
-            multiline: true,
+          select: {
+            options: [
+              { value: 'C', label: 'Aktuell' },
+              { value: 'D', label: 'Heute' },
+              { value: 'W', label: 'Diese Woche' },
+            ],
           },
         },
       },
-      // Fehlermeldung als Info-Feld direkt nach group_order
-      ...(this._groupOrderError
-        ? [
-            {
-              name: 'group_order_error',
-              type: 'custom:markdown',
-              content: `**<span style=\"color:var(--error-color)\">${this._groupOrderError}</span>**`,
-            },
-          ]
-        : []),
+      {
+        name: 'date',
+        selector: {
+          text: {},
+        },
+      },
+      {
+        name: 'max_items',
+        selector: {
+          number: {
+            min: 1,
+            max: 100,
+            mode: 'box',
+          },
+        },
+      },
+    ];
+  }
+
+  _getEpgDisplaySchema() {
+    return [
       {
         name: 'show_channel_groups',
         selector: { boolean: {} },
@@ -750,18 +1119,11 @@ export class EditorImpl extends EditorBase {
         name: 'show_description',
         selector: { boolean: {} },
       },
-      {
-        name: 'channelWidth',
-        selector: {
-          number: {
-            min: 50,
-            max: 500,
-            step: 10,
-            mode: 'slider',
-            unit_of_measurement: 'px',
-          },
-        },
-      },
+    ];
+  }
+
+  _getEpgDataSchema() {
+    return [
       {
         name: 'epgPastTime',
         selector: {
@@ -786,6 +1148,11 @@ export class EditorImpl extends EditorBase {
           },
         },
       },
+    ];
+  }
+
+  _getEpgTimeSchema() {
+    return [
       {
         name: 'epgShowFutureTime',
         selector: {
@@ -810,11 +1177,11 @@ export class EditorImpl extends EditorBase {
           },
         },
       },
-      // useDummyData ist eine Build-Variable, keine Editor-Option
-      // {
-      //   name: 'useDummyData',
-      //   selector: { boolean: {} },
-      // },
+    ];
+  }
+
+  _getEpgLayoutSchema() {
+    return [
       {
         name: 'channelWidth',
         selector: {
@@ -827,7 +1194,14 @@ export class EditorImpl extends EditorBase {
           },
         },
       },
+      {
+        name: 'group_order',
+        selector: {
+          text: {
+            multiline: true,
+          },
+        },
+      },
     ];
-    return schema;
   }
 }

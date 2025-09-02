@@ -35,7 +35,7 @@ export class EpgProgramBox extends EpgElementBase {
 
   constructor() {
     super();
-    this.dM = `${this.constructor.className||"?"}: `; // debugMsgPrefix - Prefix für Debug-Nachrichten
+    this.dM = `${this.constructor.className || '?'}: `; // debugMsgPrefix - Prefix für Debug-Nachrichten
 
     // Initialisiere Properties
     this.programs = [];
@@ -74,7 +74,7 @@ export class EpgProgramBox extends EpgElementBase {
   }
 
   _handleOnChangeNotify_Envchanges(eventdata) {
-    const dM= `${this.dM||"?: "}_handleOnChangeNotify_Envchanges()`
+    const dM = `${this.dM || '?: '}_handleOnChangeNotify_Envchanges()`;
     const { oldState, newState } = eventdata;
     this._debug(`${dM}Environment-Änderungen empfangen`, {
       oldState,
@@ -112,8 +112,21 @@ export class EpgProgramBox extends EpgElementBase {
     }
   }
 
+  /**
+   * Aktualisiert die CSS-Variable --epg-scale bei Scale-Änderungen
+   */
+  _updateEpgScaleCSS() {
+    if (this.programBox) {
+      this.programBox.style.setProperty('--epg-scale', this.scale);
+      this._debug('ProgramBox: CSS-Variable --epg-scale aktualisiert', {
+        scale: this.scale,
+        programBox: !!this.programBox,
+      });
+    }
+  }
+
   _handleOnChangeNotify_Progscrollx(eventdata) {
-    const dM= `${this.dM||"?: "}_handleOnChangeNotify_Progscrollx()`
+    const dM = `${this.dM || '?: '}_handleOnChangeNotify_Progscrollx()`;
     const scrollevent = eventdata;
     this.programaticalScroll = true;
     this.programBox.scrollLeft = scrollevent.scrollLeft;
@@ -125,7 +138,7 @@ export class EpgProgramBox extends EpgElementBase {
     });
   }
   _handleOnChangeNotify_Viewchanges(eventdata) {
-    const dM= `${this.dM||"?: "}_handleOnChangeNotify_Viewchanges()`
+    const dM = `${this.dM || '?: '}_handleOnChangeNotify_Viewchanges()`;
     this._debug(`${dM}viewchanges event empfangen`, {
       element: this,
       eventdata: eventdata,
@@ -213,6 +226,11 @@ export class EpgProgramBox extends EpgElementBase {
       changedProperties: Array.from(changedProperties.keys()),
     });
 
+    // Aktualisiere CSS-Variable --epg-scale bei Scale-Änderungen
+    if (changedProperties.has('scale')) {
+      this._updateEpgScaleCSS();
+    }
+
     // ===== SCROLLING NACH PROGRAMM-ÄNDERUNGEN =====
     // Nur beim ersten Laden (isFirstLoad === 0) automatisch scrollen
     const shouldAutoScroll = this.isFirstLoad === 0;
@@ -223,8 +241,7 @@ export class EpgProgramBox extends EpgElementBase {
         isFirstLoad: this.isFirstLoad,
         scrollPositionSeconds: this.scrollPositionSeconds,
         earliestProgramStart: this.earliestProgramStart,
-        now: new Date(Date.now() / 1000).toISOString(),
-        nowLocal: new Date(Date.now() / 1000).toLocaleString(),
+        now: new Date(Date.now() / 1000).toLocaleString(),
         pastTime: this.epgBox?.epgShowPastTime,
         pastTimeSeconds: (this.epgBox?.epgShowPastTime || 40) * 60,
       });
@@ -296,97 +313,95 @@ export class EpgProgramBox extends EpgElementBase {
     }
   }
 
-  static get styles() {
-    return [
-      super.styles,
-      css`
-        .programBox {
-          overflow: auto;
-          position: relative;
-          height: 100%;
-          width: 100%;
-          scrollbar-width: none;
-          -ms-overflow-style: none;
-        }
+  static styles = [
+    super.styles,
+    css`
+      .programBox {
+        overflow: auto;
+        position: relative;
+        height: 100%;
+        width: 100%;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+      }
 
-        .programBox::-webkit-scrollbar {
-          display: none;
-        }
+      .programBox::-webkit-scrollbar {
+        display: none;
+      }
 
-        .programContainer {
-          position: relative;
-          width: fit-content;
-          min-width: 100%;
-        }
+      .programContainer {
+        position: relative;
+        width: fit-content;
+        min-width: 100%;
+      }
 
-        .programRow {
-          display: flex;
-          flex-direction: row;
-          align-items: stretch;
-          justify-content: flex-start;
-          border-bottom: none;
-          margin: 0;
-          padding: 0;
-          flex-shrink: 0;
-          flex-grow: 0;
-          height: calc(
-            var(--epg-row-height) + var(--has-time) + var(--has-duration) + var(--has-description) +
-              var(--has-shorttext)
-          );
-          min-width: 100%;
-          width: fit-content;
-        }
+      .programRow {
+        display: flex;
+        flex-direction: row;
+        align-items: stretch;
+        justify-content: flex-start;
+        border-bottom: none;
+        margin: 0;
+        padding: 0;
+        flex-shrink: 0;
+        flex-grow: 0;
+        height: calc(
+          var(--epg-row-height) + var(--has-time) + var(--has-duration) + var(--has-description) +
+            var(--has-shorttext)
+        );
+        min-width: 100%;
+        width: fit-content;
+      }
 
-        /* Alternierende Farben für Programm-Items */
-        .programRow:nth-child(odd) epg-program-item:nth-child(even) {
-          background-color: var(--epg-odd-program-even-bg);
-          color: var(--epg-odd-program-even-text);
-        }
+      /* Alternierende Farben für Programm-Items */
+      .programRow:nth-child(odd) epg-program-item:nth-child(even) {
+        background-color: var(--epg-odd-program-even-bg);
+        color: var(--epg-odd-program-even-text);
+      }
 
-        .programRow:nth-child(odd) epg-program-item:nth-child(odd) {
-          background-color: var(--epg-odd-program-odd-bg);
-          color: var(--epg-odd-program-odd-text);
-        }
+      .programRow:nth-child(odd) epg-program-item:nth-child(odd) {
+        background-color: var(--epg-odd-program-odd-bg);
+        color: var(--epg-odd-program-odd-text);
+      }
 
-        .programRow:nth-child(even) epg-program-item:nth-child(even) {
-          background-color: var(--epg-even-program-even-bg);
-          color: var(--epg-even-program-even-text);
-        }
+      .programRow:nth-child(even) epg-program-item:nth-child(even) {
+        background-color: var(--epg-even-program-even-bg);
+        color: var(--epg-even-program-even-text);
+      }
 
-        .programRow:nth-child(even) epg-program-item:nth-child(odd) {
-          background-color: var(--epg-even-program-odd-bg);
-          color: var(--epg-even-program-odd-text);
-        }
+      .programRow:nth-child(even) epg-program-item:nth-child(odd) {
+        background-color: var(--epg-even-program-odd-bg);
+        color: var(--epg-even-program-odd-text);
+      }
 
-        /* Hover-Zustand */
-        epg-program-item:hover {
-          background-color: var(--epg-hover-bg) !important;
-          color: var(--epg-text-color) !important;
-        }
+      /* Hover-Zustand */
+      epg-program-item:hover {
+        background-color: var(--epg-hover-bg) !important;
+        color: var(--epg-text-color) !important;
+      }
 
-        .loading {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          height: 100%;
-          color: var(--epg-text-color);
-        }
+      .loading {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        color: var(--epg-text-color);
+      }
 
-        .error {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          height: 100%;
-          color: var(--epg-error-color, red);
-        }
-      `,
-    ];
-  }
+      .error {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        color: var(--epg-error-color, red);
+      }
+    `,
+  ];
 
   render() {
     this._debug('ProgramBox: render() aufgerufen');
     return html`
-      <div class="programBox" @scroll="${this._onScroll}">
+      <div class="programBox" @scroll="${this._onScroll}" style="--epg-scale: ${this.scale}">
         <!-- Time Marker über den Programmen -->
         <epg-time-marker
           .earliestProgramStart=${this.earliestProgramStart}

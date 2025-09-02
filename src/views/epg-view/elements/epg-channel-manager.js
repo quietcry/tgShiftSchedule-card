@@ -5,7 +5,7 @@
 import yaml from 'js-yaml';
 import { TgCardHelper } from '../../../tools/tg-card-helper.js';
 
-export class EpgChannelManager extends TgCardHelper{
+export class EpgChannelManager extends TgCardHelper {
   constructor(epgBox) {
     super();
     this.dM = `${this.constructor.className}: `; // debugMsgPrefix - Prefix für Debug-Nachrichten
@@ -244,7 +244,7 @@ export class EpgChannelManager extends TgCardHelper{
    * Sortiert einen Kanal in die Struktur ein
    */
   sortChannelIntoStructure(channel) {
-    const dM= `${this.dM||"?: "}sortChannelIntoStructure() `
+    const dM = `${this.dM || '?: '}sortChannelIntoStructure() `;
     this.epgBox._debug('EpgChannelManager: Sortiere Kanal in die Struktur ein', {
       channel: channel,
     });

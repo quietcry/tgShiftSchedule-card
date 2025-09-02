@@ -11,7 +11,7 @@ export class EnvSniffer extends TgCardHelper {
     this.dM = `${this.constructor.className}: `; // debugMsgPrefix - Prefix für Debug-Nachrichten
     this._cardElement = cardElement;
     this._eventTarget = eventTarget || cardElement;
-    this.envDefault={
+    this.envDefault = {
       deviceType: 'unknown',
       orientation: 'unknown',
       isTouchscreen: false,
@@ -21,10 +21,10 @@ export class EnvSniffer extends TgCardHelper {
       cardWidth: 0,
       cardHeight: 0,
       cardPosition: null,
-      huiViewPosition: null
+      huiViewPosition: null,
     };
-    this.env = {... this.envDefault};
-    this.oldEnv = {... this.env};
+    this.env = { ...this.envDefault };
+    this.oldEnv = { ...this.env };
 
     this._resizeObserver = null;
     this._resizeTimeout = null;
@@ -42,7 +42,6 @@ export class EnvSniffer extends TgCardHelper {
    * Initialisiert die Umgebungsüberwachung
    */
   init(retryCount = 0) {
-
     if (!this._cardElement || !(this._cardElement instanceof Element)) {
       this._debug(`${this.dM}Initialisierung verzögert, warte...`, { retryCount });
       if (retryCount < this._maxRetries) {
@@ -56,7 +55,8 @@ export class EnvSniffer extends TgCardHelper {
     if (rect.width <= 0 || rect.height <= 0) {
       if (retryCount < this._maxRetries) {
         this._debug(`${this.dM}Initialisierung verzögert, warte...`, {
-          retryCount });
+          retryCount,
+        });
 
         setTimeout(() => this.init(retryCount + 1), 100);
       } else {
@@ -74,14 +74,14 @@ export class EnvSniffer extends TgCardHelper {
   /**
    * Erkennt die aktuelle Umgebung
    */
-  detectEnvironment(sendEvent= false) {
+  detectEnvironment(sendEvent = false) {
     // Verhindere mehrfache Aufrufe während Retry-Schleife
     if (this._detectionInProgress) {
       this._debug(`${this.dM}detectEnvironment bereits in Bearbeitung, überspringe`);
       return;
     }
     this._detectionInProgress = true;
-    this.oldEnv = {... this.env};
+    this.oldEnv = { ...this.env };
 
     // Touchscreen über CSS Media Queries
     this.env.isTouchscreen = this.detectTouchscreen();
@@ -106,16 +106,21 @@ export class EnvSniffer extends TgCardHelper {
     this.updateHuiViewPosition();
 
     if (sendEvent) {
-      this._debug(`${this.dM}Umgebung geändert, sofortige Event-Benachrichtigung`, { oldEnv: this.oldEnv, newEnv: this.env });
+      this._debug(`${this.dM}Umgebung geändert, sofortige Event-Benachrichtigung`, {
+        oldEnv: this.oldEnv,
+        newEnv: this.env,
+      });
       this.dispatchEnvironmentChangeEvent(this.oldEnv, this.env);
       if (this._debounceTimer) {
         clearTimeout(this._debounceTimer);
         this._debounceTimer = null;
       }
-
     }
-    if ((!sendEvent) && (this._debounceTimer || this.checkEnvironmentChange())) {
-      this._debug(`${this.dM}Umgebung geändert, mit Verzögerung`, { oldEnv: this.oldEnv, newEnv: this.env });
+    if (!sendEvent && (this._debounceTimer || this.checkEnvironmentChange())) {
+      this._debug(`${this.dM}Umgebung geändert, mit Verzögerung`, {
+        oldEnv: this.oldEnv,
+        newEnv: this.env,
+      });
       this._debounceEnvironmentChange();
     }
     this._detectionInProgress = false;
@@ -126,11 +131,13 @@ export class EnvSniffer extends TgCardHelper {
    */
   detectDeviceType() {
     // Mobile: Kein Hover + grobe Pointer
-    return window.matchMedia('(hover: none) and (pointer: coarse)').matches ?
-    'mobile' :
-    window.matchMedia('(hover: hover) and (pointer: fine)').matches ?
-    'desktop' :
-    this.env.isTouchscreen ? 'mobile' : 'unknown';
+    return window.matchMedia('(hover: none) and (pointer: coarse)').matches
+      ? 'mobile'
+      : window.matchMedia('(hover: hover) and (pointer: fine)').matches
+        ? 'desktop'
+        : this.env.isTouchscreen
+          ? 'mobile'
+          : 'unknown';
   }
 
   /**
@@ -138,11 +145,15 @@ export class EnvSniffer extends TgCardHelper {
    */
   detectOrientation() {
     // Portrait: Höhe größer als Breite
-    return window.matchMedia ?
-      window.matchMedia('(orientation: portrait)').matches ? "portrait" :
-      window.matchMedia('(orientation: landscape)').matches ? "landscape" :
-      "unknown" :
-    window.innerWidth > window.innerHeight ? "landscape" : "portrait";
+    return window.matchMedia
+      ? window.matchMedia('(orientation: portrait)').matches
+        ? 'portrait'
+        : window.matchMedia('(orientation: landscape)').matches
+          ? 'landscape'
+          : 'unknown'
+      : window.innerWidth > window.innerHeight
+        ? 'landscape'
+        : 'portrait';
   }
 
   /**
@@ -150,9 +161,9 @@ export class EnvSniffer extends TgCardHelper {
    */
   detectTouchscreen() {
     // Primär über Media Queries (zuverlässiger)
-    return window.matchMedia ?
-    window.matchMedia('(pointer: coarse)').matches || window.matchMedia('(hover: none)').matches :
-    'ontouchstart' in window || navigator.maxTouchPoints > 0 || navigator.msMaxTouchPoints > 0;
+    return window.matchMedia
+      ? window.matchMedia('(pointer: coarse)').matches || window.matchMedia('(hover: none)').matches
+      : 'ontouchstart' in window || navigator.maxTouchPoints > 0 || navigator.msMaxTouchPoints > 0;
   }
 
   /**
@@ -274,9 +285,7 @@ export class EnvSniffer extends TgCardHelper {
     // Gültige Dimensionen gefunden
     this.env.cardWidth = rect.width || 0;
     this.env.cardHeight = rect.height || 0;
-
-    }
-
+  }
 
   /**
    * Fügt benutzerdefinierte Umgebungsvariablen hinzu
@@ -314,11 +323,10 @@ export class EnvSniffer extends TgCardHelper {
     }
 
     this.env = { ...this.envDefault };
-    this.oldEnv = { ...this.env };  // Kopie des leeren Objekts
+    this.oldEnv = { ...this.env }; // Kopie des leeren Objekts
     this._cardElement = null;
     this._eventTarget = null;
   }
-
 
   checkEnvironmentChange() {
     let changed = false;
@@ -328,7 +336,7 @@ export class EnvSniffer extends TgCardHelper {
         break;
       }
     }
-    return changed
+    return changed;
   }
 
   /**
@@ -354,7 +362,10 @@ export class EnvSniffer extends TgCardHelper {
    */
   dispatchEnvironmentChangeEvent(oldState, newState) {
     // Aktualisiere die öffentliche env-Property
-    this._debug(`${this.dM}Umgebungsänderung, Event-Benachrichtigung`, { oldState: oldState, newState: newState });
+    this._debug(`${this.dM}Umgebungsänderung, Event-Benachrichtigung`, {
+      oldState: oldState,
+      newState: newState,
+    });
 
     const event = new CustomEvent('envchanges-event', {
       detail: {
@@ -366,7 +377,6 @@ export class EnvSniffer extends TgCardHelper {
     });
 
     this._eventTarget.dispatchEvent(event);
-
   }
 
   /**
@@ -438,12 +448,10 @@ export class EnvSniffer extends TgCardHelper {
     }, 200);
   }
 
-
   /**
    * Handler für Karten-Resize
    */
   handleCardResize() {
     this.detectEnvironment();
   }
-
 }

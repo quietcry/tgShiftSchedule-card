@@ -7,14 +7,17 @@ export class EditorBase extends SuperBase {
     _selectedTab: { type: Number },
   };
 
-  static styles = css`
-    :host {
-      display: block;
-    }
-    .editor-container {
-      padding: 16px;
-    }
-  `;
+  static styles = [
+    super.styles,
+    css`
+      :host {
+        display: block;
+      }
+      .editor-container {
+        padding: 16px;
+      }
+    `,
+  ];
 
   constructor(defaultConfig = {}) {
     super();

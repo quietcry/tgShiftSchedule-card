@@ -85,7 +85,7 @@ export class CardBase extends SuperBase {
   }
 
   static styles = [
-    SuperBase.styles,
+    super.styles,
     css`
       :host {
         display: block;
@@ -138,7 +138,7 @@ export class CardBase extends SuperBase {
    * @param {Function} callback - Callback-Funktion, die bei Änderungen aufgerufen wird
    */
   registerInformAtChangesClients(me, eventType = '', immediately = false, callback = null) {
-    const dM= `${this.dM||"?: "}registerInformAtChangesClients() `
+    const dM = `${this.dM || '?: '}registerInformAtChangesClients() `;
     this._debug(`${dM}Anfrage`, {
       me,
       newEventType: eventType,
@@ -173,14 +173,11 @@ export class CardBase extends SuperBase {
     // Finde nur die wirklich neuen EventTypes
     const newEventTypes = eventTypes.filter(newType => !existingEventTypes.includes(newType));
     if (existingMeInformer && newEventTypes.length === 0) {
-      this._debug(
-        `${dM}Client war bereits mit allen Typen registriert`,
-        {
-          me,
-          requestedEventTypes: eventTypes,
-          existingEventTypes,
-        }
-      );
+      this._debug(`${dM}Client war bereits mit allen Typen registriert`, {
+        me,
+        requestedEventTypes: eventTypes,
+        existingEventTypes,
+      });
       return false;
     }
 
@@ -267,7 +264,9 @@ export class CardBase extends SuperBase {
             } catch (error) {
               console.error(
                 '_notifyClientsAtChanges() Fehler beim Benachrichtigen des Clients:',
-                 details, data, error
+                details,
+                data,
+                error
               );
             }
           }

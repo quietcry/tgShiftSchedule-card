@@ -24,8 +24,9 @@ export class EPGView extends ViewBase {
     _tooltipElement: { type: Object },
   };
 
-  static get styles() {
-    return css`
+  static styles = [
+    super.styles,
+    css`
       :host {
         display: block;
         width: 100%;
@@ -270,8 +271,8 @@ export class EPGView extends ViewBase {
       .scrollbarx .scrollbarx-thumb:active {
         cursor: grabbing;
       }
-    `;
-  }
+    `,
+  ];
 
   constructor() {
     super();

@@ -15,13 +15,13 @@ export class SuperBase extends LitElement {
     config: { type: Object },
   };
 
-  static get styles() {
-    return css`
+  static styles = [
+    css`
       :host {
         display: block;
       }
-    `;
-  }
+    `,
+  ];
 
   constructor() {
     super();
@@ -36,8 +36,8 @@ export class SuperBase extends LitElement {
     this._debug('SuperBase-Konstruktor wird aufgerufen');
   }
 
-  registerMeForChangeNotifys(eventTypes = '', that=this) {
-    const dM= `${this.dM||"?: "}registerMeForChangeNotifys() `
+  registerMeForChangeNotifys(eventTypes = '', that = this) {
+    const dM = `${this.dM || '?: '}registerMeForChangeNotifys() `;
     this._debug(`${dM} Aufruf`, { eventTypes, that });
     this.dispatchEvent(
       new CustomEvent('registerMeForChanges', {
@@ -54,7 +54,7 @@ export class SuperBase extends LitElement {
   }
 
   _handleOnChangeNotifys(eventdata) {
-    const dM= `${this.dM||"?: "}_handleOnChangeNotifys() `
+    const dM = `${this.dM || '?: '}_handleOnChangeNotifys() `;
     this._debug(`${dM}aufgerufen`, { eventdata });
     for (const eventType of Object.keys(eventdata)) {
       const fkt = '_handleOnChangeNotify_' + eventType.charAt(0).toUpperCase() + eventType.slice(1);

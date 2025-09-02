@@ -6,15 +6,13 @@ import { CardRegname, CardName, CardDescription } from './card-config.js';
 
 export class Card extends CardImpl {
   // className wird von CardImpl geerbt (ist 'CardImpl')
-  static get styles() {
-    return [
-      super.styles,
-      css`
-        :host {
-        }
-      `,
-    ];
-  }
+  static styles = [
+    super.styles,
+    css`
+      :host {
+      }
+    `,
+  ];
 
   constructor() {
     super();

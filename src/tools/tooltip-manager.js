@@ -166,8 +166,6 @@ export class EpgTooltip extends SuperBase {
     `;
   }
 
-
-
   /**
    * Lifecycle: Wird aufgerufen, wenn das Element entfernt wird
    */

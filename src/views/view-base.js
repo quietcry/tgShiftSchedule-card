@@ -20,6 +20,14 @@ export class ViewBase extends SuperBase {
     this._error = null;
     this._debug('ViewBase-Konstruktor: Initialisierung abgeschlossen');
   }
+  static styles = [
+    super.styles,
+    css`
+      :host {
+        display: block;
+      }
+    `,
+  ];
 
   async firstUpdated() {
     this._debug('ViewBase firstUpdated: Start');

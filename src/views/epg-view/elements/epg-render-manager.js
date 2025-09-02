@@ -105,6 +105,17 @@ export class EpgRenderManager extends TgCardHelper {
    * Rendert ein einzelnes Programm-Item
    */
   renderProgramItem(program, channelId) {
+    // Debug: Zeige was für ein Programm gerendert wird
+    this._debug('EpgRenderManager: renderProgramItem aufgerufen', {
+      programType: program.type,
+      start: program.start,
+      stop: program.stop,
+      end: program.end,
+      duration: program.duration,
+      title: program.title,
+      channelId: channelId,
+    });
+
     // Prüfe, ob es sich um ein Gap-Element handelt
     if (program.type === 'startgap' || program.type === 'endgap' || program.type === 'noprogram') {
       // Gap-Element - rendere es als leeres Element mit korrekter Breite

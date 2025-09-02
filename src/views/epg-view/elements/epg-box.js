@@ -73,8 +73,8 @@ export class EpgBox extends EpgElementBase {
     };
 
     // Eigenständige Zeit-Variablen
-    this.earliestProgramStart = Math.floor(Date.now() / 1000); // Aktuelle Zeit als Unix-Timestamp
-    this.latestProgramStop = Math.floor(Date.now() / 1000); // Aktuelle Zeit als Unix-Timestamp
+    this.earliestProgramStart = 0; // Wird auf echte Programm-Startzeit gesetzt
+    this.latestProgramStop = 0; // Wird auf echte Programm-Stoppzeit gesetzt
 
     // DOM-Referenzen (werden in firstUpdated gesetzt)
     this.programBox = null;

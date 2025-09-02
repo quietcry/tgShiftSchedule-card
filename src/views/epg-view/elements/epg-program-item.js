@@ -44,6 +44,8 @@ export class EpgProgramItem extends EpgElementBase {
     this._tooltipTimer = null;
     this._isTooltipVisible = false; // Tracke den aktuellen Tooltip-Status
     this._isUpdating = false; // Verhindert Events während Lit-Updates
+    this.dM = `${this.constructor.className}: `; // debugMsgPrefix - Prefix für Debug-Nachrichten
+    this._debug(`${this.dM}EpgProgramItem-Modul wird geladen`);
   }
 
   // Getter für Kompatibilität
@@ -76,11 +78,20 @@ export class EpgProgramItem extends EpgElementBase {
       cssStop: cssStopBefore,
       cssScale: cssScaleBefore,
       width: widthBefore,
+      duration: this.stop - this.start,
+      calculatedWidth: `(${this.stop} - ${this.start}) * ${this.scale || 'undefined'} * 1px`,
     });
 
     // Setze CSS-Variablen für automatische Breitenberechnung
     this.style.setProperty('--start', this.start);
     this.style.setProperty('--stop', this.stop);
+
+    // Debug: CSS-Variablen gesetzt
+    this._debug('EpgProgramItem: CSS-Variablen gesetzt', {
+      '--start': this.start,
+      '--stop': this.stop,
+      '--epg-scale': getComputedStyle(this).getPropertyValue('--epg-scale'),
+    });
 
     // Debug: Werte nach dem Update
     const computedStyleAfter = getComputedStyle(this);
@@ -139,6 +150,9 @@ export class EpgProgramItem extends EpgElementBase {
   }
 
   render() {
+    // Aktualisiere CSS-Variablen vor dem Rendern
+    this.updateCSSVariables();
+
     // Für Gap-Elemente: Zeige nur einen leeren Bereich
     if (this.isGap) {
       return html`
@@ -213,6 +227,11 @@ export class EpgProgramItem extends EpgElementBase {
    */
   updated(changedProperties) {
     super.updated(changedProperties);
+
+    // Aktualisiere CSS-Variablen wenn start/stop sich ändern
+    if (changedProperties.has('start') || changedProperties.has('stop')) {
+      this.updateCSSVariables();
+    }
 
     // Markiere Update als abgeschlossen
     this._isUpdating = false;

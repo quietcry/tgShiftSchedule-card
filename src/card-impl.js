@@ -208,31 +208,29 @@ export class CardImpl extends CardBase {
     }
   }
 
-  static get styles() {
-    return [
-      CardBase.styles,
-      EPGView.styles,
-      css`
-        :host {
-          display: block;
-        }
+  static styles = [
+    super.styles,
+    EPGView.styles,
+    css`
+      :host {
+        display: block;
+      }
 
-        ha-card {
-          padding: 16px;
-        }
+      ha-card {
+        padding: 16px;
+      }
 
-        .loading {
-          text-align: center;
-          padding: 20px;
-          color: var(--secondary-text-color);
-        }
+      .loading {
+        text-align: center;
+        padding: 20px;
+        color: var(--secondary-text-color);
+      }
 
-        .error {
-          text-align: center;
-          padding: 20px;
-          color: var(--error-color);
-        }
-      `,
-    ];
-  }
+      .error {
+        text-align: center;
+        padding: 20px;
+        color: var(--error-color);
+      }
+    `,
+  ];
 }
