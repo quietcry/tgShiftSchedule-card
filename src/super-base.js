@@ -33,6 +33,7 @@ export class SuperBase extends LitElement {
     this.useDummyData = this.constructor.useDummyData;
     this.showVersion = this.constructor.showVersion;
     this.tgCardHelper = new TgCardHelper(this.constructor.cardName, this.constructor.debugMode);
+    this.getCardInfoString = this.tgCardHelper.getCardInfoString;
     this._debug('SuperBase-Konstruktor wird aufgerufen');
   }
 

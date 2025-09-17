@@ -42,6 +42,7 @@ export class EditorImpl extends EditorBase {
         epgShowFutureTime: 180, // Minuten sichtbar in der Ansicht
         epgPastTime: 30, // Minuten in die Vergangenheit
         epgFutureTime: 120, // Minuten in die Zukunft
+        epgExtendConfig: '', // Erweiterte Konfiguration
       },
     });
 
@@ -383,6 +384,8 @@ export class EditorImpl extends EditorBase {
         return 'Whitelist (YAML)';
       case 'blacklist':
         return 'Blacklist (YAML)';
+      case 'epgExtendConfig':
+        return 'Erweiterte Konfiguration (YAML)';
       case 'group_order':
         return 'Sortierung (YAML)';
       case 'epgPastTime':
@@ -958,6 +961,14 @@ export class EditorImpl extends EditorBase {
       },
       {
         name: 'blacklist',
+        selector: {
+          text: {
+            multiline: true,
+          },
+        },
+      },
+      {
+        name: 'epgExtendConfig',
         selector: {
           text: {
             multiline: true,

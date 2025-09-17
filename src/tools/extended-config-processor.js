@@ -149,7 +149,7 @@ export class ExtendedConfigProcessor extends TgCardHelper {
 
   /**
    * Wertet eine Bedingung aus
-   * @param {string} condition - Bedingung (z.B. "cardwidth > 500")
+   * @param {string} condition - Bedingung (z.B. "cardWidth > 500")
    * @param {Object} env - Umgebungsvariablen
    * @returns {boolean} true wenn Bedingung erfüllt
    */
@@ -444,12 +444,7 @@ export class ExtendedConfigProcessor extends TgCardHelper {
       });
     }
 
-    console.groupCollapsed(
-      `%c${this.cardName}%c${this.version}%c Konfigurationsvergleich >>`,
-      'background: #9c27b0; color: white; padding: 2px 6px; border-top-left-radius: 12px; border-bottom-left-radius: 12px; font-weight: bold;',
-      'background: #00bcd4; color: white; padding: 2px 6px; border-top-right-radius: 12px; border-bottom-right-radius: 12px; font-weight: bold;',
-      ''
-    );
+    console.groupCollapsed(...this.getCardInfoString, 'Konfigurationsvergleich >>');
     console.log('\n🌍 Umgebungsvariablen für Bedingungsauswertung:');
 
     if (Object.keys(envTableData).length > 0) {

@@ -21,6 +21,7 @@ export class Card extends CardImpl {
 
   connectedCallback() {
     super.connectedCallback();
+    console.info(...this.getCardInfoString);
     console.log(`[${CardName}] Card ist verbunden`);
   }
 

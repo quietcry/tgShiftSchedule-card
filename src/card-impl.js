@@ -3,6 +3,7 @@ import { CardBase } from './card-base.js';
 import { TableView } from './views/table-view/table-view.js';
 import { EPGView } from './views/epg-view/epg-view.js';
 import { EnvSniffer } from './env-sniffer.js';
+import { ExtendedConfigProcessor } from './tools/extended-config-processor.js';
 import { CardName, CardRegname, DebugMode, UseDummyData } from './card-config.js';
 
 export class CardImpl extends CardBase {
@@ -66,6 +67,7 @@ export class CardImpl extends CardBase {
     if (!this._envSniffer) {
       this._debug('Initialisiere EnvSniffer bei Bedarf');
       this._envSniffer = new EnvSniffer(this);
+      this._setupEnvChangeListener();
 
       // Warte kurz und prüfe dann die Werte
       setTimeout(() => {
@@ -82,6 +84,18 @@ export class CardImpl extends CardBase {
       }, 50);
     }
   }
+
+  _setupEnvChangeListener() {
+    this.addEventListener('envchanges-event', event => {
+      this._debug('CardImpl: Environment-Änderung empfangen', event.detail);
+      this.env = this._envSniffer.env;
+
+      // Erweiterte Konfiguration neu verarbeiten bei Environment-Änderungen
+      if (this.config && this.config.epgExtendConfig) {
+        this._processExtendedConfig();
+      }
+    });
+  }
   _onProgscrollx(me, event) {
     this._debug('Progscrollx wird aufgerufen', {
       me: me,
@@ -94,6 +108,43 @@ export class CardImpl extends CardBase {
     this._initEnvSnifferIfNeeded();
     if (immediately) {
       this._envSniffer.detectEnvironment();
+    }
+  }
+
+  _processExtendedConfig() {
+    if (!this.config.epgExtendConfig || this.config.epgExtendConfig.trim() === '') {
+      this._debug('CardImpl: Keine erweiterte Konfiguration vorhanden');
+      return;
+    }
+
+    // Stelle sicher, dass this.env verfügbar ist
+    if (!this.env) {
+      this._debug('CardImpl: this.env nicht verfügbar, initialisiere EnvSniffer');
+      this._initEnvSnifferIfNeeded();
+      // Kurz warten, damit env verfügbar wird
+      setTimeout(() => {
+        this._processExtendedConfig();
+      }, 100);
+      return;
+    }
+
+    this._debug('CardImpl: Verarbeite erweiterte Konfiguration', {
+      epgExtendConfig: this.config.epgExtendConfig,
+      env: this.env,
+    });
+
+    try {
+      const processor = new ExtendedConfigProcessor();
+      const originalConfig = { ...this.config };
+
+      this.config = processor.processConfig(originalConfig, this.config.epgExtendConfig, this.env);
+
+      this._debug('CardImpl: Erweiterte Konfiguration verarbeitet', {
+        originalKeys: Object.keys(originalConfig),
+        newKeys: Object.keys(this.config),
+      });
+    } catch (error) {
+      this._debug('CardImpl: Fehler bei erweiterter Konfiguration', { error: error.message });
     }
   }
 
@@ -120,6 +171,7 @@ export class CardImpl extends CardBase {
       importantlist: '',
       epgShowPastTime: 60, // Minuten für Rückblick
       epgShowFutureTime: 180, // Minuten sichtbar in der Ansicht
+      epgExtendConfig: '', // Erweiterte Konfiguration
       useDummyData: UseDummyData === 'true', // Verwende Dummy-Daten statt echte EPG-Daten (Build-Variable)
     };
   }
@@ -134,6 +186,10 @@ export class CardImpl extends CardBase {
       ...this.getDefaultConfig(),
       ...config,
     };
+
+    // Erweiterte Konfiguration verarbeiten
+    this._processExtendedConfig();
+
     this._debug('config nach setConfig:', this.config);
     this._debug('Spezifische EPG-Werte', {
       epgShowPastTime: this.config.epgShowPastTime,
