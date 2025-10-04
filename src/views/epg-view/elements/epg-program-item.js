@@ -40,10 +40,7 @@ export class EpgProgramItem extends EpgElementBase {
     this.itemIndex = 0;
 
     // Tooltip-Event-Filterung
-    this._lastTooltipAction = null;
     this._tooltipTimer = null;
-    this._isTooltipVisible = false; // Tracke den aktuellen Tooltip-Status
-    this._isUpdating = false; // Verhindert Events während Lit-Updates
     this.dM = `${this.constructor.className}: `; // debugMsgPrefix - Prefix für Debug-Nachrichten
     this._debug(`${this.dM}EpgProgramItem-Modul wird geladen`);
   }
@@ -201,26 +198,6 @@ export class EpgProgramItem extends EpgElementBase {
     `;
   }
 
-  _onClick() {
-    // Gap-Elemente haben keine Klick-Events
-    if (this.isGap) {
-      return;
-    }
-
-    this.dispatchEvent(
-      new CustomEvent('program-selected', {
-        detail: {
-          start: this.start,
-          stop: this.stop,
-          duration: this.duration,
-          title: this.title,
-          description: this.description,
-        },
-        bubbles: true,
-        composed: true,
-      })
-    );
-  }
 
   /**
    * Lifecycle: Wird aufgerufen, wenn das Element aktualisiert wird
@@ -232,9 +209,13 @@ export class EpgProgramItem extends EpgElementBase {
     if (changedProperties.has('start') || changedProperties.has('stop')) {
       this.updateCSSVariables();
     }
-
-    // Markiere Update als abgeschlossen
-    this._isUpdating = false;
+  }
+  _onClick() {
+    // Gap-Elemente haben keine Klick-Events
+    if (this.isGap) {
+      return;
+    }
+    this._sendTooltipEvent('info');
   }
 
   _onMouseEnter() {
@@ -243,30 +224,8 @@ export class EpgProgramItem extends EpgElementBase {
       return;
     }
 
-    // Verhindere Events während Lit-Updates
-    if (this._isUpdating) {
-      this._debug('EpgProgramItem: Tooltip-Event übersprungen - Lit-Update läuft', {
-        title: this.title,
-      });
-      return;
-    }
-
-    // Nur senden wenn der Tooltip noch nicht sichtbar ist UND kein Timer läuft
-    if (!this._isTooltipVisible && !this._tooltipTimer) {
-      this._isUpdating = true; // Markiere Update als gestartet
-      this._sendDelayedTooltipEvent('show');
-      this._debug('EpgProgramItem: Tooltip-Event geplant (show)', {
-        title: this.title,
-        isGap: this.isGap,
-        isGroup: this.isGroup,
-      });
-    } else {
-      this._debug('EpgProgramItem: Tooltip-Event übersprungen - bereits geplant oder sichtbar', {
-        title: this.title,
-        isTooltipVisible: this._isTooltipVisible,
-        hasTimer: !!this._tooltipTimer,
-      });
-    }
+    // Einfach das Event senden - der Empfänger entscheidet über die Anzeige
+    this._sendDelayedTooltipEvent('show');
   }
 
   _onMouseLeave() {
@@ -275,47 +234,8 @@ export class EpgProgramItem extends EpgElementBase {
       return;
     }
 
-    // Stoppe den verzögerten Tooltip-Timer
-    if (this._tooltipTimer) {
-      clearTimeout(this._tooltipTimer);
-      this._tooltipTimer = null;
-      this._debug('EpgProgramItem: Tooltip-Timer gestoppt');
-    }
-
-    // Nur senden wenn der Tooltip sichtbar ist
-    if (this._isTooltipVisible) {
-      this._sendTooltipEvent('hide');
-      this._debug('EpgProgramItem: Tooltip-Event gesendet (hide)', {
-        title: this.title,
-      });
-    }
-
-    // Berechne die ursprünglichen Farben neu
-    // const isOddRow = this.rowIndex % 2 === 1;
-    // const isOddItem = this.itemIndex % 2 === 1;
-    // let bgColor, textColor;
-    // if (this.isCurrent) {
-    //   bgColor = 'var(--epg-accent)';
-    //   textColor = 'var(--epg-text-color)';
-    // } else if (isOddRow) {
-    //   if (isOddItem) {
-    //     bgColor = 'var(--epg-odd-program-odd-bg)';
-    //     textColor = 'var(--epg-odd-program-odd-text)';
-    //   } else {
-    //     bgColor = 'var(--epg-odd-program-even-bg)';
-    //     textColor = 'var(--epg-odd-program-even-text)';
-    //   }
-    // } else {
-    //   if (isOddItem) {
-    //     bgColor = 'var(--epg-even-program-odd-bg)';
-    //     textColor = 'var(--epg-even-program-even-text)';
-    //   } else {
-    //     bgColor = 'var(--epg-even-program-even-bg)';
-    //     textColor = 'var(--epg-even-program-even-text)';
-    //   }
-    // }
-    // this.style.backgroundColor = bgColor;
-    // this.style.color = textColor;
+    // Einfach das hide-Event senden - Timer-Management erfolgt in _sendTooltipEvent
+    this._sendTooltipEvent('hide');
   }
 
   /**
@@ -324,20 +244,14 @@ export class EpgProgramItem extends EpgElementBase {
   _sendTooltipEvent(action) {
     if (this.isGap || this.isGroup) return;
 
-    // Aktualisiere den lokalen Status
-    if (action === 'show') {
-      this._isTooltipVisible = true;
-    } else if (action === 'hide') {
-      this._isTooltipVisible = false;
+    // Stoppe Timer bei hide-Events (konsistent mit _sendDelayedTooltipEvent)
+    if (action === 'hide' && this._tooltipTimer) {
+      clearTimeout(this._tooltipTimer);
+      this._tooltipTimer = null;
+      this._debug('EpgProgramItem: Tooltip-Timer gestoppt (hide)');
     }
 
-    // Nur senden wenn sich die Action geändert hat
-    if (this._lastTooltipAction === action) {
-      this._debug('EpgProgramItem: Tooltip-Event ignoriert - gleiche Action', { action });
-      return;
-    }
-
-    this._lastTooltipAction = action;
+    // Einfach das Event senden - der Empfänger entscheidet über die Behandlung
     this.dispatchEvent(
       new CustomEvent('tooltip-event', {
         detail: {
@@ -373,6 +287,7 @@ export class EpgProgramItem extends EpgElementBase {
     // Längere Verzögerung für besseres Debouncing (500ms statt 200ms)
     this._tooltipTimer = setTimeout(() => {
       this._sendTooltipEvent(action);
+      this._tooltipTimer = null; // Timer zurücksetzen
     }, 500);
   }
 
@@ -418,16 +333,16 @@ export class EpgProgramItem extends EpgElementBase {
         opacity: calc((var(--stop, 0) - var(--start, 0)) * var(--epg-scale, 1) > 0 ? 1: 0);
       }
 
-      .programSlot {
+    .programSlot {
         padding: var(--epg-padding);
         border: 1px solid var(--epg-border-color);
-        margin: 0;
-        cursor: pointer;
-        box-sizing: border-box;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        overflow: hidden;
+      margin: 0;
+      cursor: pointer;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      overflow: hidden;
         border-radius: var(--epg-radius);
         flex: 1;
         height: 100%;
@@ -473,17 +388,17 @@ export class EpgProgramItem extends EpgElementBase {
         font-weight: bold;
         text-transform: uppercase;
         letter-spacing: 0.5px;
-      }
+    }
 
-      .programTitle {
-        font-weight: bold;
+    .programTitle {
+      font-weight: bold;
         margin-top: 1px;
-        font-size: 0.9em;
-        line-height: 1.2;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
+      font-size: 0.9em;
+      line-height: 1.2;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
 
       .programShortText {
         font-size: 0.8em;
@@ -495,8 +410,8 @@ export class EpgProgramItem extends EpgElementBase {
         font-style: italic;
       }
 
-      .programTime {
-        font-size: 0.8em;
+    .programTime {
+      font-size: 0.8em;
         margin-top: 1px;
         color: inherit;
         opacity: 0.8;
@@ -523,35 +438,35 @@ export class EpgProgramItem extends EpgElementBase {
 
         font-size: 0.8em;
         margin-top: 1px;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
         color: inherit;
-      }
+    }
 
-      .programDuration {
-        font-size: 0.8em;
+    .programDuration {
+      font-size: 0.8em;
         margin-top: 1px;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
         color: inherit;
-      }
+    }
 
-      .programDescription {
-        font-size: 0.8em;
-        line-height: 1.3;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        display: -webkit-box;
-        -webkit-line-clamp: 2;
-        -webkit-box-orient: vertical;
+    .programDescription {
+      font-size: 0.8em;
+      line-height: 1.3;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
         color: inherit;
-      }
+    }
     `,
   ];
 }
 
 if (!customElements.get('epg-program-item')) {
-  customElements.define('epg-program-item', EpgProgramItem);
+customElements.define('epg-program-item', EpgProgramItem);
 }

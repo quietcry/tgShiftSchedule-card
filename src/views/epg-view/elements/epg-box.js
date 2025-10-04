@@ -405,6 +405,16 @@ export class EpgBox extends EpgElementBase {
       envSnifferCardHeight: this.envSnifferCardHeight,
     });
     this.scrollbarX.addEventListener('scroll', this._onScrollbarScroll.bind(this));
+    this.dispatchEvent(
+      new CustomEvent('epg-box-ready', {
+        bubbles: true,
+        composed: true,
+        detail: {
+          client: this,
+        },
+      })
+    );
+
   }
 
   /**

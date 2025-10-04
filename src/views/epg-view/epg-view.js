@@ -7,7 +7,7 @@ import { EpgProgramList } from './elements/epg-program-list.js';
 import { EpgBox } from './elements/epg-box.js';
 import { DataProvider } from '../../tools/data-provider.js';
 import { EpgScrollManager } from './elements/epg-scroll-manager.js';
-import { EpgTooltip } from '../../tools/tooltip-manager.js';
+import '../../tools/tooltip-manager.js'; // Import für Custom Element Registrierung
 
 export class EPGView extends ViewBase {
   static className = 'EPGView';
@@ -32,6 +32,7 @@ export class EPGView extends ViewBase {
         width: 100%;
         position: relative;
         /* Höhe wird über JavaScript berechnet: viewport_height - epg-view_top */
+        overflow: visible; /* Erlaubt Tooltips außerhalb des Hosts */
       }
 
       .gridcontainer {
@@ -270,6 +271,17 @@ export class EPGView extends ViewBase {
 
       .scrollbarx .scrollbarx-thumb:active {
         cursor: grabbing;
+      }
+
+      /* Tooltip-Styling - Portal-ähnlicher Ansatz */
+      epg-tooltip {
+        position: fixed; /* Positioniert relativ zum Viewport */
+        z-index: 9999; /* Höchste Priorität */
+        pointer-events: none; /* Verhindert Interaktion mit darunterliegenden Elementen */
+      }
+
+      epg-tooltip.visible {
+        pointer-events: auto; /* Erlaubt Interaktion nur wenn sichtbar */
       }
     `,
   ];
@@ -579,7 +591,7 @@ export class EPGView extends ViewBase {
     }
 
     // Initialisiere TooltipCustomElement mit ProgramBox-Referenz
-    this._initializeTooltipElement();
+    //this._initializeTooltipElement();
 
     // Lade die Daten, wenn die EPG-Box bereit ist
     this._debug('EPG-View: EPG-Box ist bereit, starte Datenladung');
@@ -613,19 +625,13 @@ export class EPGView extends ViewBase {
 
     // Registriere Tooltip-Event-Listener (TooltipCustomElement wird später initialisiert)
     this.addEventListener('tooltip-event', event => {
-      // Leite das komplette event.detail an den Tooltip weiter
-      // Der Tooltip entscheidet selbst über show/hide
-      if (this._tooltipElement) {
-        this._tooltipElement.setEventData(event.detail);
-        this._debug('EPG-View: Tooltip-Event-Daten weitergeleitet', { detail: event.detail });
-      }
+      this._pipeTooltipEvent(event.detail);
     });
 
     // Prüfe ob epgBox bereits vorhanden ist
     const epgBox = this.shadowRoot.querySelector('epg-box');
     if (epgBox) {
       this._debug('EPG-View: epgBox bereits vorhanden, starte Datenladung');
-      this._initializeTooltipElement();
       this._loadData();
     } else {
       this._debug('EPG-View: epgBox noch nicht vorhanden, warte auf _onEpgBoxReady');
@@ -635,78 +641,30 @@ export class EPGView extends ViewBase {
     this._calculateOptimalHeight();
   }
 
-  /**
-   * Initialisiert den TooltipCustomElement mit ProgramBox-Referenz
-   */
-  _initializeTooltipElement() {
-    // Das Custom Element wird über das Template erstellt
-    this._tooltipElement = this.shadowRoot.querySelector('epg-tooltip');
-
-    if (this._tooltipElement) {
-      this._debug('EPG-View: TooltipCustomElement gefunden, setze Konfiguration');
-
-      // Setze Konfiguration für den Tooltip
-      this._tooltipElement.initialDelay = 3000;
-      this._tooltipElement.scrollPause = 4000;
-      this._tooltipElement.position = 'bottom';
-
-      // Warte bis die epg-program-box verfügbar ist
-      this._waitForProgramBox();
-    } else {
-      this._debug('EPG-View: TooltipCustomElement nicht gefunden, versuche es später');
-
-      // Versuche es mit einem kurzen Delay nochmal
-      setTimeout(() => {
-        this._retryTooltipElementInitialization();
-      }, 100);
-    }
-  }
-
-  /**
-   * Wartet bis die epg-program-box verfügbar ist und setzt dann die Referenzen
-   */
-  _waitForProgramBox() {
-    const epgBox = this.shadowRoot.querySelector('epg-box');
-    const programBox = epgBox?.shadowRoot?.querySelector('epg-program-box');
-
-    if (programBox) {
-      this._tooltipElement.frameElement = epgBox;
-      this._tooltipElement.hostElement = programBox;
-      this._debug('EPG-View: Frame und Host Element für Tooltip gesetzt');
-    } else {
-      // Warte noch ein bisschen und versuche es erneut
-      setTimeout(() => {
-        this._waitForProgramBox();
-      }, 200);
-    }
-  }
-
-  /**
-   * Versucht erneut den TooltipCustomElement mit ProgramBox-Referenz zu initialisieren
-   */
-  _retryTooltipElementInitialization() {
-    this._debug('EPG-View: TooltipCustomElement Retry-Initialisierung');
-
-    // Das Custom Element wird über das Template erstellt
-    this._tooltipElement = this.shadowRoot.querySelector('epg-tooltip');
-
-    if (this._tooltipElement) {
-      this._debug('EPG-View: TooltipCustomElement nachträglich gefunden, setze Konfiguration');
-
-      // Setze Konfiguration für den Tooltip
-      this._tooltipElement.initialDelay = 3000;
-      this._tooltipElement.scrollPause = 4000;
-      this._tooltipElement.position = 'bottom';
-
-      // Setze den Host Frame (ProgramBox) für die Positionierung
+  _pipeTooltipEvent(details, counter=0) {
+    this._debug('EPG-View: Tooltip-Event empfangen', { details });
+    if (! this._tooltipElement) {
       const epgBox = this.shadowRoot.querySelector('epg-box');
-      const programBox = epgBox?.shadowRoot?.querySelector('epg-program-box');
-      if (programBox) {
+      const programBox = epgBox?.shadowRoot?.querySelector('epg-program-box');  
+      this._tooltipElement = (epgBox && programBox) ? this.shadowRoot.querySelector('epg-tooltip') : null;
+      if (! this._tooltipElement ) {
+        if (counter < 10) {
+          this._debug('EPG-View: TooltipCustomElement nicht gefunden, versuche es später', { counter });
+          setTimeout(() => {
+            this._pipeTooltipEvent(details, counter + 1);
+            }, 100);
+        }
+        return;
+      } else {
+        this._debug('EPG-View: TooltipCustomElement gefunden, setze Konfiguration');
+        this._tooltipElement.initialDelay = 3000;
+        this._tooltipElement.scrollPause = 4000;
         this._tooltipElement.frameElement = epgBox;
         this._tooltipElement.hostElement = programBox;
-        this._debug('EPG-View: Frame und Host Element für Tooltip nachträglich gesetzt');
       }
     }
+    this._tooltipElement.setEventData(details);
+
   }
 
   /**
@@ -844,16 +802,16 @@ export class EPGView extends ViewBase {
           @scale-changed=${this._onScaleChanged}
         ></epg-box>
 
-        <!-- Tooltip Custom Element -->
-        <epg-tooltip
-          .data=${this._tooltipElement?.data}
-          .visible=${this._tooltipElement?.visible}
-          .position=${this._tooltipElement?.position}
-          .initialDelay=${3000}
-          .scrollPause=${4000}
-        >
-        </epg-tooltip>
       </div>
+      
+      <!-- Tooltip Custom Element - Außerhalb des Grids für bessere Kontrolle -->
+      <epg-tooltip
+        .data=${this._tooltipElement?.data}
+        .visible=${this._tooltipElement?.visible}
+        .initialDelay=${3000}
+        .scrollPause=${4000}
+      >
+      </epg-tooltip>
     `;
   }
 

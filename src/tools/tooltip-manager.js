@@ -10,7 +10,6 @@ export class EpgTooltip extends SuperBase {
 
   static properties = {
     data: { type: Object },
-    position: { type: String, reflect: true },
     margin: { type: Number },
     initialDelay: { type: Number },
     scrollPause: { type: Number },
@@ -22,12 +21,12 @@ export class EpgTooltip extends SuperBase {
     :host {
       display: block;
       position: absolute;
-      top: -9999px;
-      left: -9999px;
       opacity: 0;
       visibility: hidden;
       z-index: 10000;
       pointer-events: none;
+      max-width: 300px;
+
     }
 
     :host(.visible) {
@@ -45,8 +44,11 @@ export class EpgTooltip extends SuperBase {
       font-family: Arial, sans-serif;
       font-size: 14px;
       line-height: 1.4;
-      max-width: 300px;
+      width: 100%;  /* ✅ Einfach und elegant! */
       overflow: hidden;
+      
+      /* Smooth Transition für Breitenänderungen */
+      transition: max-width 0.2s ease, width 0.2s ease;
     }
 
     .tooltip-content {
@@ -118,7 +120,6 @@ export class EpgTooltip extends SuperBase {
     // Tooltip-Zustand
     this.visible = false;
     this.data = null;
-    this.position = 'bottom';
 
     // Auto-Scroll
     this._autoScrollTimer = null;
@@ -255,7 +256,7 @@ export class EpgTooltip extends SuperBase {
    * Setzt die Event-Daten und verarbeitet sie
    */
   setEventData(detail) {
-    this._debug('EpgTooltip: setEventData aufgerufen', { detail });
+    this._debug('EpgTooltip: setEventData aufgerufen', { detail: detail, frameElement: this.frameElement, hostElement: this.hostElement });
 
     // Verarbeite die Event-Daten
     this._eventData = detail;
@@ -265,6 +266,27 @@ export class EpgTooltip extends SuperBase {
       this.show(detail.data);
     } else if (detail.action === 'hide') {
       this.hide();
+    }
+  }
+
+  /**
+   * Lifecycle-Hook: Wird nach DOM-Update aufgerufen
+   */
+  updated(changedProperties) {
+    super.updated(changedProperties);
+    
+    // Position berechnen wenn Tooltip gezeigt werden soll
+    if (this._eventData?.action === 'show' && !this.visible) {
+      // Jetzt ist der DOM garantiert aktualisiert
+      this._calculateOptimalPosition();
+      
+      // Tooltip einblenden
+      this.visible = true;
+      this.classList.toggle('visible', this.visible);
+      
+      if (this.visible) {
+        this._startAutoScrollTimer();
+      }
     }
   }
 
@@ -280,17 +302,6 @@ export class EpgTooltip extends SuperBase {
     // Explizit Update auslösen für neue Daten
     this.requestUpdate();
 
-    // Berechne optimale Position
-    this._calculateOptimalPosition();
-
-    // Tooltip mit neuer Position einblenden
-    this.visible = true;
-
-    // CSS-Klasse setzen und Auto-Scroll starten
-    this.classList.toggle('visible', this.visible);
-    if (this.visible) {
-      this._startAutoScrollTimer();
-    }
   }
 
   /**
@@ -307,7 +318,16 @@ export class EpgTooltip extends SuperBase {
     // Stoppe Auto-Scroll
     this._stopAutoScroll();
   }
-
+  _clipToViewport(rect) {
+    return {
+      left: Math.max(0, rect.left),
+      right: Math.min(rect.right, window.innerWidth),
+      top: Math.max(0, rect.top),
+      bottom: Math.min(rect.bottom, window.innerHeight),
+      width: Math.min(rect.width, window.innerWidth - rect.left),
+      height: Math.min(rect.height, window.innerHeight - rect.top),
+    };
+  }
   /**
    * Berechnet die optimale Position für den Tooltip
    */
@@ -316,38 +336,115 @@ export class EpgTooltip extends SuperBase {
       this._debug('EpgTooltip: Kein hostElement gesetzt, verwende Standard-Position');
       return;
     }
-
+    const rand=10;
+    const elemRect=this._clipToViewport(this._eventData.element.getBoundingClientRect());
     const hostRect = this.hostElement.getBoundingClientRect();
-    const tooltipRect = this.getBoundingClientRect();
-    this._debug('EpgTooltip: tooltipRect', { tooltipRect });
-    const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight;
+    const frameRect=this.frameElement.getBoundingClientRect();   
+    this.style.maxWidth = '300px';
+    let tooltipRect = this.getBoundingClientRect();
+    const rects=[this._clipToViewport(hostRect), this._clipToViewport(frameRect)]
+    let pos=null
+    let space=null
+    const maxWidth=rects[rects.length-1].width / 3;
+    const startWidth=tooltipRect.width;
+    const widthStep=Math.abs((maxWidth-startWidth)/10);
+    let width=startWidth<maxWidth?startWidth:maxWidth;
+    while (width<=maxWidth) {
+      // Setze Breite direkt - CSS width: 100% macht den Rest
+      this.style.maxWidth = `${width}px`;
+      this.style.width = `${width}px`;
+      tooltipRect = this.getBoundingClientRect();
 
-    // Standard-Position (unten rechts vom Host)
-    let left = hostRect.right + 10;
-    let top = hostRect.top;
-
-    // Prüfe ob rechts genug Platz ist
-    if (left + tooltipRect.width > viewportWidth) {
-      // Links vom Host positionieren
-      left = hostRect.left - tooltipRect.width - 10;
+      for (const rect of rects) {
+        const topheight=elemRect.top-rect.top
+        const bottomheight=rect.bottom-elemRect.bottom
+        const leftwidth=elemRect.left-rect.left
+        const rightwidth=rect.right-elemRect.right
+        // Position top
+        if (topheight >= tooltipRect.height + 2*rand && rect.width >= tooltipRect.width + 2*rand) {
+          pos="top"
+        }
+        // Position bottom
+        else if (bottomheight >= tooltipRect.height + 2*rand && rect.width >= tooltipRect.width + 2*rand) {
+          pos="bottom"
+        }
+        // Position left
+        else if (leftwidth >= tooltipRect.width + 2*rand && rect.height >= tooltipRect.height + 2*rand) {
+          pos="left"
+        }
+        // Position right
+        else if (rightwidth >= tooltipRect.width + 2*rand && rect.height >= tooltipRect.height + 2*rand) {
+          pos="right"
+        }
+        this._debug('EpgTooltip: rect', 
+          { rect: rect,
+            elemRect: elemRect,
+            topheight: topheight,
+            bottomheight: bottomheight, 
+            leftwidth: leftwidth,
+            rightwidth: rightwidth,
+            pos: pos,
+          });
+        if (pos) {
+          space={rand:rand, rect: rect, topheight: topheight, bottomheight: bottomheight, leftwidth: leftwidth, rightwidth: rightwidth}
+          break
+        }
+      }
+      
+      if (pos) {
+        break;
+      }
+      width+=widthStep;
     }
 
-    // Prüfe ob unten genug Platz ist
-    if (top + tooltipRect.height > viewportHeight) {
-      // Über dem Host positionieren
-      top = hostRect.bottom - tooltipRect.height;
-    }
-
-    // Stelle sicher, dass der Tooltip nicht außerhalb des Viewports ist
-    left = Math.max(10, Math.min(left, viewportWidth - tooltipRect.width - 10));
-    top = Math.max(10, Math.min(top, viewportHeight - tooltipRect.height - 10));
-
-    this._debug('EpgTooltip: Position berechnet', { left, top, hostRect, tooltipRect });
+    let ttPos={left:null, top:null, width:null, height:null, bottom:null, right:null}
+    switch (pos) {
+      case "top":
+      case "bottom":
+        ttPos.left = elemRect.left + (elemRect.width / 2) - (tooltipRect.width / 2) 
+        if (ttPos.left < space.rect.left) {
+          ttPos.left = space.rect.left;
+        }
+        if (ttPos.left + tooltipRect.width > space.rect.left + space.rect.width) {
+          ttPos.left = space.rect.left + space.rect.width - tooltipRect.width;
+        }
+        break
+      case "left":
+      case "right":
+        ttPos.top = elemRect.top + (elemRect.height / 2) - (tooltipRect.height / 2) 
+        if (ttPos.top < space.rect.top) {
+          ttPos.top = space.rect.top;
+        }
+        if (ttPos.top + tooltipRect.height > space.rect.top + space.rect.height) {
+          ttPos.top = space.rect.top + space.rect.height - tooltipRect.height;
+        }
+        break
+      }
+    switch (pos) {
+        case "top":
+          ttPos.top = elemRect.top - tooltipRect.height - space.rand;  // ✅ Tooltip ÜBER dem Element
+          break
+        case "bottom":
+          ttPos.top = elemRect.bottom + space.rand;  // ✅ Tooltip UNTER dem Element
+          break
+        case "left":
+          ttPos.left = elemRect.left - tooltipRect.width - space.rand;  // ✅ Tooltip LINKS vom Element
+          break
+        case "right":
+          ttPos.left = elemRect.right + space.rand;  // ✅ Tooltip RECHTS vom Element
+          break
+        default:
+          ttPos.left = ((rects[0].left - elemRect.left) > (rects[0].right - elemRect.right)) ? rects[0].left + rand : rects[0].left+rects[0].width - tooltipRect.width - rand;
+          ttPos.top = rects[0].top + rand;
+        }
+        
+    this._debug('EpgTooltip: Position berechnet', { that: this,pos: pos, ttPos: ttPos, space: space, width: width, rects: rects, elemRect: elemRect, tooltipRect: tooltipRect });
 
     // Setze die Position
-    this.style.left = `${left}px`;
-    this.style.top = `${top}px`;
+    this.style.left = ttPos.left ? `${ttPos.left}px` : ``;
+    this.style.top = ttPos.top ? `${ttPos.top}px` : ``;
+    // right und bottom werden nicht mehr verwendet, da wir position: fixed mit left/top verwenden
+
   }
 
   /**
