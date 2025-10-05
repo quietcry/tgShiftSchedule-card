@@ -15,21 +15,21 @@ export class EpgTimebar extends EpgElementBase {
   static styles = [
     super.styles,
     css`
-      :host {
+    :host {
         --epg-border-color: black;
         --epg-time-color: black;
-        display: block;
-        width: 100%;
+      display: block;
+      width: 100%;
         height: 60px;
         overflow: hidden;
         margin: 0px;
         padding: 0px;
         --epg-timebar-border: 1px solid var(--epg-border-color, #ccc);
       }
-      .timebar {
+    .timebar {
         position: relative;
         width: 100%;
-        height: 100%;
+      height: 100%;
         background-color: var(--epg-timebar-bg, #f0f0f0);
         border-bottom: 1px solid var(--epg-border-color, #ccc);
         overflow-x: auto;
@@ -40,14 +40,14 @@ export class EpgTimebar extends EpgElementBase {
       .timebar::-webkit-scrollbar {
         display: none; /* Chrome, Safari, Opera */
       }
-      .now-marker {
-        position: absolute;
-        top: 0;
-        bottom: 0;
-        width: 2px;
-        background-color: var(--epg-now-marker-color);
-        z-index: 1;
-      }
+    .now-marker {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background-color: var(--epg-now-marker-color);
+      z-index: 1;
+    }
       table.epg-timebar-table {
         height: 100%;
         border-collapse: collapse;
@@ -458,5 +458,5 @@ export class EpgTimebar extends EpgElementBase {
 }
 
 if (!customElements.get('epg-timebar')) {
-  customElements.define('epg-timebar', EpgTimebar);
+customElements.define('epg-timebar', EpgTimebar);
 }

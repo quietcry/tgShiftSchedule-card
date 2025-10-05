@@ -583,57 +583,57 @@ export class EpgBox extends EpgElementBase {
   static styles = [
     super.styles,
     css`
-      :host {
+    :host {
         display: flex;
         flex-direction: row;
-        width: 100%;
+      width: 100%;
         height: 100%; /* Feste Höhe für Scrollbalken */
         overflow: hidden; /* Versteckt Overflow, damit ProgramBox scrollen kann */
-        position: relative;
-      }
+      position: relative;
+    }
 
       .timeBar {
         width: 100%;
         height: 40px;
         flex-shrink: 0;
-      }
+    }
 
-      .channelBox {
+    .channelBox {
         border-right: 1px solid var(--epg-border-color);
-        margin: 0; /* Keine äußeren Abstände */
-        padding: 0; /* Keine inneren Abstände */
-        display: flex;
-        flex-direction: column;
-        flex-shrink: 0;
+      margin: 0; /* Keine äußeren Abstände */
+      padding: 0; /* Keine inneren Abstände */
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
         /* Die Breite wird dynamisch über einen Inline-Style gesetzt */
         align-items: stretch; /* Verhindert Verteilung über Höhe */
         justify-content: flex-start; /* Startet oben */
         height: fit-content; /* Höhe passt sich an Inhalt an */
         max-height: none; /* Keine Höhenbegrenzung */
-      }
+    }
 
-      .programBox {
-        flex: 1;
-        overflow-x: auto;
+    .programBox {
+      flex: 1;
+      overflow-x: auto;
         overflow-y: auto;
-        margin: 0; /* Keine äußeren Abstände */
-        padding: 0; /* Keine inneren Abstände */
-        display: flex;
-        flex-direction: column;
+      margin: 0; /* Keine äußeren Abstände */
+      padding: 0; /* Keine inneren Abstände */
+      display: flex;
+      flex-direction: column;
         height: 100%; /* Feste Höhe für Scrollbalken */
         min-width: 0; /* Erlaubt Schrumpfen */
         position: relative; /* Für absolute Positionierung des TimeMarkers */
-      }
+    }
 
-      .programRow {
-        display: flex;
+    .programRow {
+      display: flex;
         flex-direction: row; /* Explizit horizontal anordnen */
         align-items: stretch; /* Items nehmen volle Höhe ein */
         justify-content: flex-start; /* Items am Anfang ausrichten */
         border-bottom: none; /* Kein Border */
-        margin: 0; /* Keine äußeren Abstände */
-        padding: 0; /* Keine inneren Abstände */
-        flex-shrink: 0;
+      margin: 0; /* Keine äußeren Abstände */
+      padding: 0; /* Keine inneren Abstände */
+      flex-shrink: 0;
         flex-grow: 0; /* Verhindert Wachsen */
         /* Höhenklassen werden über epg-row-height angewendet */
         height: calc(
@@ -675,17 +675,17 @@ export class EpgBox extends EpgElementBase {
       epg-program-item:hover {
         background-color: var(--epg-hover-bg) !important;
         color: var(--epg-text-color) !important;
-      }
+    }
 
-      .channelGroup {
+    .channelGroup {
         padding: 4px var(--epg-padding);
         background-color: var(--epg-header-bg);
         color: var(--epg-text-color);
-        font-weight: bold;
-        display: flex;
-        align-items: center;
-        margin: 0; /* Keine äußeren Abstände */
-        flex-shrink: 0; /* Verhindert Schrumpfen */
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      margin: 0; /* Keine äußeren Abstände */
+      flex-shrink: 0; /* Verhindert Schrumpfen */
         height: var(--epg-row-height);
         box-sizing: border-box;
       }
@@ -731,16 +731,16 @@ export class EpgBox extends EpgElementBase {
       .group-header:nth-child(even) .programRowContent {
         background-color: var(--epg-header-bg) !important;
         color: var(--epg-text-color) !important;
-      }
+    }
 
-      .channelRow {
+    .channelRow {
         padding: 0; /* Kein Padding */
         border: none; /* Kein Border auf der Row selbst */
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        margin: 0; /* Keine äußeren Abstände */
-        flex-shrink: 0; /* Verhindert Schrumpfen */
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      margin: 0; /* Keine äußeren Abstände */
+      flex-shrink: 0; /* Verhindert Schrumpfen */
         flex-grow: 0; /* Verhindert Wachsen */
         /* Höhenklassen werden über epg-row-height angewendet */
         height: calc(
@@ -794,60 +794,60 @@ export class EpgBox extends EpgElementBase {
       .channelRow.selected .channelRowContent {
         background-color: var(--epg-accent);
         color: var(--epg-text-color);
-      }
+    }
 
-      .programSlot {
+    .programSlot {
         padding: var(--epg-padding);
         border: 1px solid var(--epg-border-color);
-        margin: 4px;
-        cursor: pointer;
-        transition: background-color 0.2s ease;
-      }
+      margin: 4px;
+      cursor: pointer;
+      transition: background-color 0.2s ease;
+    }
 
-      .programSlot:hover {
+    .programSlot:hover {
         background-color: var(--epg-hover-bg);
-      }
+    }
 
-      .programSlot.current {
+    .programSlot.current {
         background-color: var(--epg-accent);
         color: var(--epg-text-color);
-      }
+    }
 
-      .programTitle {
-        font-weight: bold;
-        margin-bottom: 4px;
-      }
+    .programTitle {
+      font-weight: bold;
+      margin-bottom: 4px;
+    }
 
-      .programTime {
-        font-size: 0.8em;
+    .programTime {
+      font-size: 0.8em;
         color: var(--epg-time-color);
-      }
+    }
 
-      .programDescription {
-        font-size: 0.8em;
+    .programDescription {
+      font-size: 0.8em;
         color: var(--epg-description-color);
-        margin-top: 4px;
+      margin-top: 4px;
       }
 
       .loading {
-        display: flex;
-        justify-content: center;
+      display: flex;
+      justify-content: center;
         align-items: center;
         height: 200px;
         color: var(--epg-text-color);
-      }
+    }
 
       .error {
-        display: flex;
+      display: flex;
         justify-content: center;
-        align-items: center;
+      align-items: center;
         height: 200px;
         color: #f44336;
       }
 
       .noPrograms {
         display: flex;
-        justify-content: center;
+      justify-content: center;
         align-items: center;
         padding: var(--epg-padding);
         color: var(--epg-text-color);
@@ -964,7 +964,7 @@ export class EpgBox extends EpgElementBase {
         class="programBox"
         .epgBox=${this}
         .programs=${this.programs}
-        .scale=${this.scale}
+                          .scale=${this.scale}
         .containerWidth=${this.containerWidth}
         .channelWidth=${this.channelWidth}
         .env=${this.env}
@@ -972,9 +972,9 @@ export class EpgBox extends EpgElementBase {
         .latestProgramStop=${this.latestProgramStop}
         .showChannelGroups=${this.showChannelGroups}
         .showShortText=${this.showShortText}
-        .showTime=${this.showTime}
-        .showDuration=${this.showDuration}
-        .showDescription=${this.showDescription}
+                          .showTime=${this.showTime}
+                          .showDuration=${this.showDuration}
+                          .showDescription=${this.showDescription}
         ._sortedChannels=${this._sortedChannels}
         ._flatChannels=${this._flatChannels}
         ._channelGroups=${this._channelGroups}
@@ -1002,7 +1002,7 @@ export class EpgBox extends EpgElementBase {
   renderChannelItem(item, index) {
     if (this.channelManager.isGroupHeader(item)) {
       // Gruppen-Header als epg-program-item
-      return html`
+    return html`
         <epg-program-item
           id="group-channel-${item.name}"
           .type=${'group'}
@@ -1016,9 +1016,9 @@ export class EpgBox extends EpgElementBase {
       return html`
         <div class="channelRow epg-row-height">
           <div class="channelRowContent">${item.channeldata?.name || item.name}</div>
-        </div>
-      `;
-    }
+      </div>
+    `;
+  }
   }
 
   /**

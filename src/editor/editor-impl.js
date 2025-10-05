@@ -26,17 +26,17 @@ export class EditorImpl extends EditorBase {
     super({
       ...DefaultConfig,
       ...{
-        entity: '',
-        time_window: 'C',
-        date: '',
-        max_items: 10,
-        show_channel: true,
-        show_channel_groups: true,
-        show_time: true,
-        show_duration: true,
+      entity: '',
+      time_window: 'C',
+      date: '',
+      max_items: 10,
+      show_channel: true,
+      show_channel_groups: true,
+      show_time: true,
+      show_duration: true,
         show_shorttext: false,
-        show_description: true,
-        view_mode: 'Liste',
+      show_description: true,
+      view_mode: 'Liste',
         channelWidth: 180,
         epgShowPastTime: 60, // Minuten für Rückblick (Backview)
         epgShowFutureTime: 180, // Minuten sichtbar in der Ansicht
@@ -159,23 +159,23 @@ export class EditorImpl extends EditorBase {
 
   _renderBasicTab() {
     return html`
-      <ha-form
-        .hass=${this.hass}
-        .data=${this.config}
+        <ha-form
+          .hass=${this.hass}
+          .data=${this.config}
         .schema=${this._getBasicSchema()}
-        .computeLabel=${this._computeLabel}
-        @value-changed=${this._valueChanged}
-        class=${this._yamlError ? 'yaml-error-input' : ''}
-      ></ha-form>
+          .computeLabel=${this._computeLabel}
+          @value-changed=${this._valueChanged}
+          class=${this._yamlError ? 'yaml-error-input' : ''}
+        ></ha-form>
 
-      ${this._yamlError
-        ? html`
-            <div class="yaml-error">
-              <ha-icon icon="mdi:alert-circle"></ha-icon>
-              <span>YAML-Fehler: ${this._yamlError}</span>
-            </div>
-          `
-        : ''}
+        ${this._yamlError
+          ? html`
+              <div class="yaml-error">
+                <ha-icon icon="mdi:alert-circle"></ha-icon>
+                <span>YAML-Fehler: ${this._yamlError}</span>
+              </div>
+            `
+          : ''}
     `;
   }
 
@@ -225,7 +225,7 @@ export class EditorImpl extends EditorBase {
           >
             Layout
           </button>
-        </div>
+              </div>
 
         <!-- EPG Tab Content -->
         <div class="epg-tab-content">${this._renderEpgTabContent()}</div>
@@ -250,21 +250,21 @@ export class EditorImpl extends EditorBase {
 
   _renderEpgDisplayTab() {
     return html`
-      <ha-form
-        .hass=${this.hass}
-        .data=${this.config}
+              <ha-form
+                .hass=${this.hass}
+                .data=${this.config}
         .schema=${this._getEpgDisplaySchema()}
-        .computeLabel=${this._computeLabel}
-        @value-changed=${this._valueChanged}
-      ></ha-form>
+                .computeLabel=${this._computeLabel}
+                @value-changed=${this._valueChanged}
+              ></ha-form>
     `;
   }
 
   _renderEpgDataTab() {
     return html`
-      <ha-form
-        .hass=${this.hass}
-        .data=${this.config}
+              <ha-form
+                .hass=${this.hass}
+                .data=${this.config}
         .schema=${this._getEpgDataSchema()}
         .computeLabel=${this._computeLabel}
         @value-changed=${this._valueChanged}
@@ -290,19 +290,19 @@ export class EditorImpl extends EditorBase {
         .hass=${this.hass}
         .data=${this.config}
         .schema=${this._getEpgLayoutSchema()}
-        .computeLabel=${this._computeLabel}
-        @value-changed=${this._valueChanged}
-        class=${this._groupOrderError ? 'yaml-error-input' : ''}
-      ></ha-form>
+                .computeLabel=${this._computeLabel}
+                @value-changed=${this._valueChanged}
+                class=${this._groupOrderError ? 'yaml-error-input' : ''}
+              ></ha-form>
 
-      ${this._groupOrderError
-        ? html`
-            <div class="yaml-error">
-              <ha-icon icon="mdi:alert-circle"></ha-icon>
-              <span>group_order YAML-Fehler: ${this._groupOrderError}</span>
-            </div>
-          `
-        : ''}
+              ${this._groupOrderError
+                ? html`
+                    <div class="yaml-error">
+                      <ha-icon icon="mdi:alert-circle"></ha-icon>
+                      <span>group_order YAML-Fehler: ${this._groupOrderError}</span>
+                    </div>
+                  `
+                : ''}
     `;
   }
 
@@ -312,7 +312,7 @@ export class EditorImpl extends EditorBase {
         <h3>Liste View Konfiguration</h3>
         <p>Hier werden die Konfigurationsoptionen für die Listenansicht angezeigt.</p>
         <p>Diese Ansicht zeigt die Programme in einer kompakten Liste an.</p>
-      </div>
+              </div>
     `;
   }
 
@@ -320,13 +320,13 @@ export class EditorImpl extends EditorBase {
     return html`
       <div class="view-mode-panel">
         <h3>Tabelle View Konfiguration</h3>
-        <ha-form
-          .hass=${this.hass}
-          .data=${this.config}
+          <ha-form
+            .hass=${this.hass}
+            .data=${this.config}
           .schema=${this._getTableSchema()}
-          .computeLabel=${this._computeLabel}
-          @value-changed=${this._valueChanged}
-        ></ha-form>
+            .computeLabel=${this._computeLabel}
+            @value-changed=${this._valueChanged}
+          ></ha-form>
       </div>
     `;
   }
@@ -544,17 +544,17 @@ export class EditorImpl extends EditorBase {
   _selectViewMode(mode) {
     this._debug('EditorImpl _selectViewMode wird aufgerufen mit:', mode);
 
-    this.config.view_mode = mode;
+      this.config.view_mode = mode;
     this._selectedTab = 1; // Automatisch zum View-Tab wechseln
     this._viewModeDropdownOpen = false; // Dropdown schließen nach Auswahl
-    this.requestUpdate();
-    this.dispatchEvent(
-      new CustomEvent('config-changed', {
-        detail: { config: this.config },
-        bubbles: true,
-        composed: true,
-      })
-    );
+      this.requestUpdate();
+      this.dispatchEvent(
+        new CustomEvent('config-changed', {
+          detail: { config: this.config },
+          bubbles: true,
+          composed: true,
+        })
+      );
   }
 
   _validateYaml(yamlString) {
@@ -581,7 +581,7 @@ export class EditorImpl extends EditorBase {
       :host {
       }
 
-      .card-config {
+    .card-config {
         padding: 10px;
       }
 
@@ -673,8 +673,8 @@ export class EditorImpl extends EditorBase {
         padding: 12px 16px;
         cursor: pointer;
         transition: all 0.2s ease;
-        display: flex;
-        align-items: center;
+      display: flex;
+      align-items: center;
         border-left: 1px solid var(--divider-color);
       }
 
@@ -807,51 +807,51 @@ export class EditorImpl extends EditorBase {
         background-color: white;
       }
 
-      .yaml-error {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        margin: 8px 0;
-        padding: 12px;
-        background-color: var(--error-color);
-        color: white;
-        border-radius: 4px;
-        font-size: 14px;
-      }
-      .yaml-error ha-icon {
-        color: white;
-      }
-      .yaml-error-input,
-      .yaml-error-input ha-textarea,
-      .yaml-error-input ha-textfield,
-      .yaml-error-input mwc-textarea,
-      .yaml-error-input mwc-textfield {
-        --mdc-text-field-outline-color: var(--error-color) !important;
-        --mdc-text-field-focus-outline-color: var(--error-color) !important;
-        --mdc-text-field-hover-outline-color: var(--error-color) !important;
-        --mdc-text-field-label-ink-color: var(--error-color) !important;
-        --mdc-text-field-ink-color: var(--error-color) !important;
-      }
-      .yaml-error-input ha-textarea {
-        --mdc-text-field-outline-color: var(--error-color) !important;
-        --mdc-text-field-focus-outline-color: var(--error-color) !important;
-        --mdc-text-field-hover-outline-color: var(--error-color) !important;
-      }
-      .yaml-error-input ha-textfield {
-        --mdc-text-field-outline-color: var(--error-color) !important;
-        --mdc-text-field-focus-outline-color: var(--error-color) !important;
-        --mdc-text-field-hover-outline-color: var(--error-color) !important;
-      }
-      .yaml-error-input mwc-textarea {
-        --mdc-text-field-outline-color: var(--error-color) !important;
-        --mdc-text-field-focus-outline-color: var(--error-color) !important;
-        --mdc-text-field-hover-outline-color: var(--error-color) !important;
-      }
-      .yaml-error-input mwc-textfield {
-        --mdc-text-field-outline-color: var(--error-color) !important;
-        --mdc-text-field-focus-outline-color: var(--error-color) !important;
-        --mdc-text-field-hover-outline-color: var(--error-color) !important;
-      }
+    .yaml-error {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 8px 0;
+      padding: 12px;
+      background-color: var(--error-color);
+      color: white;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+    .yaml-error ha-icon {
+      color: white;
+    }
+    .yaml-error-input,
+    .yaml-error-input ha-textarea,
+    .yaml-error-input ha-textfield,
+    .yaml-error-input mwc-textarea,
+    .yaml-error-input mwc-textfield {
+      --mdc-text-field-outline-color: var(--error-color) !important;
+      --mdc-text-field-focus-outline-color: var(--error-color) !important;
+      --mdc-text-field-hover-outline-color: var(--error-color) !important;
+      --mdc-text-field-label-ink-color: var(--error-color) !important;
+      --mdc-text-field-ink-color: var(--error-color) !important;
+    }
+    .yaml-error-input ha-textarea {
+      --mdc-text-field-outline-color: var(--error-color) !important;
+      --mdc-text-field-focus-outline-color: var(--error-color) !important;
+      --mdc-text-field-hover-outline-color: var(--error-color) !important;
+    }
+    .yaml-error-input ha-textfield {
+      --mdc-text-field-outline-color: var(--error-color) !important;
+      --mdc-text-field-focus-outline-color: var(--error-color) !important;
+      --mdc-text-field-hover-outline-color: var(--error-color) !important;
+    }
+    .yaml-error-input mwc-textarea {
+      --mdc-text-field-outline-color: var(--error-color) !important;
+      --mdc-text-field-focus-outline-color: var(--error-color) !important;
+      --mdc-text-field-hover-outline-color: var(--error-color) !important;
+    }
+    .yaml-error-input mwc-textfield {
+      --mdc-text-field-outline-color: var(--error-color) !important;
+      --mdc-text-field-focus-outline-color: var(--error-color) !important;
+      --mdc-text-field-hover-outline-color: var(--error-color) !important;
+    }
     `,
   ];
 

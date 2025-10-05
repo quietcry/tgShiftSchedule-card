@@ -645,7 +645,7 @@ export class EPGView extends ViewBase {
     this._debug('EPG-View: Tooltip-Event empfangen', { details });
     if (! this._tooltipElement) {
       const epgBox = this.shadowRoot.querySelector('epg-box');
-      const programBox = epgBox?.shadowRoot?.querySelector('epg-program-box');  
+      const programBox = epgBox?.shadowRoot?.querySelector('epg-program-box');
       this._tooltipElement = (epgBox && programBox) ? this.shadowRoot.querySelector('epg-tooltip') : null;
       if (! this._tooltipElement ) {
         if (counter < 10) {
@@ -776,7 +776,7 @@ export class EPGView extends ViewBase {
     return html`
       <div class="gridcontainer">
         <div class="headline">
-          <div class="superbutton">${this._renderSuperButton()}</div>
+        <div class="superbutton">${this._renderSuperButton()}</div>
           <div class="timeBar">
             <epg-timebar
               .scale=${this._timeBarScale}
@@ -803,7 +803,7 @@ export class EPGView extends ViewBase {
         ></epg-box>
 
       </div>
-      
+
       <!-- Tooltip Custom Element - Außerhalb des Grids für bessere Kontrolle -->
       <epg-tooltip
         .data=${this._tooltipElement?.data}
@@ -866,5 +866,5 @@ export class EPGView extends ViewBase {
 }
 
 if (!customElements.get('epg-view')) {
-  customElements.define('epg-view', EPGView);
+customElements.define('epg-view', EPGView);
 }
