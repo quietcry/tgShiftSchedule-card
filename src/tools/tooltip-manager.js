@@ -7,6 +7,7 @@ import { css, html } from 'lit';
  */
 export class EpgTooltip extends SuperBase {
   static className = 'EpgTooltip';
+  static tooltipStartWidth = 300;
 
   static properties = {
     data: { type: Object },
@@ -25,8 +26,9 @@ export class EpgTooltip extends SuperBase {
       visibility: hidden;
       z-index: 10000;
       pointer-events: none;
-      max-width: 300px;
-
+      max-width: ${EpgTooltip.tooltipStartWidth}px;
+      width: ${EpgTooltip.tooltipStartWidth}px;
+      box-sizing: border-box;
     }
 
     :host(.visible) {
@@ -45,8 +47,12 @@ export class EpgTooltip extends SuperBase {
       font-size: 14px;
       line-height: 1.4;
       width: 100%;  /* ✅ Einfach und elegant! */
+      height: var(--tooltip-height);
       overflow: hidden;
-      
+
+      /* Wichtig: Padding in Breite einrechnen */
+      box-sizing: border-box;
+
       /* Smooth Transition für Breitenänderungen */
       transition: max-width 0.2s ease, width 0.2s ease;
     }
@@ -107,6 +113,44 @@ export class EpgTooltip extends SuperBase {
     .tooltip-description::-webkit-scrollbar-thumb:hover {
       background: rgba(255, 255, 255, 0.5);
     }
+
+    /* Tooltip-Toolbar Styles */
+    .tooltip-toolbar {
+      display: var(--tooltip-topbar);
+      justify-content: flex-end;
+      align-items: center;
+      padding: 4px 8px;
+      background-color: rgba(255, 255, 255, 0.1);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 8px 8px 0 0;
+    }
+
+    .tooltip-close {
+      background: rgba(255, 255, 255, 0.2);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      color: white;
+      border-radius: 50%;
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: bold;
+      transition: all 0.2s ease;
+    }
+
+    .tooltip-close:hover {
+      background: rgba(255, 255, 255, 0.3);
+      border-color: rgba(255, 255, 255, 0.5);
+      transform: scale(1.1);
+    }
+
+    .tooltip-close:active {
+      background: rgba(255, 255, 255, 0.4);
+      transform: scale(0.95);
+    }
   `;
 
   constructor() {
@@ -124,7 +168,35 @@ export class EpgTooltip extends SuperBase {
     // Auto-Scroll
     this._autoScrollTimer = null;
 
+    // Event-Handler Flags
+    this._closeButtonRegistered = false;
+
     this._debug('EpgTooltip initialisiert');
+  }
+
+  /**
+   * Lifecycle-Hook: Wird nach dem ersten Render aufgerufen
+   */
+  firstUpdated() {
+    super.firstUpdated();
+    this._debug('EpgTooltip: firstUpdated aufgerufen');
+  }
+
+  /**
+   * Event-Handler für Close-Button
+   */
+  _handleCloseClick(event) {
+    // event.preventDefault();
+    // event.stopPropagation();
+
+    this._debug('EpgTooltip: Close-Button geklickt', {
+      tooltipVisible: this.visible,
+      tooltipData: this.data?.title
+    });
+
+    // Tooltip schließen
+    this.hide();
+
   }
 
   /**
@@ -146,7 +218,11 @@ export class EpgTooltip extends SuperBase {
 
     return html`
       <div class="tooltip">
+
         <div class="tooltip-content">
+          <div class="tooltip-toolbar">
+            <button class="tooltip-close">X</button>
+          </div>
           <div class="tooltip-header">
             <div class="tooltip-title">${this.data.title || 'Unbekanntes Programm'}</div>
             ${this.data.shortText
@@ -210,24 +286,39 @@ export class EpgTooltip extends SuperBase {
   /**
    * Startet das automatische Scrollen der Description
    */
+  /**
+   * Prüft ob der Beschreibungsbereich überläuft
+   */
+  _hasDescriptionOverflow() {
+    const description = this.shadowRoot?.querySelector('.tooltip-description');
+    if (!description) return false;
+
+    const hasOverflow = description.scrollHeight > description.clientHeight;
+
+    this._debug('EpgTooltip: Überlauf-Prüfung', {
+      scrollHeight: description.scrollHeight,
+      clientHeight: description.clientHeight,
+      hasOverflow: hasOverflow
+    });
+
+    return hasOverflow;
+  }
+
   _startAutoScroll() {
     this._debug('EpgTooltip-Scroll: automatisches Scrollen 1');
     if (!this.visible) return;
+
+    // Prüfe ob Scroll überhaupt nötig ist
+    if (!this._hasDescriptionOverflow()) {
+      this._debug('EpgTooltip-Scroll: Kein Überlauf, Scrollen übersprungen');
+      return;
+    }
 
     const description = this.shadowRoot?.querySelector('.tooltip-description');
     this._debug('EpgTooltip-Scroll: automatisches Scrollen 2');
     if (!description) return;
 
     const scrollHeight = description.scrollHeight - description.clientHeight;
-
-    // Wenn kein Scroll nötig ist, stoppe
-    this._debug('EpgTooltip-Scroll: automatisches Scrollen 3', {
-      scrollHeight,
-      descriptionScrollHeight: description.scrollHeight,
-      descriptionClientHeight: description.clientHeight,
-    });
-    if (scrollHeight <= 0) return;
-    this._debug('EpgTooltip-Scroll: automatisches Scrollen 4');
 
     this._debug('EpgTooltip-Scroll: Starte automatisches Scrollen', {
       scrollHeight,
@@ -259,6 +350,7 @@ export class EpgTooltip extends SuperBase {
     this._debug('EpgTooltip: setEventData aufgerufen', { detail: detail, frameElement: this.frameElement, hostElement: this.hostElement });
 
     // Verarbeite die Event-Daten
+    if (this.data?.action !== "info") {
     this._eventData = detail;
 
     // Entscheide selbst über show/hide basierend auf action
@@ -266,6 +358,9 @@ export class EpgTooltip extends SuperBase {
       this.show(detail.data);
     } else if (detail.action === 'hide') {
       this.hide();
+    } else if (detail.action === 'info') {
+      this.showInfo(detail.data);
+      }
     }
   }
 
@@ -274,19 +369,41 @@ export class EpgTooltip extends SuperBase {
    */
   updated(changedProperties) {
     super.updated(changedProperties);
-    
+
+    // Close-Button Event-Handler registrieren (nur einmal)
+    if (!this._closeButtonRegistered && this.data) {
+      const closeButton = this.shadowRoot.querySelector('.tooltip-close');
+      if (closeButton) {
+        this._debug('EpgTooltip: updated closeButton gefunden und registriert');
+        closeButton.addEventListener('click', this._handleCloseClick.bind(this));
+        this._closeButtonRegistered = true;
+      } else {
+        this._debug('EpgTooltip: updated closeButton nicht gefunden');
+      }
+    }
+
     // Position berechnen wenn Tooltip gezeigt werden soll
-    if (this._eventData?.action === 'show' && !this.visible) {
+    if (this.data?.action === 'show' && !this.visible) {
       // Jetzt ist der DOM garantiert aktualisiert
       this._calculateOptimalPosition();
-      
+
       // Tooltip einblenden
       this.visible = true;
       this.classList.toggle('visible', this.visible);
-      
+
       if (this.visible) {
         this._startAutoScrollTimer();
       }
+    } else if (this.data?.action === 'info' ) {
+      this._debug('EpgTooltip: showInfo II');
+      this._calculateOptimalPosition();
+      // Tooltip einblenden
+      this.visible = true;
+      this.classList.toggle('visible', this.visible);
+
+      if (this.visible) {
+        this._startAutoScrollTimer();
+        }
     }
   }
 
@@ -297,7 +414,22 @@ export class EpgTooltip extends SuperBase {
     this._debug('EpgTooltip: show aufgerufen', { data });
 
     this.data = data;
-    this.visible = false;
+    this.data.action = 'show';
+    // this.visible = false;
+
+    // Explizit Update auslösen für neue Daten
+    this.requestUpdate();
+
+  }
+  /**
+   * Zeigt den Tooltip als Info an
+   */
+  showInfo(data) {
+    this._debug('EpgTooltip: showInfo aufgerufen', { data });
+
+    this.data = data;
+    this.data.action = 'info';
+    // this.visible = false;
 
     // Explizit Update auslösen für neue Daten
     this.requestUpdate();
@@ -310,14 +442,18 @@ export class EpgTooltip extends SuperBase {
   hide() {
     this._debug('EpgTooltip: hide aufgerufen');
 
-    this.visible = false;
+    if (this.data?.action === 'show' || this.data?.action === 'info') {
+      this.visible = false;
+      this.data.action = 'hide';
 
     // CSS-Klasse entfernen
     this.classList.remove('visible');
 
     // Stoppe Auto-Scroll
     this._stopAutoScroll();
+    }
   }
+
   _clipToViewport(rect) {
     return {
       left: Math.max(0, rect.left),
@@ -331,6 +467,18 @@ export class EpgTooltip extends SuperBase {
   /**
    * Berechnet die optimale Position für den Tooltip
    */
+  _setDefaultCSS(width=this.constructor.tooltipStartWidth) {
+    this.style.maxWidth = `${width}px`;
+    this.style.width = `${width}px`;
+    this.style.height = "auto";
+    this.style.top = "auto";
+    this.style.left = "auto";
+    this.style.bottom = "auto";
+    this.style.right = "auto";
+    this.style.setProperty('--tooltip-topbar', 'none');
+    this.style.setProperty('--tooltip-height', 'auto');
+  }
+
   _calculateOptimalPosition() {
     if (!this.hostElement) {
       this._debug('EpgTooltip: Kein hostElement gesetzt, verwende Standard-Position');
@@ -338,21 +486,36 @@ export class EpgTooltip extends SuperBase {
     }
     const rand=10;
     const elemRect=this._clipToViewport(this._eventData.element.getBoundingClientRect());
-    const hostRect = this.hostElement.getBoundingClientRect();
-    const frameRect=this.frameElement.getBoundingClientRect();   
-    this.style.maxWidth = '300px';
+    this._setDefaultCSS();
     let tooltipRect = this.getBoundingClientRect();
-    const rects=[this._clipToViewport(hostRect), this._clipToViewport(frameRect)]
+    this._debug("epgtooltip: >",{width:tooltipRect.width})
+    const rects=[
+      this._clipToViewport(this.hostElement.getBoundingClientRect()),
+      this._clipToViewport(this.frameElement.getBoundingClientRect())
+    ]
     let pos=null
     let space=null
     const maxWidth=rects[rects.length-1].width / 3;
     const startWidth=tooltipRect.width;
     const widthStep=Math.abs((maxWidth-startWidth)/10);
     let width=startWidth<maxWidth?startWidth:maxWidth;
+    if (this.data?.action === 'info') {
+      this.style.setProperty('--tooltip-height', '100%');
+      this.style.setProperty('--tooltip-topbar', 'flex');
+      this.style.maxWidth = `${rects[rects.length-1].width}px`;
+      this.style.width = `${rects[rects.length-1].width}px`;
+      this.style.left = `${rects[rects.length-1].left}px`;
+      this.style.height = `${rects[rects.length-1].height}px`;
+      this.style.top = `${rects[rects.length-1].top}px`;
+      this._debug('EpgTooltip: showInfo III', rects[rects.length-1] );
+      return;
+    }
+    this.style.setProperty('--tooltip-height', 'auto');
+    this.style.setProperty('--tooltip-topbar', 'none');
+    this._debug('EpgTooltip: Position default', { width: width, length: rects.length });
     while (width<=maxWidth) {
       // Setze Breite direkt - CSS width: 100% macht den Rest
-      this.style.maxWidth = `${width}px`;
-      this.style.width = `${width}px`;
+      this._setDefaultCSS(width);
       tooltipRect = this.getBoundingClientRect();
 
       for (const rect of rects) {
@@ -376,21 +539,23 @@ export class EpgTooltip extends SuperBase {
         else if (rightwidth >= tooltipRect.width + 2*rand && rect.height >= tooltipRect.height + 2*rand) {
           pos="right"
         }
-        this._debug('EpgTooltip: rect', 
+        this._debug('EpgTooltip: Position vordefiniert',
           { rect: rect,
             elemRect: elemRect,
             topheight: topheight,
-            bottomheight: bottomheight, 
+            bottomheight: bottomheight,
             leftwidth: leftwidth,
             rightwidth: rightwidth,
             pos: pos,
+            width: width,
+
           });
         if (pos) {
           space={rand:rand, rect: rect, topheight: topheight, bottomheight: bottomheight, leftwidth: leftwidth, rightwidth: rightwidth}
           break
         }
       }
-      
+
       if (pos) {
         break;
       }
@@ -401,22 +566,22 @@ export class EpgTooltip extends SuperBase {
     switch (pos) {
       case "top":
       case "bottom":
-        ttPos.left = elemRect.left + (elemRect.width / 2) - (tooltipRect.width / 2) 
-        if (ttPos.left < space.rect.left) {
-          ttPos.left = space.rect.left;
+        ttPos.left = elemRect.left + (elemRect.width / 2) - (tooltipRect.width / 2)
+        if (ttPos.left < space.rect.left+space.rand) {
+          ttPos.left = space.rect.left+space.rand;
         }
-        if (ttPos.left + tooltipRect.width > space.rect.left + space.rect.width) {
-          ttPos.left = space.rect.left + space.rect.width - tooltipRect.width;
+        if (ttPos.left + tooltipRect.width > space.rect.left + space.rect.width-space.rand) {
+          ttPos.left = space.rect.left + space.rect.width - tooltipRect.width-space.rand;
         }
         break
       case "left":
       case "right":
-        ttPos.top = elemRect.top + (elemRect.height / 2) - (tooltipRect.height / 2) 
-        if (ttPos.top < space.rect.top) {
-          ttPos.top = space.rect.top;
+        ttPos.top = elemRect.top + (elemRect.height / 2) - (tooltipRect.height / 2)
+        if (ttPos.top < space.rect.top+space.rand) {
+          ttPos.top = space.rect.top+space.rand;
         }
-        if (ttPos.top + tooltipRect.height > space.rect.top + space.rect.height) {
-          ttPos.top = space.rect.top + space.rect.height - tooltipRect.height;
+        if (ttPos.top + tooltipRect.height > space.rect.top + space.rect.height-space.rand) {
+          ttPos.top = space.rect.top + space.rect.height - tooltipRect.height-space.rand;
         }
         break
       }
@@ -428,7 +593,7 @@ export class EpgTooltip extends SuperBase {
           ttPos.top = elemRect.bottom + space.rand;  // ✅ Tooltip UNTER dem Element
           break
         case "left":
-          ttPos.left = elemRect.left - tooltipRect.width - space.rand;  // ✅ Tooltip LINKS vom Element
+          ttPos.left = elemRect.left - (tooltipRect.width + space.rand);  // ✅ Tooltip LINKS vom Element
           break
         case "right":
           ttPos.left = elemRect.right + space.rand;  // ✅ Tooltip RECHTS vom Element
@@ -437,7 +602,7 @@ export class EpgTooltip extends SuperBase {
           ttPos.left = ((rects[0].left - elemRect.left) > (rects[0].right - elemRect.right)) ? rects[0].left + rand : rects[0].left+rects[0].width - tooltipRect.width - rand;
           ttPos.top = rects[0].top + rand;
         }
-        
+
     this._debug('EpgTooltip: Position berechnet', { that: this,pos: pos, ttPos: ttPos, space: space, width: width, rects: rects, elemRect: elemRect, tooltipRect: tooltipRect });
 
     // Setze die Position
