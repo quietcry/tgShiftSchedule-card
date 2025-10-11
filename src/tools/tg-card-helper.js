@@ -31,23 +31,54 @@ export class TgCardHelper {
     let className = null;
     let methodName = null;
     let cardName = null;
+    let contextObject = null;
 
-    if (args[0] && args[0] instanceof Object && args[0].className) {
-      className = args[0].className || className;
-      methodName = args[0].methodName || methodName;
-      cardName = args[0].cardName || cardName;
+    // Prüfe ob das erste Argument ein Kontext-Objekt ist (this aus SuperBase)
+    // Kontext-Objekt erkennt man daran, dass es eine constructor-Eigenschaft hat UND
+    // spezifische Eigenschaften unserer Klassen hat (cardName ist einzigartig für unsere Klassen)
+    if (Array.isArray(args[0]) && args[0].length === 1 && args[0][0] && typeof args[0][0] === 'object' && args[0][0].constructor && (args[0][0].cardName || args[0][0].constructor.className)) {
+      contextObject = args[0][0];
       args = args.slice(1);
     }
-    // Versuche verschiedene Methoden, um den echten Klassennamen zu bekommen
-    className =
-      className ||
-      this.className ||
-      this.constructor.className ||
-      this.tagName?.toLowerCase().replace(/[^a-z0-9]/g, '') ||
-      this.constructor.name ||
-      this.cardName ||
-      classNameDefault;
-    cardName = cardName || this.cardName || cardNameDefault;
+    else {
+      contextObject = this;
+    }
+
+    // Extrahiere Informationen aus dem Kontext-Objekt (immer vorhanden)
+    // Methode 1: Statischer Klassennamen (falls definiert)
+    if (contextObject.constructor.className) {
+      className = contextObject.constructor.className;
+    }
+    // Methode 2: Tag-Name des Custom Elements
+    else if (contextObject.tagName) {
+      className = contextObject.tagName.toLowerCase().replace(/[^a-z0-9]/g, '');
+    }
+    // Methode 3: Constructor name (kann minifiziert sein)
+    else if (contextObject.constructor.name && contextObject.constructor.name.length > 2) {
+      className = contextObject.constructor.name;
+    }
+    // Methode 4: Fallback auf cardName
+    else if (contextObject.cardName) {
+      className = contextObject.cardName;
+    }
+    // Methode 5: Fallback auf Default
+    else {
+      className = classNameDefault;
+    }
+
+    cardName = contextObject.cardName || this.cardName || cardNameDefault;
+
+    // Prüfe sofort, ob wir Debug-Meldungen für diese Klasse ausgeben sollen
+    const debugList = this.debugMode.split(',').map(item => item.trim().toLowerCase());
+    const shouldDebug =
+      debugList[0].toLowerCase() === 'true'
+        ? !debugList.slice(1).includes(className.toLowerCase())
+        : debugList.includes(className.toLowerCase());
+
+    // Wenn wir keine Debug-Meldungen ausgeben sollen, beende hier
+    if (!shouldDebug) return;
+
+    // Ermittle den Methodennamen nur wenn wir Debug-Meldungen ausgeben
     if (!methodName) {
       try {
         const stack = new Error().stack.split('\n');
@@ -75,18 +106,11 @@ export class TgCardHelper {
     }
     methodName = methodName || methodNameDefault;
 
-    const debugList = this.debugMode.split(',').map(item => item.trim().toLowerCase());
-    const shouldDebug =
-      debugList[0].toLowerCase() === 'true'
-        ? !debugList.slice(1).includes(className.toLowerCase())
-        : debugList.includes(className.toLowerCase());
-
-    if (shouldDebug) {
-      let path = `[${cardName}]:[${className}]:[${methodName}]`;
-      while (path.length < 50) {
-        path = path + ' ';
-      }
-      console.debug(path, ...args);
+    // Erstelle Debug-Ausgabe
+    let path = `[${cardName}]:[${className}]:[${methodName}]`;
+    while (path.length < 50) {
+      path = path + ' ';
     }
+    console.debug(path, ...args);
   }
 }
