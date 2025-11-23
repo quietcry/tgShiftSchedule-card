@@ -24,6 +24,8 @@ export class CalendarView extends ViewBase {
     this._cleanupDone = false; // Flag, ob die Bereinigung bereits beim initialen Laden ausgeführt wurde
     this._displayedMonths = 2; // Anzahl der angezeigten Monate (wird aus config.numberOfMonths initialisiert)
     this._startMonthOffset = 0; // Offset für den Startmonat (0 = aktueller Monat, -1 = Vormonat, +1 = nächster Monat)
+    this._isWriting = false; // Flag, ob gerade geschrieben wird
+    this._writeLockTimer = null; // Timer für das 5-Sekunden-Lock nach dem Schreiben
   }
 
   // Formatiert eine Zahl auf zwei Ziffern (z.B. 1 -> "01", 25 -> "25")
@@ -32,13 +34,36 @@ export class CalendarView extends ViewBase {
   }
 
   set hass(hass) {
+    // Ignoriere Updates während des Schreibens und 5 Sekunden danach
+    if (this._isWriting) {
+      console.log('set hass: Update während des Schreibens ignoriert');
+      this._hass = hass; // Aktualisiere hass trotzdem, aber lade keine Daten
+      this.requestUpdate();
+      return;
+    }
+    
     const previousEntityState = this._hass?.states[this._config?.entity]?.state;
     const newEntityState = hass?.states[this._config?.entity]?.state;
     
+    // Prüfe auch zusätzliche Entities auf Änderungen
+    let hasAnyEntityChanged = previousEntityState !== newEntityState;
+    if (!hasAnyEntityChanged && this._config && this._knownEntityIds) {
+      // Prüfe alle bekannten zusätzlichen Entities
+      for (let i = 1; i < this._knownEntityIds.length; i++) {
+        const entityId = this._knownEntityIds[i];
+        const prevState = this._hass?.states[entityId]?.state;
+        const newState = hass?.states[entityId]?.state;
+        if (prevState !== newState) {
+          hasAnyEntityChanged = true;
+          break;
+        }
+      }
+    }
+    
     this._hass = hass;
     if (this._config) {
-      // Nur laden, wenn sich der State tatsächlich geändert hat (nicht bei jedem Update)
-      if (previousEntityState !== newEntityState) {
+      // Nur laden, wenn sich ein State tatsächlich geändert hat (nicht bei jedem Update)
+      if (hasAnyEntityChanged) {
         this.loadWorkingDays();
       }
     }
@@ -472,8 +497,19 @@ export class CalendarView extends ViewBase {
       console.error('distributeDataToEntities: hass oder config fehlt');
       return;
     }
-
-    // Verwende die gecachte Liste der Entities, falls verfügbar
+    
+    // Setze Schreib-Lock
+    this._isWriting = true;
+    console.log('distributeDataToEntities: Schreib-Lock aktiviert');
+    
+    // Lösche vorhandenen Timer, falls vorhanden
+    if (this._writeLockTimer) {
+      clearTimeout(this._writeLockTimer);
+      this._writeLockTimer = null;
+    }
+    
+    try {
+      // Verwende die gecachte Liste der Entities, falls verfügbar
     // Prüfe aber auch, ob neue Entities hinzugekommen sind
     let allEntityIds;
     if (this._knownEntityIds && this._knownEntityIds.length > 0) {
@@ -540,6 +576,12 @@ export class CalendarView extends ViewBase {
           console.error(`distributeDataToEntities: Fehler beim Leeren von ${entityId}`, error);
         }
       }
+      // Setze Timer auch wenn keine Daten vorhanden waren
+      this._writeLockTimer = setTimeout(() => {
+        this._isWriting = false;
+        this._writeLockTimer = null;
+        console.log('distributeDataToEntities: Schreib-Lock nach 5 Sekunden deaktiviert (keine Daten)');
+      }, 5000);
       return;
     }
 
@@ -620,7 +662,7 @@ export class CalendarView extends ViewBase {
       }
     }
 
-    // Schreibe die Werte in die Entities
+    // Schreibe die Werte in die Entities (sequenziell, um sicherzustellen, dass alle Calls abgeschlossen sind)
     for (const entityId of allEntityIds) {
       const value = entityValues[entityId] || '';
       const maxLength = maxLengths[entityId];
@@ -653,9 +695,37 @@ export class CalendarView extends ViewBase {
       }
     }
     
-    // Wenn noch Daten übrig sind, die nicht gespeichert werden konnten
-    if (remainingData.length > 0) {
-      console.error(`distributeDataToEntities: WARNUNG - ${remainingData.length} Zeichen konnten nicht gespeichert werden!`, remainingData);
+    // Leere alle zusätzlichen Entities, die nicht verwendet wurden (um alte Daten zu entfernen)
+    // Wir müssen alle bekannten zusätzlichen Entities prüfen, nicht nur die in allEntityIds
+    const allAdditionalEntities = this.findAdditionalEntities(this._config.entity);
+    for (const additionalEntityId of allAdditionalEntities) {
+      // Wenn diese Entity nicht in entityValues ist, bedeutet das, dass sie nicht verwendet wurde
+      if (!(additionalEntityId in entityValues)) {
+        try {
+          await this._hass.callService('input_text', 'set_value', {
+            entity_id: additionalEntityId,
+            value: '',
+          });
+          console.log(`distributeDataToEntities: ${additionalEntityId} - Leere ungenutzte Entity`);
+        } catch (error) {
+          console.error(`distributeDataToEntities: Fehler beim Leeren von ${additionalEntityId}`, error);
+        }
+      }
+    }
+    
+      // Wenn noch Daten übrig sind, die nicht gespeichert werden konnten
+      if (remainingData.length > 0) {
+        console.error(`distributeDataToEntities: WARNUNG - ${remainingData.length} Zeichen konnten nicht gespeichert werden!`, remainingData);
+      }
+    } catch (error) {
+      console.error('distributeDataToEntities: Fehler beim Verteilen der Daten', error);
+    } finally {
+      // Schreib-Lock für weitere 5 Sekunden aufrechterhalten (um sicherzustellen, dass alle Updates verarbeitet wurden)
+      this._writeLockTimer = setTimeout(() => {
+        this._isWriting = false;
+        this._writeLockTimer = null;
+        console.log('distributeDataToEntities: Schreib-Lock nach 5 Sekunden deaktiviert');
+      }, 5000);
     }
   }
 
