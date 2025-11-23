@@ -1,8 +1,8 @@
 {
-  "name": "tgeditor-card",
+  "name": "tgcalendar-card",
   "version": "1.0.0",
-  "description": "Eine Home Assistant Karte mit Editor-Funktionalität",
-  "main": "src/tgeditor-card.js",
+  "description": "Eine Home Assistant Karte für Arbeitszeiten-Kalender",
+  "main": "src/tgcalendar-card.js",
   "type": "module",
   "scripts": {
     "build": "NODE_OPTIONS='--experimental-json-modules' webpack --mode=production",

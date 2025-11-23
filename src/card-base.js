@@ -61,16 +61,9 @@ export class CardBase extends SuperBase {
   getDefaultConfig() {
     this._debug('getDefaultConfig wird aufgerufen');
     return {
-      entity: '',
-      time_window: 'C',
-      date: '',
-      max_items: 10,
-      show_channel: true,
-      show_time: true,
-      show_duration: true,
-      show_shorttext: false,
-      show_description: true,
-      view_mode: 'Liste',
+      entity: 'input_text.arbeitszeiten',
+      numberOfMonths: 14,
+      initialDisplayedMonths: 2,
     };
   }
 

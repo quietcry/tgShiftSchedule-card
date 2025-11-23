@@ -56,6 +56,28 @@ export class EpgDataManager extends TgCardHelper {
     // });
 
     let programs = Object.values(teilEpg.epg);
+    
+    // Füge Kanal-Daten zu jedem Programm hinzu
+    programs.forEach(program => {
+      program.channelId = channel.channelid || channel.id || '';
+      program.channelName = channel.name || '';
+      // Initialisiere Record-Status falls nicht vorhanden
+      if (program.record === undefined) {
+        program.record = false;
+      }
+    });
+    
+    this._debug('addTeilEpg() - Kanal-Daten hinzugefügt', {
+      channelId: channel.channelid || channel.id,
+      channelName: channel.name,
+      anzahlProgramme: programs.length,
+      beispielProgramm: programs[0] ? {
+        title: programs[0].title,
+        channelId: programs[0].channelId,
+        channelName: programs[0].channelName
+      } : null
+    });
+    
     // Sortiere Programme nach Startzeit
     programs.sort((a, b) => a.start - b.start);
 

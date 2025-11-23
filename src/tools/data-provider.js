@@ -274,4 +274,42 @@ export class DataProvider {
       throw error;
     }
   }
+
+  /**
+   * Holt Meta-Daten für Record-Synchronisation von der Integration
+   * @param {string} entity - Entity-Name der Integration
+   * @returns {Promise<Object>} Meta-Daten mit Record-Informationen
+   */
+  async fetchMetaData(entity) {
+    this._debug('fetchMetaData(): Starte Meta-Datenabruf', {
+      entity: entity,
+      hasHass: !!this.hass,
+    });
+
+    if (!this.hass || !entity) {
+      throw new Error('HASS oder Entity nicht verfügbar für Meta-Datenabruf');
+    }
+
+    try {
+      // Rufe Meta-Daten von der Integration ab
+      const response = await this.hass.callService('tg_epg', 'get_meta_data', {
+        entity_id: entity,
+      });
+
+      this._debug('fetchMetaData(): Meta-Daten erfolgreich abgerufen', {
+        entity: entity,
+        responseKeys: response ? Object.keys(response) : [],
+        hasRecords: !!response?.records,
+        recordCount: response?.records ? Object.keys(response.records).length : 0,
+      });
+
+      return response || {};
+    } catch (error) {
+      this._debug('fetchMetaData(): Fehler beim Meta-Datenabruf', {
+        entity: entity,
+        fehler: error.message,
+      });
+      throw error;
+    }
+  }
 }

@@ -11,6 +11,9 @@ export class EpgProgramItem extends EpgElementBase {
     title: { type: String },
     description: { type: String },
     shortText: { type: String },
+    programId: { type: String },
+    channelId: { type: String },
+    channelName: { type: String },
 
     showTime: { type: Boolean },
     showDuration: { type: Boolean },
@@ -30,6 +33,9 @@ export class EpgProgramItem extends EpgElementBase {
     this.title = '';
     this.description = '';
     this.shortText = '';
+    this.programId = '';
+    this.channelId = '';
+    this.channelName = '';
 
     this.showTime = true;
     this.showDuration = true;
@@ -264,13 +270,24 @@ export class EpgProgramItem extends EpgElementBase {
             start: this.start,
             stop: this.stop,
             duration: this.duration,
+            programId: this.programId,
+            channelId: this.channelId,
+            channelName: this.channelName,
           },
         },
         bubbles: true,
         composed: true,
       })
     );
-    this._debug('EpgProgramItem: Tooltip-Event gesendet', { action });
+    this._debug('EpgProgramItem: Tooltip-Event gesendet', { 
+      action,
+      data: {
+        title: this.title,
+        programId: this.programId,
+        channelId: this.channelId,
+        channelName: this.channelName
+      }
+    });
   }
 
   /**

@@ -1,19 +1,15 @@
-const Version = '2025.10-0007';
-const CardRegname = 'tgepg-card';
-const CardName = 'TG EPG Card';
-const CardDescription = 'Eine Karte für die EPG-Anzeige';
-const CardFilename = 'tgepg-card.js';
-const DebugMode = 'true,EpgRenderManager,EnvSniffer'; // Aktiviere Debug für alle Komponenten
-const UseDummyData = 'false'; // Verwende Dummy-Daten statt echte EPG-Daten (Build-Variable)
-// Ändern Sie dies zu 'true' für Debug-Builds mit Dummy-Daten
-const showVersion = true;
+const Version = '2025.11-0001';
+const CardRegname = 'tgcalendar-card';
+const CardName = 'TG Kalender Card';
+const CardDescription = 'Eine Kalender-Karte für Arbeitszeiten';
+const CardFilename = 'tgcalendar-card.js';
+const DebugMode = 'false'; // Aktiviere Debug für alle Komponenten
+const UseDummyData = 'false';
+const showVersion = false;
 
-// EPG-Zeitkonfiguration
+// Kalender-Konfiguration
 const DefaultConfig = {
-  epgShowPastTime: 60, // Minuten für Rückblick (Backview)
-  epgShowFutureTime: 180, // Minuten sichtbar in der Ansicht
-  epgPastTime: 30, // Minuten in die Vergangenheit
-  epgFutureTime: 120, // Minuten in die Zukunft
+  entity: 'input_text.arbeitszeiten', // input_text Entity für Speicherung
 };
 
 export {

@@ -58,20 +58,28 @@ export class EpgTooltip extends SuperBase {
     }
 
     .tooltip-content {
-      display: grid;
-      grid-template-rows: auto 1fr;
+      display: flex;
+      flex-direction: column;
       height: 100%;
     }
 
     .tooltip-header {
+      flex-shrink: 0;
       margin-bottom: 8px;
+    }
+
+    .tooltip-title-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 4px;
     }
 
     .tooltip-title {
       font-weight: bold;
       font-size: 16px;
-      margin-bottom: 4px;
       color: #ffffff;
+      flex: 1;
     }
 
     .tooltip-subtitle {
@@ -84,16 +92,25 @@ export class EpgTooltip extends SuperBase {
     .tooltip-time {
       font-size: 12px;
       color: #aaaaaa;
-      margin-bottom: 0;
+      margin-bottom: 4px;
+    }
+
+    .tooltip-channel {
+      font-size: 14px;
+      color: #cccccc;
+      font-weight: 500;
+      margin-left: 8px;
     }
 
     .tooltip-description {
+      flex: 1;
       overflow-y: auto;
       overflow-x: hidden;
       padding-right: 4px;
       color: #dddddd;
       font-size: 13px;
       line-height: 1.3;
+      vertical-align: top;
     }
 
     .tooltip-description::-webkit-scrollbar {
@@ -117,12 +134,24 @@ export class EpgTooltip extends SuperBase {
     /* Tooltip-Toolbar Styles */
     .tooltip-toolbar {
       display: var(--tooltip-topbar);
-      justify-content: flex-end;
+      justify-content: space-between;
       align-items: center;
       padding: 4px 8px;
       background-color: rgba(255, 255, 255, 0.1);
       border-bottom: 1px solid rgba(255, 255, 255, 0.2);
       border-radius: 8px 8px 0 0;
+    }
+
+    .tooltip-toolbar-left {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .tooltip-toolbar-right {
+      display: flex;
+      align-items: center;
+      gap: 4px;
     }
 
     .tooltip-close {
@@ -149,6 +178,43 @@ export class EpgTooltip extends SuperBase {
 
     .tooltip-close:active {
       background: rgba(255, 255, 255, 0.4);
+      transform: scale(0.95);
+    }
+
+    .tooltip-record {
+      background: rgba(128, 128, 128, 0.2);
+      border: 1px solid rgba(128, 128, 128, 0.3);
+      color: #888888;
+      border-radius: 50%;
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 14px;
+      transition: all 0.2s ease;
+    }
+
+    .tooltip-record.recorded {
+      background: rgba(255, 0, 0, 0.2);
+      border: 1px solid rgba(255, 0, 0, 0.3);
+      color: #ff4444;
+    }
+
+    .tooltip-record:hover {
+      background: rgba(255, 0, 0, 0.3);
+      border-color: rgba(255, 0, 0, 0.5);
+      transform: scale(1.1);
+    }
+
+    .tooltip-record.recorded:hover {
+      background: rgba(255, 0, 0, 0.4);
+      border-color: rgba(255, 0, 0, 0.6);
+    }
+
+    .tooltip-record:active {
+      background: rgba(255, 0, 0, 0.4);
       transform: scale(0.95);
     }
   `;
@@ -196,7 +262,24 @@ export class EpgTooltip extends SuperBase {
 
     // Tooltip schließen
     this.hide();
+  }
 
+  /**
+   * Event-Handler für Record-Button
+   */
+  _handleRecordClick(event) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    this._debug('EpgTooltip: Record-Button geklickt', {
+      tooltipVisible: this.visible,
+      tooltipData: this.data?.title,
+      programId: this.data?.programId,
+      channelId: this.data?.channelId
+    });
+
+    // TODO: Aufnahme-Funktionalität implementieren
+    // Hier können Sie die Aufnahme-Logik hinzufügen
   }
 
   /**
@@ -218,13 +301,24 @@ export class EpgTooltip extends SuperBase {
 
     return html`
       <div class="tooltip">
-
         <div class="tooltip-content">
           <div class="tooltip-toolbar">
-            <button class="tooltip-close">X</button>
+            <div class="tooltip-toolbar-left">
+              <button class="tooltip-record ${this.data.record ? 'recorded' : ''}" title="Aufnahme planen">
+                <ha-icon icon="mdi:record"></ha-icon>
+              </button>
+            </div>
+            <div class="tooltip-toolbar-right">
+              <button class="tooltip-close">X</button>
+            </div>
           </div>
           <div class="tooltip-header">
-            <div class="tooltip-title">${this.data.title || 'Unbekanntes Programm'}</div>
+            <div class="tooltip-title-row">
+              <div class="tooltip-title">${this.data.title || 'Unbekanntes Programm'}</div>
+              ${this.data.channelName && this.data.action === 'info'
+                ? html`<div class="tooltip-channel">${this.data.channelName}</div>`
+                : ''}
+            </div>
             ${this.data.shortText
               ? html`<div class="tooltip-subtitle">${this.data.shortText}</div>`
               : ''}
@@ -236,7 +330,7 @@ export class EpgTooltip extends SuperBase {
             </div>
           </div>
           ${this.data.description
-            ? html`<div class="tooltip-description">${this.data.description}</div>`
+            ? html`<div class="tooltip-description">${this.data.description.split(/\|\*?/).map(line => html`${line}<br/>`)}</div>`
             : ''}
         </div>
       </div>
@@ -370,16 +464,26 @@ export class EpgTooltip extends SuperBase {
   updated(changedProperties) {
     super.updated(changedProperties);
 
-    // Close-Button Event-Handler registrieren (nur einmal)
+    // Event-Handler registrieren (nur einmal)
     if (!this._closeButtonRegistered && this.data) {
       const closeButton = this.shadowRoot.querySelector('.tooltip-close');
+      const recordButton = this.shadowRoot.querySelector('.tooltip-record');
+      
       if (closeButton) {
         this._debug('EpgTooltip: updated closeButton gefunden und registriert');
         closeButton.addEventListener('click', this._handleCloseClick.bind(this));
-        this._closeButtonRegistered = true;
       } else {
         this._debug('EpgTooltip: updated closeButton nicht gefunden');
       }
+      
+      if (recordButton) {
+        this._debug('EpgTooltip: updated recordButton gefunden und registriert');
+        recordButton.addEventListener('click', this._handleRecordClick.bind(this));
+      } else {
+        this._debug('EpgTooltip: updated recordButton nicht gefunden');
+      }
+      
+      this._closeButtonRegistered = true;
     }
 
     // Position berechnen wenn Tooltip gezeigt werden soll

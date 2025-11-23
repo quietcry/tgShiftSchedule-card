@@ -1437,6 +1437,105 @@ export class EpgBox extends EpgElementBase {
   _onProgramBoxScroll() {
     this._updateScrollbarThumb();
   }
+
+  /**
+   * Aktualisiert den Record-Status aller Programme basierend auf Meta-Daten
+   * @param {Object} records - Record-Daten von der Integration
+   */
+  updateRecordStatus(records) {
+    this._debug('EpgBox: updateRecordStatus aufgerufen', {
+      recordCount: records ? Object.keys(records).length : 0,
+      records: records
+    });
+
+    if (!records || typeof records !== 'object') {
+      this._debug('EpgBox: updateRecordStatus - Keine gültigen Record-Daten');
+      return;
+    }
+
+    let updatedCount = 0;
+
+    // Gehe durch alle Kanäle und Programme
+    this._flatChannels.forEach(channel => {
+      if (channel.programs && Array.isArray(channel.programs)) {
+        channel.programs.forEach(program => {
+          // Prüfe ob für dieses Programm ein Record existiert
+          const programId = program.id;
+          const channelId = program.channelId;
+          
+          // Suche nach Record basierend auf programId oder channelId + start/stop
+          const recordKey = this._findRecordKey(records, program);
+          
+          if (recordKey && records[recordKey]) {
+            const recordData = records[recordKey];
+            const wasRecorded = program.record || false;
+            const isRecorded = recordData.recorded || false;
+            
+            if (wasRecorded !== isRecorded) {
+              program.record = isRecorded;
+              updatedCount++;
+              
+              this._debug('EpgBox: Record-Status aktualisiert', {
+                programId: programId,
+                channelId: channelId,
+                title: program.title,
+                wasRecorded: wasRecorded,
+                isRecorded: isRecorded,
+                recordKey: recordKey
+              });
+            }
+          }
+        });
+      }
+    });
+
+    if (updatedCount > 0) {
+      this._debug('EpgBox: Record-Status Updates abgeschlossen', {
+        updatedCount: updatedCount,
+        totalRecords: Object.keys(records).length
+      });
+      
+      // Trigger ein Update, damit Lit die Änderungen rendert
+      this.requestUpdate();
+    } else {
+      this._debug('EpgBox: Keine Record-Status Änderungen');
+    }
+  }
+
+  /**
+   * Findet den passenden Record-Key für ein Programm
+   * @param {Object} records - Record-Daten
+   * @param {Object} program - Programm-Objekt
+   * @returns {string|null} Record-Key oder null
+   */
+  _findRecordKey(records, program) {
+    const programId = program.id;
+    const channelId = program.channelId;
+    const start = program.start;
+    const stop = program.stop;
+
+    // Versuche verschiedene Matching-Strategien
+    const possibleKeys = [
+      programId, // Direkte programId
+      `${channelId}_${start}_${stop}`, // channelId + Zeit
+      `${programId}_${start}`, // programId + start
+    ];
+
+    for (const key of possibleKeys) {
+      if (records[key]) {
+        return key;
+      }
+    }
+
+    // Fallback: Suche nach programId in allen Keys
+    for (const key of Object.keys(records)) {
+      if (key.includes(programId) || records[key].programId === programId) {
+        return key;
+      }
+    }
+
+    return null;
+  }
 }
 
 customElements.define('epg-box', EpgBox);

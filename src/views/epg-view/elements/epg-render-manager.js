@@ -147,6 +147,9 @@ export class EpgRenderManager extends TgCardHelper {
           .title=${program.title || ''}
           .description=${program.description || ''}
           .shortText=${program.shorttext || ''}
+          .programId=${program.id || ''}
+          .channelId=${channelId || ''}
+          .channelName=${program.channelName || ''}
           .isCurrent=${program.isCurrent || false}
           .showTime=${this.epgBox.showTime}
           .showDuration=${this.epgBox.showDuration}

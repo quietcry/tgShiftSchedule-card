@@ -1,12 +1,7 @@
 import { html, css } from 'lit';
 import { ViewBase } from '../view-base.js';
-import { EpgViewBase } from './epg-view-base.js';
-import { EpgTimebar } from './elements/epg-timebar.js';
-import { EpgChannelList } from './elements/epg-channel-list.js';
-import { EpgProgramList } from './elements/epg-program-list.js';
 import { EpgBox } from './elements/epg-box.js';
 import { DataProvider } from '../../tools/data-provider.js';
-import { EpgScrollManager } from './elements/epg-scroll-manager.js';
 import '../../tools/tooltip-manager.js'; // Import für Custom Element Registrierung
 
 export class EPGView extends ViewBase {
@@ -295,6 +290,7 @@ export class EPGView extends ViewBase {
     this._env = null;
     this._dataProvider = null;
     this._lastUpdate = null;
+    this._lastMetaUpdate = null;
 
     // Tooltip Custom Element Referenz
     this._tooltipElement = null;
@@ -311,14 +307,19 @@ export class EPGView extends ViewBase {
       const newState = value?.states[this.config.entity];
       const oldLastUpdate = oldState?.attributes?.last_update;
       const newLastUpdate = newState?.attributes?.last_update;
+      const oldLastMetaUpdate = oldState?.attributes?.last_meta_update;
+      const newLastMetaUpdate = newState?.attributes?.last_meta_update;
 
-      this._debug('EPGView set hass: Vergleiche last_update', {
+      this._debug('EPGView set hass: Vergleiche last_update und last_meta_update', {
         oldLastUpdate,
         newLastUpdate,
+        oldLastMetaUpdate,
+        newLastMetaUpdate,
         oldHass: !!this._hass,
         newHass: !!value,
         entity: this.config?.entity,
         thisLastUpdate: this._lastUpdate,
+        thisLastMetaUpdate: this._lastMetaUpdate,
       });
 
       this._hass = value;
@@ -372,6 +373,45 @@ export class EPGView extends ViewBase {
         this._debug('EPGView: last_update unverändert, überspringe Update und Rendering', {
           lastUpdate: this._lastUpdate,
           newLastUpdate: newLastUpdate,
+        });
+      }
+
+      // Prüfe last_meta_update für Record-Synchronisation
+      if (this._lastMetaUpdate === null || newLastMetaUpdate !== this._lastMetaUpdate) {
+        this._debug('EPGView: last_meta_update Vergleich', {
+          newLastMetaUpdate,
+          thisLastMetaUpdate: this._lastMetaUpdate,
+          hasHass: !!this._hass,
+          hasConfig: !!this.config,
+          entity: this.config?.entity,
+        });
+
+        if (this._hass && this.config?.entity) {
+          this._debug(
+            'EPGView: last_meta_update hat sich geändert oder erstmaliger Aufruf, starte Meta-Update',
+            {
+              old: this._lastMetaUpdate,
+              new: newLastMetaUpdate,
+            }
+          );
+          this._lastMetaUpdate = newLastMetaUpdate; // Aktualisiere sofort
+          // Fange async Fehler ab
+          this._loadMetaData().catch(error => {
+            this._debug('EPGView: Fehler beim Laden der Meta-Daten im hass Setter', {
+              error: error.message,
+            });
+          });
+        } else {
+          this._debug('EPGView: hass oder entity nicht verfügbar für Meta-Update', {
+            hasHass: !!this._hass,
+            hasConfig: !!this.config,
+            entity: this.config?.entity,
+          });
+        }
+      } else {
+        this._debug('EPGView: last_meta_update unverändert, überspringe Meta-Update', {
+          lastMetaUpdate: this._lastMetaUpdate,
+          newLastMetaUpdate: newLastMetaUpdate,
         });
       }
     } else {
@@ -495,6 +535,22 @@ export class EPGView extends ViewBase {
     await this._fetchViewData(this.config);
   }
 
+  async _loadMetaData() {
+    this._debug('EPG-View: _loadMetaData wird aufgerufen');
+
+    if (!this._dataProvider || !this.config.entity) {
+      this._debug('EPG-View: _loadMetaData: Übersprungen - dataProvider oder entity fehlt', {
+        dataProvider: !!this._dataProvider,
+        entity: this.config.entity,
+      });
+      return;
+    }
+
+    // Starte den Meta-Datenabruf direkt
+    this._debug('EPG-View: Starte Meta-Datenabruf für Record-Synchronisation');
+    await this._fetchMetaData(this.config);
+  }
+
   async _fetchViewData(config) {
     this._debug('_fetchViewData(): _fetchViewData gestartet', {
       entity: config.entity,
@@ -533,7 +589,7 @@ export class EPGView extends ViewBase {
         this._debug('_fetchViewData(): Neue EPG-Daten empfangen', {
           epg: data,
           kanal: data.channeldata.name,
-          kanalId: data.channeldata.id,
+          kanalId: data.channeldata.channelid,
           anzahlProgramme:
             data.epg && typeof data.epg === 'object' ? Object.keys(data.epg).length : 0,
           programme:
@@ -578,6 +634,42 @@ export class EPGView extends ViewBase {
     );
 
     return result;
+  }
+
+  async _fetchMetaData(config) {
+    this._debug('_fetchMetaData(): _fetchMetaData gestartet', {
+      entity: config.entity,
+      hasDataProvider: !!this._dataProvider,
+    });
+
+    if (!this._dataProvider) {
+      throw new Error('DataProvider nicht initialisiert');
+    }
+
+    // Hole die EPG-Box
+    const epgBox = this.shadowRoot?.querySelector('epg-box');
+    if (!epgBox) {
+      this._debug('_fetchMetaData(): EPG-Box nicht gefunden, überspringe Meta-Datenabruf');
+      return [];
+    }
+
+    this._debug('_fetchMetaData(): Starte Meta-Datenabruf für Record-Synchronisation');
+    
+    // Rufe Meta-Daten über DataProvider ab
+    const metaData = await this._dataProvider.fetchMetaData(config.entity);
+    this._debug('_fetchMetaData(): Meta-Daten empfangen', { 
+      metaData,
+      hasRecords: !!metaData?.records,
+      recordCount: metaData?.records ? Object.keys(metaData.records).length : 0
+    });
+    
+    // Verarbeite Meta-Daten und aktualisiere Programme mit Record-Status
+    if (metaData?.records) {
+      epgBox.updateRecordStatus(metaData.records);
+    }
+    
+    this._debug('_fetchMetaData(): Meta-Datenabruf abgeschlossen');
+    return metaData;
   }
 
   _onEpgBoxReady() {
