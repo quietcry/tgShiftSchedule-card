@@ -1,20 +1,21 @@
-# TG Kalender Card
+# TG Schichtplan Card
 
-Eine Kalender-Karte für Home Assistant zur Verwaltung von Arbeitszeiten.
+Eine Schichtplan-Karte für Home Assistant zur Verwaltung von Arbeitszeiten und Schichten.
 
 ## Funktionen
 
-- Kalenderansicht für den laufenden und den Folgemonat
-- Toggle-Buttons für jeden Tag zum Ein- und Ausschalten der Arbeitszeiten
-- Speicherung der Daten in einem `input_text` Entity
-- Format: `<monatsnummer>:<tag>,<tag>;` (z.B. `12:1,2,3,4,5;1:1,2,3`)
+- Schichtplanansicht für mehrere Monate (konfigurierbar, max. 14 Monate)
+- Toggle-Buttons für jeden Tag zum Ein- und Ausschalten der Arbeitszeiten/Schichten
+- Unterstützung für mehrere Schichten pro Tag (Standard + bis zu 4 weitere Schichten)
+- Speicherung der Daten in einem oder mehreren `input_text` Entities
+- Format: `<jahr>:<monat>:<tag><schicht>,<tag><schicht>;` (z.B. `25:11:03a,04ab,05a;25:12:01a`)
 
 ## Installation
 
-1. Kopiere die Datei `tgcalendar-card.js` aus dem `dist` Ordner in deinen `www` Ordner (z.B. `config/www/tgCalendar/`)
+1. Kopiere die Datei `tgshiftschedule-card.js` aus dem `dist` Ordner in deinen `www` Ordner (z.B. `config/www/tgShiftSchedule/`)
 2. Füge die Ressource in Home Assistant ein:
    - Einstellungen → Dashboards → Ressourcen
-   - URL: `/local/tgCalendar/tgcalendar-card.js`
+   - URL: `/local/tgShiftSchedule/tgshiftschedule-card.js`
    - Typ: JavaScript-Modul
 
 ## Voraussetzungen
@@ -33,22 +34,26 @@ input_text:
 Füge die Karte zu deinem Dashboard hinzu:
 
 ```yaml
-type: custom:tgcalendar-card
+type: custom:tgshiftschedule-card
 entity: input_text.arbeitszeiten
 ```
 
 ## Datenformat
 
-Die Arbeitszeiten werden im folgenden Format gespeichert:
+Die Arbeitszeiten/Schichten werden im folgenden Format gespeichert:
 
 ```
-<monatsnummer>:<tag>,<tag>,<tag>;<monatsnummer>:<tag>,<tag>
+<jahr>:<monat>:<tag><schicht>,<tag><schicht>;<jahr>:<monat>:<tag><schicht>
 ```
 
 Beispiel:
-- `12:1,2,3,4,5;1:1,2,3` bedeutet:
-  - Dezember (Monat 12): Tage 1, 2, 3, 4, 5 sind Arbeitszeiten
-  - Januar (Monat 1): Tage 1, 2, 3 sind Arbeitszeiten
+- `25:11:03a,04ab,05a;25:12:01a,09a` bedeutet:
+  - November 2025: Tag 3 hat Schicht 'a', Tag 4 hat Schichten 'a' und 'b', Tag 5 hat Schicht 'a'
+  - Dezember 2025: Tag 1 und 9 haben Schicht 'a'
+
+**Schicht-Shortcuts:**
+- `a`: Standardschicht (immer aktiv)
+- `b`, `c`, `d`, `e`: Zusätzliche Schichten (konfigurierbar im Editor)
 
 **Wichtig**: Es werden nur die Tage gespeichert, an denen Sie arbeiten müssen.
 
@@ -59,4 +64,4 @@ npm install
 npm run build
 ```
 
-Die kompilierte Datei wird in `dist/tgcalendar-card.js` erstellt.
+Die kompilierte Datei wird in `dist/tgshiftschedule-card.js` erstellt.
