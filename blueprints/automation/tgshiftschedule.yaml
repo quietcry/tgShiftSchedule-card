@@ -98,7 +98,7 @@ action:
           {% set _ = alle.append(entity) %}
         {% endfor %}
         {{ alle }}
-      schichtplan_teile: >
+      schichtplan: >
         {% set teile = [] %}
         {% for entity_id in alle_entities %}
           {% set entity_state = states(entity_id) %}
@@ -106,8 +106,7 @@ action:
             {% set _ = teile.append(entity_state|string) %}
           {% endif %}
         {% endfor %}
-        {{ teile }}
-      schichtplan: "{{ schichtplan_teile|join(';') }}"
+        {{ teile|join(';') }}
       aktive_schichten: >
         {% set schichten = [] %}
         {% if schicht_a_input %}{% set _ = schichten.append('a') %}{% endif %}
