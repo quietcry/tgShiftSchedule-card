@@ -64,12 +64,18 @@ condition: []
 
 action:
   - variables:
+      text_entity_input: !input text_entity
+      schicht_a_input: !input schicht_a
+      schicht_b_input: !input schicht_b
+      schicht_c_input: !input schicht_c
+      schicht_d_input: !input schicht_d
+      schicht_e_input: !input schicht_e
       heute_jahr: "{{ now().strftime('%y') }}"
       heute_monat: "{{ now().strftime('%m') }}"
       heute_tag: "{{ now().strftime('%d') }}"
-      haupt_entity: "{{ !input text_entity }}"
+      haupt_entity: "{{ text_entity_input }}"
       zusaetzliche_entities: >
-        {% set base_entity = !input text_entity %}
+        {% set base_entity = text_entity_input %}
         {% set entity_parts = base_entity.split('.') %}
         {% set zusatz = [] %}
         {% if entity_parts|length == 2 %}
@@ -104,11 +110,11 @@ action:
       schichtplan: "{{ schichtplan_teile|join(';') }}"
       aktive_schichten: >
         {% set schichten = [] %}
-        {% if !input schicht_a %}{% set _ = schichten.append('a') %}{% endif %}
-        {% if !input schicht_b %}{% set _ = schichten.append('b') %}{% endif %}
-        {% if !input schicht_c %}{% set _ = schichten.append('c') %}{% endif %}
-        {% if !input schicht_d %}{% set _ = schichten.append('d') %}{% endif %}
-        {% if !input schicht_e %}{% set _ = schichten.append('e') %}{% endif %}
+        {% if schicht_a_input %}{% set _ = schichten.append('a') %}{% endif %}
+        {% if schicht_b_input %}{% set _ = schichten.append('b') %}{% endif %}
+        {% if schicht_c_input %}{% set _ = schichten.append('c') %}{% endif %}
+        {% if schicht_d_input %}{% set _ = schichten.append('d') %}{% endif %}
+        {% if schicht_e_input %}{% set _ = schichten.append('e') %}{% endif %}
         {{ schichten }}
       schicht_aktiv: >
         {% set monat_key = heute_jahr + ':' + heute_monat %}
