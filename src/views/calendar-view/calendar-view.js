@@ -1051,22 +1051,24 @@ export class CalendarView extends ViewBase {
     const currentYear = now.getFullYear();
 
     const dayElements = this._getDayElements(key, currentDay);
-    const isWorking = workingDays.includes(parseInt(currentDay));
     const isToday = (year === currentYear && month === currentMonth && currentDay === today);
 
-        // Prüfe ob der ausgewählte Kalender an diesem Tag aktiv ist
-        const selectedShortcut = this._getSelectedCalendarShortcut();
-        const hasSelectedShift = selectedShortcut && dayElements.includes(selectedShortcut);
-        const selectedCalendar = this._getCalendarByShortcut(selectedShortcut);
-        let buttonStyle = '';
+    // Prüfe ob der ausgewählte Kalender an diesem Tag aktiv ist
+    const selectedShortcut = this._getSelectedCalendarShortcut();
+    const hasSelectedShift = selectedShortcut && dayElements.includes(selectedShortcut);
+    const selectedCalendar = this._getCalendarByShortcut(selectedShortcut);
+    let buttonStyle = '';
 
-        // Im Modus "single": Verwende Orange für ausgewählte Tage
-        if (this._config?.mode === 'single' && isWorking) {
-          buttonStyle = `background-color: ${CalendarView.DEFAULT_SELECTED_DAY_COLOR};`;
-        } else if (hasSelectedShift && selectedCalendar && selectedCalendar.color) {
-          // In Advanced-Modi: Verwende die Farbe des ausgewählten Kalenders
-          buttonStyle = `background-color: ${selectedCalendar.color};`;
-        }
+    // isWorking sollte nur true sein, wenn der ausgewählte Kalender aktiv ist
+    const isWorking = hasSelectedShift;
+
+    // Im Modus "single": Verwende Orange für ausgewählte Tage (nur wenn Kalender "a" aktiv ist)
+    if (this._config?.mode === 'single' && isWorking) {
+      buttonStyle = `background-color: ${CalendarView.DEFAULT_SELECTED_DAY_COLOR};`;
+    } else if (hasSelectedShift && selectedCalendar && selectedCalendar.color) {
+      // In Advanced-Modi: Verwende die Farbe des ausgewählten Kalenders
+      buttonStyle = `background-color: ${selectedCalendar.color};`;
+    }
 
         // Erstelle visuelle Darstellung der Kalender (alle außer dem ausgewählten)
         const shiftIndicators = dayElements
