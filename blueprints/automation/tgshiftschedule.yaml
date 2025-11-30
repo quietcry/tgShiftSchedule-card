@@ -81,8 +81,14 @@ action:
         {% if entity_parts|length == 2 %}
           {% set domain = entity_parts[0] %}
           {% set base_name = entity_parts[1] %}
-          {% set moegliche_suffixe = ['001', '002', '003', '004', '005', '006', '007', '008', '009', '010', '011', '012', '013', '014', '015', '016', '017', '018', '019', '020'] %}
-          {% for suffix in moegliche_suffixe %}
+          {% for nummer in range(1, 1000) %}
+            {% if nummer < 10 %}
+              {% set suffix = '00' + nummer|string %}
+            {% elif nummer < 100 %}
+              {% set suffix = '0' + nummer|string %}
+            {% else %}
+              {% set suffix = nummer|string %}
+            {% endif %}
             {% set entity_id = domain + '.' + base_name + '_' + suffix %}
             {% if states(entity_id) is defined and states(entity_id) is not none %}
               {% set _ = zusatz.append(entity_id) %}
