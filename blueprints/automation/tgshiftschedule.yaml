@@ -17,30 +17,120 @@ blueprint:
       default: true
       selector:
         boolean: {}
+    schicht_a_startzeit:
+      name: Standardschicht (a) Startzeit
+      description: Optionale Startzeit für Schicht a (Format: HH:MM, z.B. 08:00)
+      default: ""
+      selector:
+        text: {}
+    schicht_a_endzeit:
+      name: Standardschicht (a) Endzeit
+      description: Optionale Endzeit für Schicht a (Format: HH:MM, z.B. 16:00)
+      default: ""
+      selector:
+        text: {}
+    schicht_a_text:
+      name: Standardschicht (a) Text
+      description: Optionaler Text für Schicht a
+      default: ""
+      selector:
+        text: {}
     schicht_b:
       name: Schicht B prüfen
       description: Prüfe ob Schicht B aktiv ist
       default: false
       selector:
         boolean: {}
+    schicht_b_startzeit:
+      name: Schicht B Startzeit
+      description: Optionale Startzeit für Schicht b (Format: HH:MM, z.B. 08:00)
+      default: ""
+      selector:
+        text: {}
+    schicht_b_endzeit:
+      name: Schicht B Endzeit
+      description: Optionale Endzeit für Schicht b (Format: HH:MM, z.B. 16:00)
+      default: ""
+      selector:
+        text: {}
+    schicht_b_text:
+      name: Schicht B Text
+      description: Optionaler Text für Schicht b
+      default: ""
+      selector:
+        text: {}
     schicht_c:
       name: Schicht C prüfen
       description: Prüfe ob Schicht C aktiv ist
       default: false
       selector:
         boolean: {}
+    schicht_c_startzeit:
+      name: Schicht C Startzeit
+      description: Optionale Startzeit für Schicht c (Format: HH:MM, z.B. 08:00)
+      default: ""
+      selector:
+        text: {}
+    schicht_c_endzeit:
+      name: Schicht C Endzeit
+      description: Optionale Endzeit für Schicht c (Format: HH:MM, z.B. 16:00)
+      default: ""
+      selector:
+        text: {}
+    schicht_c_text:
+      name: Schicht C Text
+      description: Optionaler Text für Schicht c
+      default: ""
+      selector:
+        text: {}
     schicht_d:
       name: Schicht D prüfen
       description: Prüfe ob Schicht D aktiv ist
       default: false
       selector:
         boolean: {}
+    schicht_d_startzeit:
+      name: Schicht D Startzeit
+      description: Optionale Startzeit für Schicht d (Format: HH:MM, z.B. 08:00)
+      default: ""
+      selector:
+        text: {}
+    schicht_d_endzeit:
+      name: Schicht D Endzeit
+      description: Optionale Endzeit für Schicht d (Format: HH:MM, z.B. 16:00)
+      default: ""
+      selector:
+        text: {}
+    schicht_d_text:
+      name: Schicht D Text
+      description: Optionaler Text für Schicht d
+      default: ""
+      selector:
+        text: {}
     schicht_e:
       name: Schicht E prüfen
       description: Prüfe ob Schicht E aktiv ist
       default: false
       selector:
         boolean: {}
+    schicht_e_startzeit:
+      name: Schicht E Startzeit
+      description: Optionale Startzeit für Schicht e (Format: HH:MM, z.B. 08:00)
+      default: ""
+      selector:
+        text: {}
+    schicht_e_endzeit:
+      name: Schicht E Endzeit
+      description: Optionale Endzeit für Schicht e (Format: HH:MM, z.B. 16:00)
+      default: ""
+      selector:
+        text: {}
+    schicht_e_text:
+      name: Schicht E Text
+      description: Optionaler Text für Schicht e
+      default: ""
+      selector:
+        text: {}
     action_wenn_schicht_aktiv:
       name: Aktion wenn Schicht aktiv
       description: Aktion die ausgeführt wird, wenn heute eine der ausgewählten Schichten aktiv ist
@@ -73,9 +163,25 @@ action:
       schicht_c_input: !input schicht_c
       schicht_d_input: !input schicht_d
       schicht_e_input: !input schicht_e
+      schicht_a_startzeit_input: !input schicht_a_startzeit
+      schicht_a_endzeit_input: !input schicht_a_endzeit
+      schicht_a_text_input: !input schicht_a_text
+      schicht_b_startzeit_input: !input schicht_b_startzeit
+      schicht_b_endzeit_input: !input schicht_b_endzeit
+      schicht_b_text_input: !input schicht_b_text
+      schicht_c_startzeit_input: !input schicht_c_startzeit
+      schicht_c_endzeit_input: !input schicht_c_endzeit
+      schicht_c_text_input: !input schicht_c_text
+      schicht_d_startzeit_input: !input schicht_d_startzeit
+      schicht_d_endzeit_input: !input schicht_d_endzeit
+      schicht_d_text_input: !input schicht_d_text
+      schicht_e_startzeit_input: !input schicht_e_startzeit
+      schicht_e_endzeit_input: !input schicht_e_endzeit
+      schicht_e_text_input: !input schicht_e_text
       heute_jahr: "{{ now().strftime('%y') }}"
       heute_monat: "{{ now().strftime('%m') }}"
       heute_tag: "{{ now().strftime('%d') }}"
+      aktuelle_zeit: "{{ now().strftime('%H:%M') }}"
       haupt_entity: "{{ text_entity_input }}"
       zusaetzliche_entities: >
         {% set base_entity = text_entity_input %}
@@ -124,10 +230,10 @@ action:
         {% if schicht_d_input %}{% set _ = schichten.append('d') %}{% endif %}
         {% if schicht_e_input %}{% set _ = schichten.append('e') %}{% endif %}
         {{ schichten }}
-      schicht_aktiv: >
+      aktive_schichten_heute: >
         {% set monat_key = heute_jahr + ':' + heute_monat %}
         {% set monate = schichtplan.split(';') if schichtplan else [] %}
-        {% set gefunden = false %}
+        {% set gefundene_schichten = [] %}
         {% for monat in monate %}
           {% if monat and monat.startswith(monat_key + ':') %}
             {% set tage_teil = monat.split(':', 2)[2] if ':' in monat else '' %}
@@ -136,8 +242,8 @@ action:
               {% for tag_entry in tage_liste %}
                 {% if tag_entry and tag_entry.startswith(heute_tag) %}
                   {% for schicht in aktive_schichten %}
-                    {% if schicht in tag_entry %}
-                      {% set gefunden = true %}
+                    {% if schicht in tag_entry and schicht not in gefundene_schichten %}
+                      {% set _ = gefundene_schichten.append(schicht) %}
                     {% endif %}
                   {% endfor %}
                 {% endif %}
@@ -145,7 +251,34 @@ action:
             {% endif %}
           {% endif %}
         {% endfor %}
-        {{ gefunden }}
+        {{ gefundene_schichten }}
+      schicht_aktiv: "{{ aktive_schichten_heute|length > 0 }}"
+      result: >
+        {% set ergebnis = [] %}
+        {% for schicht in aktive_schichten_heute %}
+          {% if schicht == 'a' and schicht_a_startzeit_input|trim != '' and schicht_a_endzeit_input|trim != '' %}
+            {% if aktuelle_zeit >= schicht_a_startzeit_input and aktuelle_zeit <= schicht_a_endzeit_input %}
+              {% set _ = ergebnis.append({'startzeit': schicht_a_startzeit_input, 'endzeit': schicht_a_endzeit_input, 'text': schicht_a_text_input}) %}
+            {% endif %}
+          {% elif schicht == 'b' and schicht_b_startzeit_input|trim != '' and schicht_b_endzeit_input|trim != '' %}
+            {% if aktuelle_zeit >= schicht_b_startzeit_input and aktuelle_zeit <= schicht_b_endzeit_input %}
+              {% set _ = ergebnis.append({'startzeit': schicht_b_startzeit_input, 'endzeit': schicht_b_endzeit_input, 'text': schicht_b_text_input}) %}
+            {% endif %}
+          {% elif schicht == 'c' and schicht_c_startzeit_input|trim != '' and schicht_c_endzeit_input|trim != '' %}
+            {% if aktuelle_zeit >= schicht_c_startzeit_input and aktuelle_zeit <= schicht_c_endzeit_input %}
+              {% set _ = ergebnis.append({'startzeit': schicht_c_startzeit_input, 'endzeit': schicht_c_endzeit_input, 'text': schicht_c_text_input}) %}
+            {% endif %}
+          {% elif schicht == 'd' and schicht_d_startzeit_input|trim != '' and schicht_d_endzeit_input|trim != '' %}
+            {% if aktuelle_zeit >= schicht_d_startzeit_input and aktuelle_zeit <= schicht_d_endzeit_input %}
+              {% set _ = ergebnis.append({'startzeit': schicht_d_startzeit_input, 'endzeit': schicht_d_endzeit_input, 'text': schicht_d_text_input}) %}
+            {% endif %}
+          {% elif schicht == 'e' and schicht_e_startzeit_input|trim != '' and schicht_e_endzeit_input|trim != '' %}
+            {% if aktuelle_zeit >= schicht_e_startzeit_input and aktuelle_zeit <= schicht_e_endzeit_input %}
+              {% set _ = ergebnis.append({'startzeit': schicht_e_startzeit_input, 'endzeit': schicht_e_endzeit_input, 'text': schicht_e_text_input}) %}
+            {% endif %}
+          {% endif %}
+        {% endfor %}
+        {{ ergebnis }}
 
   - choose:
       - conditions:
