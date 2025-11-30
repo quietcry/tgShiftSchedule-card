@@ -55,6 +55,9 @@ blueprint:
         action: {}
 
 trigger:
+  - platform: homeassistant
+    event: start
+    id: haStart
   - platform: time
     at: "00:00:00"
   - platform: state
