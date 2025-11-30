@@ -1071,11 +1071,13 @@ export class CalendarView extends ViewBase {
     }
 
         // Erstelle visuelle Darstellung der Kalender (alle außer dem ausgewählten)
+        // Nur aktivierte Kalender werden angezeigt
         const shiftIndicators = dayElements
           .filter(shortcut => shortcut !== selectedShortcut) // Filtere den ausgewählten Kalender heraus
           .map(shortcut => {
             const calendar = this._getCalendarByShortcut(shortcut);
-            if (calendar && calendar.color) {
+            // Nur anzeigen, wenn der Kalender aktiviert ist
+            if (calendar && calendar.enabled && calendar.color) {
               return html`
                 <span
                   class="shift-indicator"
@@ -1084,8 +1086,9 @@ export class CalendarView extends ViewBase {
                 </span>
               `;
             }
-            return html`<span class="shift-indicator" title="${shortcut}">${shortcut}</span>`;
-          });
+            return null; // Nicht anzeigen, wenn Kalender deaktiviert ist
+          })
+          .filter(indicator => indicator !== null); // Entferne null-Werte
 
     return html`
       <td>
