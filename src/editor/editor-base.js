@@ -45,10 +45,6 @@ export class EditorBase extends SuperBase {
         await cardHelpers.loadHaForm();
         this._debug('[EditorBase] EditorBase ha-form geladen');
       } catch (error) {
-        console.error(
-          `[${this.constructor.cardName}] [EditorBase] Fehler beim Laden von custom-card-helpers:`,
-          error
-        );
         throw error;
       }
     } else {

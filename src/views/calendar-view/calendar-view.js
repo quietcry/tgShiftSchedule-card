@@ -50,7 +50,6 @@ export class CalendarView extends ViewBase {
   set hass(hass) {
     // Ignoriere Updates während des Schreibens und 5 Sekunden danach
     if (this._isWriting) {
-      console.log('set hass: Update während des Schreibens ignoriert');
       this._hass = hass; // Aktualisiere hass trotzdem, aber lade keine Daten
       this.requestUpdate();
       return;
@@ -128,7 +127,6 @@ export class CalendarView extends ViewBase {
       if (exists) {
         // Aktualisiere _selectedCalendar, auch wenn es bereits gesetzt ist
         this._selectedCalendar = config.selectedCalendar;
-        console.log('set config: _selectedCalendar synchronisiert mit config.selectedCalendar:', this._selectedCalendar);
       } else {
         // Wenn der ausgewählte Kalender nicht aktiviert ist, verwende den ersten aktivierten
         if (allCalendars.length > 0) {
@@ -210,7 +208,6 @@ export class CalendarView extends ViewBase {
     // Speichere die Liste der bekannten Entities für späteres Schreiben
     // Diese Liste enthält: Haupt-Entity + alle zusätzlichen Entities
     this._knownEntityIds = [baseEntityId, ...additionalEntities];
-    console.log('loadWorkingDays: Alle bekannten Entities (Haupt + zusätzliche):', this._knownEntityIds);
 
     // Lade Daten aus allen Entities (Haupt-Entity + zusätzliche)
     for (const entityId of this._knownEntityIds) {
@@ -220,23 +217,14 @@ export class CalendarView extends ViewBase {
         const currentLength = entity.state.length;
         const maxLength = maxLengths[entityId];
         if (maxLength !== undefined) {
-          console.log(`loadWorkingDays: ${entityId} - Länge: ${currentLength}/${maxLength}`);
         }
       }
     }
 
     // Füge alle Strings zusammen (mit ";" als Trennzeichen) und parse dann einmal
-    console.log('loadWorkingDays: Anzahl dataStrings:', dataStrings.length);
     const additionalEntityIds = this._knownEntityIds ? this._knownEntityIds.slice(1) : [];
-    console.log('loadWorkingDays: dataStrings Details:', {
-      allEntities: this._knownEntityIds,
-      dataLengths: dataStrings.map(s => s?.length || 0),
-      mainEntity: this._config.entity,
-      additionalEntities: additionalEntityIds
-    });
     if (dataStrings.length > 0) {
       const combinedString = dataStrings.join(';');
-      console.log('loadWorkingDays: Kombinierter String Länge:', combinedString.length);
       this.parseWorkingDays(combinedString);
     } else {
       this._workingDays = {};
@@ -282,14 +270,6 @@ export class CalendarView extends ViewBase {
         monthsToKeep.push({ year, month });
       }
 
-      console.log('loadWorkingDays: Bereinigung', {
-        numberOfMonths,
-        currentYear,
-        currentMonth,
-        monthsToKeep,
-        keys: Object.keys(this._workingDays)
-      });
-
       let hasChanges = false;
 
       for (const key of Object.keys(this._workingDays)) {
@@ -304,7 +284,6 @@ export class CalendarView extends ViewBase {
             m => m.year === keyYear && m.month === keyMonth
           );
 
-          // console.log('loadWorkingDays: Prüfe Key', {
           //   key,
           //   keyYear,
           //   keyMonth,
@@ -313,13 +292,11 @@ export class CalendarView extends ViewBase {
           // });
 
           if (!shouldKeep) {
-            console.log('loadWorkingDays: Entferne Key', key);
             delete this._workingDays[key];
             hasChanges = true;
           }
         } else {
           // Ungültiges Format, entfernen
-          console.log('loadWorkingDays: Ungültiges Format, entferne Key', key);
           delete this._workingDays[key];
           hasChanges = true;
         }
@@ -328,14 +305,12 @@ export class CalendarView extends ViewBase {
       // Wenn Änderungen vorgenommen wurden, speichere die bereinigten Daten
       if (hasChanges) {
         const cleanedValue = this.serializeWorkingDays();
-        console.log('loadWorkingDays: Alte Monate entfernt, neue Werte:', cleanedValue);
         try {
           await this._hass.callService('input_text', 'set_value', {
             entity_id: this._config.entity,
             value: cleanedValue,
           });
         } catch (error) {
-          console.error('loadWorkingDays: Fehler beim Speichern der bereinigten Daten', error);
         }
       }
     }
@@ -500,7 +475,6 @@ export class CalendarView extends ViewBase {
     const mainMaxLength = this.getEntityMaxLength(mainEntityId);
     if (mainMaxLength !== null) {
       maxLengths[mainEntityId] = mainMaxLength;
-      console.log(`getAllEntityMaxLengths: ${mainEntityId} max length: ${mainMaxLength}`);
     }
 
     // Prüfe zusätzliche Entities
@@ -509,7 +483,6 @@ export class CalendarView extends ViewBase {
       const additionalMaxLength = this.getEntityMaxLength(additionalEntityId);
       if (additionalMaxLength !== null) {
         maxLengths[additionalEntityId] = additionalMaxLength;
-        console.log(`getAllEntityMaxLengths: ${additionalEntityId} max length: ${additionalMaxLength}`);
       }
     }
 
@@ -527,11 +500,9 @@ export class CalendarView extends ViewBase {
     let allEntityIds;
     if (this._knownEntityIds && this._knownEntityIds.length > 0) {
       allEntityIds = [...this._knownEntityIds];
-      console.log('checkStorageUsage: Verwende gecachte Entity-Liste:', allEntityIds);
     } else {
       // Fallback: Suche Entities neu
       allEntityIds = [this._config.entity, ...this.findAdditionalEntities(this._config.entity)];
-      console.log('checkStorageUsage: Entity-Liste neu gesucht:', allEntityIds);
     }
 
     const maxLengths = this.getAllEntityMaxLengths();
@@ -549,7 +520,6 @@ export class CalendarView extends ViewBase {
     // Ansonsten lese die Längen aus den aktuellen States
     if (serializedDataLength !== null && serializedDataLength !== undefined) {
       totalCurrentLength = serializedDataLength;
-      console.log('checkStorageUsage: Verwende übergebene Datenlänge:', serializedDataLength);
     } else {
       // Lese Längen aus den aktuellen States
       for (const entityId of allEntityIds) {
@@ -558,7 +528,6 @@ export class CalendarView extends ViewBase {
           totalCurrentLength += entity.state.length;
         }
       }
-      console.log('checkStorageUsage: Lese Längen aus aktuellen States');
     }
 
     // Berechne maximale Gesamtlänge
@@ -576,11 +545,6 @@ export class CalendarView extends ViewBase {
     }
 
     const percentage = (totalCurrentLength / totalMaxLength) * 100;
-    console.log('checkStorageUsage: Speicherverbrauch:', {
-      totalCurrentLength,
-      totalMaxLength,
-      percentage: Math.round(percentage * 10) / 10
-    });
 
     // Prüfe ob 90% überschritten werden
     if (percentage >= 90) {
@@ -590,7 +554,6 @@ export class CalendarView extends ViewBase {
         maxLength: totalMaxLength,
         percentage: Math.round(percentage * 10) / 10,
       };
-      console.warn('checkStorageUsage: 90% der Gesamtlänge überschritten!', this._storageWarning);
     } else {
       this._storageWarning = null;
     }
@@ -643,13 +606,11 @@ export class CalendarView extends ViewBase {
 
   async distributeDataToEntities(serializedData) {
     if (!this._hass || !this._config || !this._config.entity) {
-      console.error('distributeDataToEntities: hass oder config fehlt');
       return;
     }
 
     // Setze Schreib-Lock
     this._isWriting = true;
-    console.log('distributeDataToEntities: Schreib-Lock aktiviert');
 
     // Lösche vorhandenen Timer, falls vorhanden
     if (this._writeLockTimer) {
@@ -664,7 +625,6 @@ export class CalendarView extends ViewBase {
     if (this._knownEntityIds && this._knownEntityIds.length > 0) {
       // Verwende gecachte Liste
       allEntityIds = [...this._knownEntityIds];
-      console.log('distributeDataToEntities: Verwende gecachte Entity-Liste:', allEntityIds);
 
       // Prüfe ob neue Entities hinzugekommen sind
       const currentAdditionalEntities = this.findAdditionalEntities(this._config.entity);
@@ -674,7 +634,6 @@ export class CalendarView extends ViewBase {
         const newEntities = currentAdditionalEntities.slice(knownAdditionalCount);
         allEntityIds.push(...newEntities);
         this._knownEntityIds = [...allEntityIds];
-        console.log('distributeDataToEntities: Neue Entities gefunden und hinzugefügt:', newEntities);
       }
     } else {
       // Keine gecachte Liste vorhanden, sammle Entities neu
@@ -682,7 +641,6 @@ export class CalendarView extends ViewBase {
       const additionalEntities = this.findAdditionalEntities(this._config.entity);
       allEntityIds.push(...additionalEntities);
       this._knownEntityIds = [...allEntityIds];
-      console.log('distributeDataToEntities: Entity-Liste neu gesammelt:', allEntityIds);
     }
 
     // Ermittle die maximale Länge für jede Entity
@@ -697,24 +655,14 @@ export class CalendarView extends ViewBase {
         // Wenn keine max-Länge bekannt ist, verwende einen Standardwert (z.B. 255)
         maxLengths[entityId] = 255;
         totalMaxLength += 255;
-        console.warn(`distributeDataToEntities: Keine max-Länge für ${entityId}, verwende Standardwert 255`);
       }
     }
 
     // Debug: Zeige wie viele Zeichen wir schreiben wollen vs. können
     const dataLength = serializedData ? serializedData.length : 0;
-    console.log('distributeDataToEntities: Zeichen-Statistik:', {
-      wollenSchreiben: dataLength,
-      koennenSchreiben: totalMaxLength,
-      verfuegbar: totalMaxLength - dataLength,
-      prozent: totalMaxLength > 0 ? Math.round((dataLength / totalMaxLength) * 100 * 10) / 10 : 0,
-      entities: allEntityIds.length,
-      maxLengthsPerEntity: maxLengths
-    });
 
     // Wenn keine Daten vorhanden sind, setze alle Entities auf leer
     if (!serializedData || serializedData.trim() === '') {
-      console.log('distributeDataToEntities: Keine Daten, setze alle Entities auf leer');
       for (const entityId of allEntityIds) {
         try {
           await this._hass.callService('input_text', 'set_value', {
@@ -722,14 +670,12 @@ export class CalendarView extends ViewBase {
             value: '',
           });
         } catch (error) {
-          console.error(`distributeDataToEntities: Fehler beim Leeren von ${entityId}`, error);
         }
       }
       // Setze Timer auch wenn keine Daten vorhanden waren
       this._writeLockTimer = setTimeout(() => {
         this._isWriting = false;
         this._writeLockTimer = null;
-        console.log('distributeDataToEntities: Schreib-Lock nach 5 Sekunden deaktiviert (keine Daten)');
       }, 5000);
       return;
     }
@@ -752,7 +698,6 @@ export class CalendarView extends ViewBase {
       entityValues[currentEntityId] = valueToWrite;
       remainingData = remainingData.substring(charsToTake);
 
-      console.log(`distributeDataToEntities: ${currentEntityId} - Schreibe ${charsToTake} Zeichen, verbleibend: ${remainingData.length}`);
 
       // Wenn noch Daten übrig sind, wechsle zur nächsten Entity
       if (remainingData.length > 0) {
@@ -762,7 +707,6 @@ export class CalendarView extends ViewBase {
 
     // Wenn am Ende noch Text über ist, prüfe ob zwischenzeitlich eine zusätzliche Entität angelegt wurde
     if (remainingData.length > 0) {
-      console.log(`distributeDataToEntities: Noch ${remainingData.length} Zeichen übrig, prüfe auf neue Entities...`);
 
       // Prüfe ob neue Entities hinzugekommen sind
       const currentAdditionalEntities = this.findAdditionalEntities(this._config.entity);
@@ -771,7 +715,6 @@ export class CalendarView extends ViewBase {
       if (currentAdditionalEntities.length > knownAdditionalCount) {
         // Neue Entities gefunden
         const newEntities = currentAdditionalEntities.slice(knownAdditionalCount);
-        console.log(`distributeDataToEntities: ${newEntities.length} neue Entities gefunden:`, newEntities);
 
         // Aktualisiere die Liste
         allEntityIds.push(...newEntities);
@@ -784,7 +727,6 @@ export class CalendarView extends ViewBase {
             maxLengths[newEntityId] = maxLength;
           } else {
             maxLengths[newEntityId] = 255;
-            console.warn(`distributeDataToEntities: Keine max-Länge für ${newEntityId}, verwende Standardwert 255`);
           }
         }
 
@@ -800,14 +742,12 @@ export class CalendarView extends ViewBase {
           entityValues[currentEntityId] = valueToWrite;
           remainingData = remainingData.substring(charsToTake);
 
-          console.log(`distributeDataToEntities: ${currentEntityId} (neu) - Schreibe ${charsToTake} Zeichen, verbleibend: ${remainingData.length}`);
 
           if (remainingData.length > 0) {
             currentEntityIndex++;
           }
         }
       } else {
-        console.error(`distributeDataToEntities: Keine neuen Entities gefunden, aber noch ${remainingData.length} Zeichen übrig!`);
       }
     }
 
@@ -818,18 +758,14 @@ export class CalendarView extends ViewBase {
 
       // Der Wert sollte nie die maximale Länge überschreiten, da wir zeichenweise verteilen
       if (value.length > maxLength) {
-        console.error(`distributeDataToEntities: FEHLER - Wert überschreitet max-Länge für ${entityId}! Länge: ${value.length}, Max: ${maxLength}`);
         // Kürze den Wert auf die maximale Länge (als Notfall-Lösung)
         const truncatedValue = value.substring(0, maxLength);
-        console.warn(`distributeDataToEntities: Wert wird auf ${maxLength} Zeichen gekürzt`);
         try {
           await this._hass.callService('input_text', 'set_value', {
             entity_id: entityId,
             value: truncatedValue,
           });
-          console.log(`distributeDataToEntities: ${entityId} - Länge: ${truncatedValue.length}/${maxLength} (GEKÜRZT!)`);
         } catch (error) {
-          console.error(`distributeDataToEntities: Fehler beim Speichern in ${entityId}`, error);
         }
       } else {
         try {
@@ -837,9 +773,7 @@ export class CalendarView extends ViewBase {
             entity_id: entityId,
             value: value,
           });
-          console.log(`distributeDataToEntities: ${entityId} - Länge: ${value.length}/${maxLength}`);
         } catch (error) {
-          console.error(`distributeDataToEntities: Fehler beim Speichern in ${entityId}`, error);
         }
       }
     }
@@ -855,38 +789,31 @@ export class CalendarView extends ViewBase {
             entity_id: additionalEntityId,
             value: '',
           });
-          console.log(`distributeDataToEntities: ${additionalEntityId} - Leere ungenutzte Entity`);
         } catch (error) {
-          console.error(`distributeDataToEntities: Fehler beim Leeren von ${additionalEntityId}`, error);
         }
       }
     }
 
       // Wenn noch Daten übrig sind, die nicht gespeichert werden konnten
       if (remainingData.length > 0) {
-        console.error(`distributeDataToEntities: WARNUNG - ${remainingData.length} Zeichen konnten nicht gespeichert werden!`, remainingData);
       }
     } catch (error) {
-      console.error('distributeDataToEntities: Fehler beim Verteilen der Daten', error);
     } finally {
       // Schreib-Lock für weitere 5 Sekunden aufrechterhalten (um sicherzustellen, dass alle Updates verarbeitet wurden)
       this._writeLockTimer = setTimeout(() => {
         this._isWriting = false;
         this._writeLockTimer = null;
-        console.log('distributeDataToEntities: Schreib-Lock nach 5 Sekunden deaktiviert');
       }, 5000);
     }
   }
 
   async toggleDay(month, day, year = null) {
-    console.log('toggleDay aufgerufen', { month, day, year, hass: !!this._hass, config: !!this._config });
 
     // Stelle sicher, dass month und day Zahlen sind
     const monthNum = parseInt(month);
     const dayNum = parseInt(day);
 
     if (isNaN(monthNum) || isNaN(dayNum)) {
-      console.error('toggleDay: Ungültige Werte', { month, day, monthNum, dayNum });
       return;
     }
 
@@ -912,12 +839,10 @@ export class CalendarView extends ViewBase {
     }
 
     if (isPreviousMonth) {
-      console.log('toggleDay: Vormonat ist schreibgeschützt, Aktion abgebrochen');
       return;
     }
 
     if (!this._hass || !this._config || !this._config.entity) {
-      console.error('toggleDay: hass oder config fehlt', { hass: !!this._hass, config: !!this._config, entity: this._config?.entity });
       return;
     }
 
@@ -931,9 +856,6 @@ export class CalendarView extends ViewBase {
 
     // Hole das ausgewählte Kalender-Shortcut
     const selectedCalendarShortcut = this._getSelectedCalendarShortcut();
-    console.log('toggleDay: Ausgewählter Kalender-Shortcut:', selectedCalendarShortcut);
-    console.log('toggleDay: Vorher - workingDays[key]:', this._workingDays[key]);
-    console.log('toggleDay: Vorher - Tag', dayNum, 'hat:', this._workingDays[key]?.[dayNum]);
 
     if (!selectedCalendarShortcut) {
       // Fallback: Standardkalender (a)
@@ -962,14 +884,11 @@ export class CalendarView extends ViewBase {
 
       // WICHTIG: Erstelle eine Kopie des Arrays, um sicherzustellen, dass wir mit dem richtigen Array arbeiten
       const elements = [...(this._workingDays[key][dayNum] || [])];
-      console.log('toggleDay: Vor Toggle - elements:', elements);
-      console.log('toggleDay: Soll Kalender hinzufügen/entfernen:', selectedCalendarShortcut);
 
       const elementIndex = elements.indexOf(selectedCalendarShortcut);
 
       if (elementIndex > -1) {
         // Kalender entfernen
-        console.log('toggleDay: Entferne Kalender', selectedCalendarShortcut, 'von Tag', dayNum);
         elements.splice(elementIndex, 1);
         // Wenn keine Kalender mehr vorhanden sind, entferne den Tag
         if (elements.length === 0) {
@@ -984,20 +903,16 @@ export class CalendarView extends ViewBase {
         }
       } else {
         // Kalender hinzufügen (nur wenn noch nicht vorhanden)
-        console.log('toggleDay: Füge Kalender', selectedCalendarShortcut, 'zu Tag', dayNum, 'hinzu');
         if (!elements.includes(selectedCalendarShortcut)) {
           elements.push(selectedCalendarShortcut);
           // Aktualisiere das Array im _workingDays
           this._workingDays[key][dayNum] = elements;
         }
       }
-      console.log('toggleDay: Nach Toggle - elements:', this._workingDays[key][dayNum]);
     }
 
-    console.log('toggleDay: Nachher - workingDays[key]:', this._workingDays[key]);
 
     const serializedData = this.serializeWorkingDays();
-    console.log('toggleDay: Neue Werte', { monthNum, yearNum, dayNum, workingDays: this._workingDays[key], serializedData, entity: this._config.entity });
 
     // Verteile die Daten auf mehrere Entities, falls nötig
     await this.distributeDataToEntities(serializedData);
@@ -1250,24 +1165,19 @@ export class CalendarView extends ViewBase {
 
   _getSelectedCalendarShortcut() {
     // Gibt den Shortcut des ausgewählten Kalenders zurück
-    // console.log('_getSelectedCalendarShortcut: _selectedCalendar =', this._selectedCalendar);
-    // console.log('_getSelectedCalendarShortcut: config.selectedCalendar =', this._config?.selectedCalendar);
 
     // Prüfe zuerst _selectedCalendar
     if (this._selectedCalendar !== null && this._selectedCalendar !== undefined && this._selectedCalendar !== '') {
-      // console.log('_getSelectedCalendarShortcut: Verwende _selectedCalendar:', this._selectedCalendar);
       return this._selectedCalendar;
     }
 
     // Falls _selectedCalendar nicht gesetzt ist, prüfe die Config
     if (this._config?.selectedCalendar) {
       this._selectedCalendar = this._config.selectedCalendar;
-      // console.log('_getSelectedCalendarShortcut: Verwende selectedCalendar aus Config:', this._selectedCalendar);
       return this._selectedCalendar;
     }
 
     // Fallback: Standardkalender (a)
-    // console.log('_getSelectedCalendarShortcut: Fallback zu Standardkalender (a)');
     return 'a';
   }
 

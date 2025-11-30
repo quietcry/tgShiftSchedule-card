@@ -1,4 +1,4 @@
-const Version = '2025.11-0006';
+const Version = '2025.11-0007';
 const CardRegname = 'tgcalendar-card';
 const CardName = 'TG Kalender Card';
 const CardDescription = 'Eine Kalender-Karte für Arbeitszeiten';

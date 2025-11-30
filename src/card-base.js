@@ -264,12 +264,7 @@ export class CardBase extends SuperBase {
               });
               client.callback(data);
             } catch (error) {
-              console.error(
-                '_notifyClientsAtChanges() Fehler beim Benachrichtigen des Clients:',
-                details,
-                data,
-                error
-              );
+              // Fehler beim Benachrichtigen des Clients
             }
           }
         }

@@ -16,18 +16,14 @@ export class Card extends CardImpl {
 
   constructor() {
     super();
-    console.log(`[${CardName}] Card wird initialisiert`);
   }
 
   connectedCallback() {
     super.connectedCallback();
-    console.info(...this.getCardInfoString);
-    console.log(`[${CardName}] Card ist verbunden`);
   }
 
   disconnectedCallback() {
     super.disconnectedCallback();
-    console.log(`[${CardName}] Card ist getrennt`);
   }
 }
 
@@ -39,15 +35,12 @@ if (window.customCards) {
     description: CardDescription,
     preview: true,
   });
-  console.log(`[${CardName}] Karte in customCards registriert`);
 }
 
 // Registriere die Karte als Custom Element
 if (!customElements.get(CardRegname)) {
   try {
     customElements.define(CardRegname, Card);
-    console.log(`[${CardName}] Custom Element erfolgreich registriert`);
   } catch (error) {
-    console.error(`[${CardName}] Fehler bei der Custom Element-Registrierung:`, error);
   }
 }

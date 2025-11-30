@@ -18,7 +18,6 @@ export class TgCardHelper {
       '',
     ];
 
-    // if (this.debugMode) console.debug(`[${this.cardName}] tgCardHelper-Modul wird geladen`);
     // this._debug('tgCardHelper initialisiert');
   }
   _debug(...args) {
@@ -111,6 +110,5 @@ export class TgCardHelper {
     while (path.length < 50) {
       path = path + ' ';
     }
-    console.debug(path, ...args);
   }
 }
