@@ -15,11 +15,11 @@ export class EditorImpl extends EditorBase {
       mode: 'single',
       selectedCalendar: 'a',
       calendars: [
-        { shortcut: 'a', name: 'Standardkalender', color: '#ff9800', enabled: true },
-        { shortcut: 'b', name: 'Kalender B', color: '#ff0000', enabled: false },
-        { shortcut: 'c', name: 'Kalender C', color: '#00ff00', enabled: false },
-        { shortcut: 'd', name: 'Kalender D', color: '#0000ff', enabled: false },
-        { shortcut: 'e', name: 'Kalender E', color: '#ffff00', enabled: false },
+        { shortcut: 'a', name: 'Standardschicht', color: '#ff9800', enabled: true },
+        { shortcut: 'b', name: 'Schicht B', color: '#ff0000', enabled: false },
+        { shortcut: 'c', name: 'Schicht C', color: '#00ff00', enabled: false },
+        { shortcut: 'd', name: 'Schicht D', color: '#0000ff', enabled: false },
+        { shortcut: 'e', name: 'Schicht E', color: '#ffff00', enabled: false },
       ],
     });
 
@@ -44,11 +44,11 @@ export class EditorImpl extends EditorBase {
     // Stelle sicher, dass calendars Array vorhanden ist und alle 5 Kalender enthält
     if (!this.config.calendars || !Array.isArray(this.config.calendars)) {
       this.config.calendars = [
-        { shortcut: 'a', name: 'Standardkalender', color: '#ff9800', enabled: true },
-        { shortcut: 'b', name: 'Kalender B', color: '#ff0000', enabled: false },
-        { shortcut: 'c', name: 'Kalender C', color: '#00ff00', enabled: false },
-        { shortcut: 'd', name: 'Kalender D', color: '#0000ff', enabled: false },
-        { shortcut: 'e', name: 'Kalender E', color: '#ffff00', enabled: false },
+        { shortcut: 'a', name: 'Standardschicht', color: '#ff9800', enabled: true },
+        { shortcut: 'b', name: 'Schicht B', color: '#ff0000', enabled: false },
+        { shortcut: 'c', name: 'Schicht C', color: '#00ff00', enabled: false },
+        { shortcut: 'd', name: 'Schicht D', color: '#0000ff', enabled: false },
+        { shortcut: 'e', name: 'Schicht E', color: '#ffff00', enabled: false },
       ];
     }
 
@@ -174,7 +174,7 @@ export class EditorImpl extends EditorBase {
 
     return html`
       <div class="calendar-item">
-        <h4>Kalender ${calendar.shortcut.toUpperCase()}</h4>
+        <h4>Schicht ${calendar.shortcut.toUpperCase()}</h4>
         <div class="calendar-fields">
           <ha-textfield
             label="Name"
@@ -221,11 +221,11 @@ export class EditorImpl extends EditorBase {
 
     if (!this.config.calendars) {
       this.config.calendars = [
-        { shortcut: 'a', name: 'Standardkalender', color: '#ff9800', enabled: true },
-        { shortcut: 'b', name: 'Kalender B', color: '#ff0000', enabled: false },
-        { shortcut: 'c', name: 'Kalender C', color: '#00ff00', enabled: false },
-        { shortcut: 'd', name: 'Kalender D', color: '#0000ff', enabled: false },
-        { shortcut: 'e', name: 'Kalender E', color: '#ffff00', enabled: false },
+        { shortcut: 'a', name: 'Standardschicht', color: '#ff9800', enabled: true },
+        { shortcut: 'b', name: 'Schicht B', color: '#ff0000', enabled: false },
+        { shortcut: 'c', name: 'Schicht C', color: '#00ff00', enabled: false },
+        { shortcut: 'd', name: 'Schicht D', color: '#0000ff', enabled: false },
+        { shortcut: 'e', name: 'Schicht E', color: '#ffff00', enabled: false },
       ];
     }
 

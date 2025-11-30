@@ -1,7 +1,7 @@
 {
-    "name": "Kalender Card",
+    "name": "Schichtplan Card",
     "render_readme": true,
-    "filename": "tgcalendar-card.js",
+    "filename": "tgshiftschedule-card.js",
     "content_in_root": false
 }
 

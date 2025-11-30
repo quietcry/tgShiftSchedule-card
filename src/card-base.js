@@ -65,7 +65,7 @@ export class CardBase extends SuperBase {
       numberOfMonths: 14,
       initialDisplayedMonths: 2,
       mode: 'single',
-      selectedCalendar: 'a', // Standardkalender
+      selectedCalendar: 'a', // Standardschicht
       calendars: [
         { shortcut: 'a', name: 'Standardkalender', color: '#ff9800', enabled: true },
         { shortcut: 'b', name: 'Kalender B', color: '#ff0000', enabled: false },

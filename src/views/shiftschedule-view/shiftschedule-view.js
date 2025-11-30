@@ -1,19 +1,19 @@
 import { html, css, unsafeCSS } from 'lit';
 import { ViewBase } from '../view-base.js';
 
-export class CalendarView extends ViewBase {
-  static className = 'CalendarView';
+export class ShiftScheduleView extends ViewBase {
+  static className = 'ShiftScheduleView';
 
   // Zentrale Definition der Standardfarbe für ausgewählte Tage im Single-Modus
   static DEFAULT_SELECTED_DAY_COLOR = '#ff9800'; // Orange
 
-  // Fixe Kalender-Definition: Standard (a) + 4 weitere (b, c, d, e)
+  // Fixe Schicht-Definition: Standard (a) + 4 weitere (b, c, d, e)
   static CALENDARS = [
-    { shortcut: 'a', name: 'Standardkalender', defaultColor: '#ff9800' },
-    { shortcut: 'b', name: 'Kalender B', defaultColor: '#ff0000' },
-    { shortcut: 'c', name: 'Kalender C', defaultColor: '#00ff00' },
-    { shortcut: 'd', name: 'Kalender D', defaultColor: '#0000ff' },
-    { shortcut: 'e', name: 'Kalender E', defaultColor: '#ffff00' },
+    { shortcut: 'a', name: 'Standardschicht', defaultColor: '#ff9800' },
+    { shortcut: 'b', name: 'Schicht B', defaultColor: '#ff0000' },
+    { shortcut: 'c', name: 'Schicht C', defaultColor: '#00ff00' },
+    { shortcut: 'd', name: 'Schicht D', defaultColor: '#0000ff' },
+    { shortcut: 'e', name: 'Schicht E', defaultColor: '#ffff00' },
   ];
 
   static get properties() {
@@ -979,7 +979,7 @@ export class CalendarView extends ViewBase {
 
     // Im Modus "single": Verwende Orange für ausgewählte Tage (nur wenn Kalender "a" aktiv ist)
     if (this._config?.mode === 'single' && isWorking) {
-      buttonStyle = `background-color: ${CalendarView.DEFAULT_SELECTED_DAY_COLOR};`;
+      buttonStyle = `background-color: ${ShiftScheduleView.DEFAULT_SELECTED_DAY_COLOR};`;
     } else if (hasSelectedShift && selectedCalendar && selectedCalendar.color) {
       // In Advanced-Modi: Verwende die Farbe des ausgewählten Kalenders
       buttonStyle = `background-color: ${selectedCalendar.color};`;
@@ -997,7 +997,7 @@ export class CalendarView extends ViewBase {
                 <span
                   class="shift-indicator"
                   style="background-color: ${calendar.color};"
-                  title="${calendar.name || `Kalender ${shortcut.toUpperCase()}`}">
+                  title="${calendar.name || `Schicht ${shortcut.toUpperCase()}`}">
                 </span>
               `;
             }
@@ -1502,7 +1502,7 @@ export class CalendarView extends ViewBase {
                       ${allCalendars.map(calendar => {
                         return html`
                           <mwc-list-item value="${calendar.shortcut}">
-                            ${calendar.name || `Kalender ${calendar.shortcut.toUpperCase()}`}
+                            ${calendar.name || `Schicht ${calendar.shortcut.toUpperCase()}`}
                           </mwc-list-item>
                         `;
                       })}
@@ -1524,7 +1524,7 @@ export class CalendarView extends ViewBase {
     css`
       :host {
         display: block;
-        --tgcalendar-default-selected-day-color: ${unsafeCSS(CalendarView.DEFAULT_SELECTED_DAY_COLOR)};
+        --tgshiftschedule-default-selected-day-color: ${unsafeCSS(ShiftScheduleView.DEFAULT_SELECTED_DAY_COLOR)};
       }
 
       .calendar-wrapper {
@@ -1701,7 +1701,7 @@ export class CalendarView extends ViewBase {
 
       /* Fallback: Wenn keine Schicht ausgewählt ist, verwende die Standardfarbe */
       .day-button.working:not([style*="background-color"]) {
-        background-color: var(--accent-color, var(--tgcalendar-default-selected-day-color));
+        background-color: var(--accent-color, var(--tgshiftschedule-default-selected-day-color));
       }
 
       .day-button.today {
@@ -1770,7 +1770,7 @@ export class CalendarView extends ViewBase {
         gap: 12px;
         padding: 16px;
         margin-bottom: 16px;
-        background-color: var(--warning-color, var(--tgcalendar-default-selected-day-color));
+        background-color: var(--warning-color, var(--tgshiftschedule-default-selected-day-color));
         color: var(--text-primary-color, #ffffff);
         border-radius: 4px;
         border-left: 4px solid var(--error-color, #f44336);
@@ -1808,8 +1808,8 @@ export class CalendarView extends ViewBase {
   ];
 }
 
-// Registriere CalendarView als Custom Element
-if (!customElements.get('calendar-view')) {
-  customElements.define('calendar-view', CalendarView);
+// Registriere ShiftScheduleView als Custom Element
+if (!customElements.get('shiftschedule-view')) {
+  customElements.define('shiftschedule-view', ShiftScheduleView);
 }
 

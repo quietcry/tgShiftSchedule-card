@@ -1,6 +1,6 @@
 import { html, css } from 'lit';
 import { CardBase } from './card-base.js';
-import './views/calendar-view/calendar-view.js'; // Import für Custom Element Registrierung
+import './views/shiftschedule-view/shiftschedule-view.js'; // Import für Custom Element Registrierung
 import { CardName, CardRegname } from './card-config.js';
 
 export class CardImpl extends CardBase {
@@ -80,17 +80,17 @@ export class CardImpl extends CardBase {
     this._debug('config nach setConfig:', this.config);
 
     // View initialisieren oder aktualisieren
-    this._viewType = 'CalendarView';
+    this._viewType = 'ShiftScheduleView';
 
     try {
       if (!this._view) {
-        // Erstelle CalendarView als Custom Element nur wenn noch nicht vorhanden
-        this._debug('setConfig: Erstelle neue Calendar-View');
-        this._view = document.createElement('calendar-view');
+        // Erstelle ShiftScheduleView als Custom Element nur wenn noch nicht vorhanden
+        this._debug('setConfig: Erstelle neue ShiftSchedule-View');
+        this._view = document.createElement('shiftschedule-view');
 
         // Event-Listener für Config-Änderungen von der View
         this._view.addEventListener('config-changed', (ev) => {
-          this._debug('config-changed Event von Calendar-View empfangen:', ev.detail);
+          this._debug('config-changed Event von ShiftSchedule-View empfangen:', ev.detail);
           if (ev.detail && ev.detail.config) {
             this.config = ev.detail.config;
             // Dispatch das Event weiter, damit Home Assistant die Config aktualisiert
@@ -106,12 +106,12 @@ export class CardImpl extends CardBase {
 
         // Übergebe hass an die View, falls es bereits gesetzt wurde
         if (this._hass) {
-          this._debug('setConfig: Übergebe gespeicherten hass an Calendar-View');
+          this._debug('setConfig: Übergebe gespeicherten hass an ShiftSchedule-View');
           this._view.hass = this._hass;
         }
       } else {
         // View existiert bereits, aktualisiere nur die Config
-        this._debug('setConfig: Aktualisiere bestehende Calendar-View');
+        this._debug('setConfig: Aktualisiere bestehende ShiftSchedule-View');
       }
 
       // Aktualisiere die Config der View (wichtig: auch wenn View bereits existiert)

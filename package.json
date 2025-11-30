@@ -1,8 +1,8 @@
 {
-  "name": "tgcalendar-card",
+  "name": "tgshiftschedule-card",
   "version": "1.0.0",
-  "description": "Eine Home Assistant Karte für Arbeitszeiten-Kalender",
-  "main": "src/tgcalendar-card.js",
+  "description": "Eine Home Assistant Karte für Schichtpläne",
+  "main": "src/tgshiftschedule-card.js",
   "type": "module",
   "scripts": {
     "build": "NODE_OPTIONS='--experimental-json-modules' webpack --mode=production",
