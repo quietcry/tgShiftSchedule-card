@@ -64,6 +64,15 @@ export class CardBase extends SuperBase {
       entity: 'input_text.arbeitszeiten',
       numberOfMonths: 14,
       initialDisplayedMonths: 2,
+      mode: 'single',
+      selectedCalendar: 'a', // Standardkalender
+      calendars: [
+        { shortcut: 'a', name: 'Standardkalender', color: '#ff9800', enabled: true },
+        { shortcut: 'b', name: 'Kalender B', color: '#ff0000', enabled: false },
+        { shortcut: 'c', name: 'Kalender C', color: '#00ff00', enabled: false },
+        { shortcut: 'd', name: 'Kalender D', color: '#0000ff', enabled: false },
+        { shortcut: 'e', name: 'Kalender E', color: '#ffff00', enabled: false },
+      ],
     };
   }
 
