@@ -40,7 +40,7 @@ export class EditorImpl extends EditorBase {
     }
 
     this._debug(`EditorImpl render mit config:`, this.config);
-    
+
     // Stelle sicher, dass calendars Array vorhanden ist und alle 5 Kalender enthält
     if (!this.config.calendars || !Array.isArray(this.config.calendars)) {
       this.config.calendars = [
@@ -51,7 +51,7 @@ export class EditorImpl extends EditorBase {
         { shortcut: 'e', name: 'Kalender E', color: '#ffff00', enabled: false },
       ];
     }
-    
+
     // Stelle sicher, dass genau 5 Kalender vorhanden sind (a, b, c, d, e)
     const defaultCalendars = [
       { shortcut: 'a', name: 'Standardkalender', color: '#ff9800', enabled: true }, // Fix: Standardkalender
@@ -60,11 +60,11 @@ export class EditorImpl extends EditorBase {
       { shortcut: 'd', name: 'Kalender D', color: '#0000ff', enabled: false },
       { shortcut: 'e', name: 'Kalender E', color: '#ffff00', enabled: false },
     ];
-    
+
     // Initialisiere oder aktualisiere Kalender-Array
     const calendarsMap = new Map();
     this.config.calendars.forEach(cal => calendarsMap.set(cal.shortcut, cal));
-    
+
     // Füge fehlende Kalender hinzu oder aktualisiere vorhandene
     this.config.calendars = defaultCalendars.map(defaultCal => {
       const existing = calendarsMap.get(defaultCal.shortcut);
@@ -78,7 +78,7 @@ export class EditorImpl extends EditorBase {
       }
       return defaultCal;
     });
-    
+
     return html`
       <div class="card-config">
         <ha-form
@@ -130,13 +130,13 @@ export class EditorImpl extends EditorBase {
       </div>
     `;
   }
-  
+
   _updateUseElements(value) {
     this.config = {
       ...this.config,
       useElements: value,
     };
-    
+
     this.dispatchEvent(
       new CustomEvent('config-changed', {
         detail: { config: this.config },
@@ -146,7 +146,7 @@ export class EditorImpl extends EditorBase {
     );
     this.requestUpdate();
   }
-  
+
   _getColorOptions() {
     // Liste von vordefinierten Farben
     return [
@@ -171,7 +171,7 @@ export class EditorImpl extends EditorBase {
   _renderCalendar(index, calendar) {
     const colorOptions = this._getColorOptions();
     const currentColor = calendar.color || '#ff0000';
-    
+
     return html`
       <div class="calendar-item">
         <h4>Kalender ${calendar.shortcut.toUpperCase()}</h4>
@@ -212,13 +212,13 @@ export class EditorImpl extends EditorBase {
       </div>
     `;
   }
-  
+
   _updateCalendar(shortcut, property, value) {
     // Standardkalender (a) ist fix und kann nicht geändert werden
     if (shortcut === 'a') {
       return;
     }
-    
+
     if (!this.config.calendars) {
       this.config.calendars = [
         { shortcut: 'a', name: 'Standardkalender', color: '#ff9800', enabled: true },
@@ -228,7 +228,7 @@ export class EditorImpl extends EditorBase {
         { shortcut: 'e', name: 'Kalender E', color: '#ffff00', enabled: false },
       ];
     }
-    
+
     // Erstelle eine neue Kopie des Arrays und aktualisiere den betroffenen Kalender
     const newCalendars = this.config.calendars.map(cal => {
       if (cal.shortcut === shortcut) {
@@ -243,19 +243,19 @@ export class EditorImpl extends EditorBase {
       }
       return cal;
     });
-    
+
     // Aktualisiere die Config direkt (immutable update)
     const newConfig = {
       ...this.config,
       calendars: newCalendars,
     };
-    
+
     // Aktualisiere die Config direkt
     this.config = newConfig;
-    
+
     // Aktualisiere die Ansicht sofort
     this.requestUpdate();
-    
+
     // Dispatch config-changed Event - Home Assistant speichert die Config automatisch
     // Verwende setTimeout, um sicherzustellen, dass das Event nicht den Editor schließt
     setTimeout(() => {
@@ -326,25 +326,25 @@ export class EditorImpl extends EditorBase {
       .card-config {
         padding: 10px;
       }
-      
+
       .elements-section {
         margin-top: 20px;
         padding-top: 20px;
         border-top: 1px solid var(--divider-color, #e0e0e0);
       }
-      
+
       .elements-header {
         margin-bottom: 15px;
       }
-      
+
       .elements-header ha-combo-box {
         width: 100%;
       }
-      
+
       .calendars-list {
         margin-top: 15px;
       }
-      
+
       .calendar-item {
         margin-bottom: 20px;
         padding: 15px;
@@ -352,26 +352,26 @@ export class EditorImpl extends EditorBase {
         border: 1px solid var(--divider-color, #e0e0e0);
         border-radius: 4px;
       }
-      
+
       .calendar-item h4 {
         margin: 0 0 15px 0;
         font-size: 14px;
         font-weight: 500;
         color: var(--primary-text-color, #000000);
       }
-      
+
       .calendar-fields {
         display: grid;
         grid-template-columns: 1fr;
         gap: 15px;
       }
-      
+
       .calendar-fields ha-textfield,
       .calendar-fields ha-switch,
       .calendar-fields .color-selector {
         width: 100%;
       }
-      
+
       ha-switch {
         display: flex;
         align-items: center;

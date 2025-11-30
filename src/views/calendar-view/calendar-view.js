@@ -3,10 +3,10 @@ import { ViewBase } from '../view-base.js';
 
 export class CalendarView extends ViewBase {
   static className = 'CalendarView';
-  
+
   // Zentrale Definition der Standardfarbe für ausgewählte Tage im Single-Modus
   static DEFAULT_SELECTED_DAY_COLOR = '#ff9800'; // Orange
-  
+
   // Fixe Kalender-Definition: Standard (a) + 4 weitere (b, c, d, e)
   static CALENDARS = [
     { shortcut: 'a', name: 'Standardkalender', defaultColor: '#ff9800' },
@@ -55,10 +55,10 @@ export class CalendarView extends ViewBase {
       this.requestUpdate();
       return;
     }
-    
+
     const previousEntityState = this._hass?.states[this._config?.entity]?.state;
     const newEntityState = hass?.states[this._config?.entity]?.state;
-    
+
     // Prüfe auch zusätzliche Entities auf Änderungen
     let hasAnyEntityChanged = previousEntityState !== newEntityState;
     if (!hasAnyEntityChanged && this._config && this._knownEntityIds) {
@@ -73,7 +73,7 @@ export class CalendarView extends ViewBase {
         }
       }
     }
-    
+
     this._hass = hass;
     if (this._config) {
       // Nur laden, wenn sich ein State tatsächlich geändert hat (nicht bei jedem Update)
@@ -87,7 +87,7 @@ export class CalendarView extends ViewBase {
   set config(config) {
     // Setze _config zuerst, damit _getActiveElements() funktioniert
     this._config = config;
-    
+
     // Initialisiere _displayedMonths aus der Config
     if (config && config.initialDisplayedMonths) {
       // Verwende initialDisplayedMonths als Standardwert
@@ -100,9 +100,9 @@ export class CalendarView extends ViewBase {
       // Stelle sicher, dass _displayedMonths nicht größer als numberOfMonths ist
       this._displayedMonths = Math.min(this._displayedMonths || 2, config.numberOfMonths);
     }
-    
+
     // Initialisiere _selectedElement - muss nach _config gesetzt werden, damit _getActiveElements() funktioniert
-    
+
     // Initialisiere _displayedMonths aus der Config
     if (config && config.initialDisplayedMonths) {
       // Verwende initialDisplayedMonths als Standardwert
@@ -115,12 +115,12 @@ export class CalendarView extends ViewBase {
       // Stelle sicher, dass _displayedMonths nicht größer als numberOfMonths ist
       this._displayedMonths = Math.min(this._displayedMonths || 2, config.numberOfMonths);
     }
-    
+
     // Initialisiere _selectedCalendar - prüfe nur aktivierte Kalender
     // Setze _config zuerst, damit _getAllCalendars() funktioniert
     this._config = config;
     const allCalendars = this._getAllCalendars();
-    
+
     // Synchronisiere _selectedCalendar immer mit config.selectedCalendar
     if (config && config.selectedCalendar) {
       // Prüfe ob der ausgewählte Kalender aktiviert ist
@@ -187,7 +187,7 @@ export class CalendarView extends ViewBase {
         }
       }
     }
-    
+
     if (this._hass) {
       this.loadWorkingDays();
     }
@@ -206,12 +206,12 @@ export class CalendarView extends ViewBase {
     // Prüfe auf zusätzliche Entities (z.B. input_text.arbeitszeiten_001, _002, etc.)
     const baseEntityId = this._config.entity;
     const additionalEntities = this.findAdditionalEntities(baseEntityId);
-    
+
     // Speichere die Liste der bekannten Entities für späteres Schreiben
     // Diese Liste enthält: Haupt-Entity + alle zusätzlichen Entities
     this._knownEntityIds = [baseEntityId, ...additionalEntities];
     console.log('loadWorkingDays: Alle bekannten Entities (Haupt + zusätzliche):', this._knownEntityIds);
-    
+
     // Lade Daten aus allen Entities (Haupt-Entity + zusätzliche)
     for (const entityId of this._knownEntityIds) {
       const entity = this._hass.states[entityId];
@@ -257,7 +257,7 @@ export class CalendarView extends ViewBase {
       const currentMonth = now.getMonth() + 1; // 1-12
       const currentYearFull = now.getFullYear();
       const currentYear = currentYearFull % 100; // Kurzform, z.B. 25
-      
+
       // Berechne Vormonat und sein Jahr
       let previousMonth, previousYear;
       if (currentMonth === 1) {
@@ -267,13 +267,13 @@ export class CalendarView extends ViewBase {
         previousMonth = currentMonth - 1;
         previousYear = currentYear;
       }
-      
+
       // Erstelle Liste aller Monate, die behalten werden sollen
       const monthsToKeep = [];
-      
+
       // Füge Vormonat hinzu
       monthsToKeep.push({ year: previousYear, month: previousMonth });
-      
+
       // Füge alle angezeigten Monate hinzu
       for (let i = 0; i < numberOfMonths; i++) {
         const date = new Date(currentYearFull, currentMonth - 1 + i, 1);
@@ -281,7 +281,7 @@ export class CalendarView extends ViewBase {
         const month = date.getMonth() + 1;
         monthsToKeep.push({ year, month });
       }
-      
+
       console.log('loadWorkingDays: Bereinigung', {
         numberOfMonths,
         currentYear,
@@ -289,21 +289,21 @@ export class CalendarView extends ViewBase {
         monthsToKeep,
         keys: Object.keys(this._workingDays)
       });
-      
+
       let hasChanges = false;
-      
+
       for (const key of Object.keys(this._workingDays)) {
         // Parse den Key um zu prüfen, ob er behalten werden soll
         const keyParts = key.split(':');
         if (keyParts.length === 2) {
           const keyYear = parseInt(keyParts[0]);
           const keyMonth = parseInt(keyParts[1]);
-          
+
           // Prüfe ob dieser Key in der Liste der zu behaltenden Monate ist
           const shouldKeep = monthsToKeep.some(
             m => m.year === keyYear && m.month === keyMonth
           );
-          
+
           // console.log('loadWorkingDays: Prüfe Key', {
           //   key,
           //   keyYear,
@@ -311,7 +311,7 @@ export class CalendarView extends ViewBase {
           //   shouldKeep,
           //   monthsToKeep: monthsToKeep.map(m => `${m.year}:${m.month}`)
           // });
-          
+
           if (!shouldKeep) {
             console.log('loadWorkingDays: Entferne Key', key);
             delete this._workingDays[key];
@@ -324,7 +324,7 @@ export class CalendarView extends ViewBase {
           hasChanges = true;
         }
       }
-      
+
       // Wenn Änderungen vorgenommen wurden, speichere die bereinigten Daten
       if (hasChanges) {
         const cleanedValue = this.serializeWorkingDays();
@@ -339,7 +339,7 @@ export class CalendarView extends ViewBase {
         }
       }
     }
-    
+
     this.requestUpdate();
   }
 
@@ -354,7 +354,7 @@ export class CalendarView extends ViewBase {
       // Format: <jahr>:<monat>:<tag><elementen>,<tag><elementen> oder altes Format
       // Beispiel: "25:11:01a,02ah,03b" oder "25:11:01,02,03" (altes Format ohne Elemente)
       const colons = trimmedPart.split(':');
-      
+
       if (colons.length === 2) {
         // Altes Format ohne Jahr (Kompatibilität): <monat>:<tag>,<tag>
         const month = colons[0].trim();
@@ -373,7 +373,7 @@ export class CalendarView extends ViewBase {
         // Prüfe ob erstes Element ein Jahr ist (kleiner als 13) oder ein Monat
         const first = parseInt(colons[0].trim());
         const second = parseInt(colons[1].trim());
-        
+
         if (first <= 12 && second > 12) {
           // Altes Format: <monat>:<jahr>:<tag>,<tag> - konvertiere zu neuem Format
           const monthNum = first;
@@ -402,11 +402,11 @@ export class CalendarView extends ViewBase {
   _parseDaysWithElements(daysStr) {
     const result = {};
     const dayEntries = daysStr.split(',').filter(d => d.trim() !== '');
-    
+
     for (const entry of dayEntries) {
       const trimmed = entry.trim();
       if (!trimmed) continue;
-      
+
       // Extrahiere Tag und Elemente: "01a" -> day=1, elements=["a"]
       // Oder: "02ah" -> day=2, elements=["a", "h"]
       // Oder altes Format: "01" -> day=1, elements=[]
@@ -415,7 +415,7 @@ export class CalendarView extends ViewBase {
         const dayNum = parseInt(match[1]);
         const elementsStr = match[2] || '';
         const elements = elementsStr.split('').filter(e => e.trim() !== '');
-        
+
         if (!isNaN(dayNum) && dayNum >= 1 && dayNum <= 31) {
           // Wenn der Tag bereits existiert, füge Elemente hinzu (keine Duplikate)
           if (result[dayNum]) {
@@ -427,7 +427,7 @@ export class CalendarView extends ViewBase {
         }
       }
     }
-    
+
     return result;
   }
 
@@ -438,7 +438,7 @@ export class CalendarView extends ViewBase {
 
   findAdditionalEntities(baseEntityId) {
     const additionalEntities = [];
-    
+
     if (!this._hass || !this._hass.states) {
       return additionalEntities;
     }
@@ -450,12 +450,12 @@ export class CalendarView extends ViewBase {
     }
 
     const [domain, baseName] = entityParts;
-    
+
     // Suche nach Entities mit _001, _002, etc. (bis _999)
     for (let i = 1; i <= 999; i++) {
       const suffix = String(i).padStart(3, '0'); // _001, _002, ..., _999
       const additionalEntityId = `${domain}.${baseName}_${suffix}`;
-      
+
       if (this._hass.states[additionalEntityId]) {
         additionalEntities.push(additionalEntityId);
       } else {
@@ -464,7 +464,7 @@ export class CalendarView extends ViewBase {
         break;
       }
     }
-    
+
     return additionalEntities;
   }
 
@@ -480,7 +480,7 @@ export class CalendarView extends ViewBase {
 
     // input_text Entities haben ein 'max' Attribut, das die maximale Länge definiert
     const maxLength = entity.attributes.max;
-    
+
     if (maxLength !== undefined && maxLength !== null) {
       return parseInt(maxLength);
     }
@@ -490,7 +490,7 @@ export class CalendarView extends ViewBase {
 
   getAllEntityMaxLengths() {
     const maxLengths = {};
-    
+
     if (!this._hass || !this._config || !this._config.entity) {
       return maxLengths;
     }
@@ -594,7 +594,7 @@ export class CalendarView extends ViewBase {
     } else {
       this._storageWarning = null;
     }
-    
+
     // Wichtig: requestUpdate() aufrufen, damit die Warnung angezeigt wird
     this.requestUpdate();
   }
@@ -608,17 +608,17 @@ export class CalendarView extends ViewBase {
       if (yearA !== yearB) return yearA - yearB;
       return monthA - monthB;
     });
-    
+
     for (const key of keys) {
       const days = this._workingDays[key];
       if (!days || typeof days !== 'object' || Array.isArray(days)) continue;
-      
+
       // Struktur: {day: [elements]}
       const dayEntries = Object.keys(days)
         .map(d => parseInt(d))
         .filter(d => !isNaN(d))
         .sort((a, b) => a - b);
-      
+
       if (dayEntries.length > 0) {
         // Format: <jahr>:<monat>:<tag><elementen>,<tag><elementen>
         // Beispiel: "25:11:01a,02ab,03b"
@@ -646,17 +646,17 @@ export class CalendarView extends ViewBase {
       console.error('distributeDataToEntities: hass oder config fehlt');
       return;
     }
-    
+
     // Setze Schreib-Lock
     this._isWriting = true;
     console.log('distributeDataToEntities: Schreib-Lock aktiviert');
-    
+
     // Lösche vorhandenen Timer, falls vorhanden
     if (this._writeLockTimer) {
       clearTimeout(this._writeLockTimer);
       this._writeLockTimer = null;
     }
-    
+
     try {
       // Verwende die gecachte Liste der Entities, falls verfügbar
     // Prüfe aber auch, ob neue Entities hinzugekommen sind
@@ -665,7 +665,7 @@ export class CalendarView extends ViewBase {
       // Verwende gecachte Liste
       allEntityIds = [...this._knownEntityIds];
       console.log('distributeDataToEntities: Verwende gecachte Entity-Liste:', allEntityIds);
-      
+
       // Prüfe ob neue Entities hinzugekommen sind
       const currentAdditionalEntities = this.findAdditionalEntities(this._config.entity);
       const knownAdditionalCount = this._knownEntityIds.length - 1; // -1 für Haupt-Entity
@@ -739,44 +739,44 @@ export class CalendarView extends ViewBase {
     const entityValues = {};
     let currentEntityIndex = 0;
     let remainingData = serializedData;
-    
+
     // Verteile die Daten auf die verfügbaren Entities
     while (remainingData.length > 0 && currentEntityIndex < allEntityIds.length) {
       const currentEntityId = allEntityIds[currentEntityIndex];
       const maxLength = maxLengths[currentEntityId];
-      
+
       // Nimm so viele Zeichen wie möglich aus remainingData
       const charsToTake = Math.min(remainingData.length, maxLength);
       const valueToWrite = remainingData.substring(0, charsToTake);
-      
+
       entityValues[currentEntityId] = valueToWrite;
       remainingData = remainingData.substring(charsToTake);
-      
+
       console.log(`distributeDataToEntities: ${currentEntityId} - Schreibe ${charsToTake} Zeichen, verbleibend: ${remainingData.length}`);
-      
+
       // Wenn noch Daten übrig sind, wechsle zur nächsten Entity
       if (remainingData.length > 0) {
         currentEntityIndex++;
       }
     }
-    
+
     // Wenn am Ende noch Text über ist, prüfe ob zwischenzeitlich eine zusätzliche Entität angelegt wurde
     if (remainingData.length > 0) {
       console.log(`distributeDataToEntities: Noch ${remainingData.length} Zeichen übrig, prüfe auf neue Entities...`);
-      
+
       // Prüfe ob neue Entities hinzugekommen sind
       const currentAdditionalEntities = this.findAdditionalEntities(this._config.entity);
       const knownAdditionalCount = this._knownEntityIds ? this._knownEntityIds.length - 1 : 0; // -1 für Haupt-Entity
-      
+
       if (currentAdditionalEntities.length > knownAdditionalCount) {
         // Neue Entities gefunden
         const newEntities = currentAdditionalEntities.slice(knownAdditionalCount);
         console.log(`distributeDataToEntities: ${newEntities.length} neue Entities gefunden:`, newEntities);
-        
+
         // Aktualisiere die Liste
         allEntityIds.push(...newEntities);
         this._knownEntityIds = [...allEntityIds];
-        
+
         // Ermittle max-Längen für neue Entities
         for (const newEntityId of newEntities) {
           const maxLength = this.getEntityMaxLength(newEntityId);
@@ -787,21 +787,21 @@ export class CalendarView extends ViewBase {
             console.warn(`distributeDataToEntities: Keine max-Länge für ${newEntityId}, verwende Standardwert 255`);
           }
         }
-        
+
         // Verteile die verbleibenden Daten auf die neuen Entities
         currentEntityIndex = allEntityIds.length - newEntities.length;
         while (remainingData.length > 0 && currentEntityIndex < allEntityIds.length) {
           const currentEntityId = allEntityIds[currentEntityIndex];
           const maxLength = maxLengths[currentEntityId];
-          
+
           const charsToTake = Math.min(remainingData.length, maxLength);
           const valueToWrite = remainingData.substring(0, charsToTake);
-          
+
           entityValues[currentEntityId] = valueToWrite;
           remainingData = remainingData.substring(charsToTake);
-          
+
           console.log(`distributeDataToEntities: ${currentEntityId} (neu) - Schreibe ${charsToTake} Zeichen, verbleibend: ${remainingData.length}`);
-          
+
           if (remainingData.length > 0) {
             currentEntityIndex++;
           }
@@ -815,7 +815,7 @@ export class CalendarView extends ViewBase {
     for (const entityId of allEntityIds) {
       const value = entityValues[entityId] || '';
       const maxLength = maxLengths[entityId];
-      
+
       // Der Wert sollte nie die maximale Länge überschreiten, da wir zeichenweise verteilen
       if (value.length > maxLength) {
         console.error(`distributeDataToEntities: FEHLER - Wert überschreitet max-Länge für ${entityId}! Länge: ${value.length}, Max: ${maxLength}`);
@@ -843,7 +843,7 @@ export class CalendarView extends ViewBase {
         }
       }
     }
-    
+
     // Leere alle zusätzlichen Entities, die nicht verwendet wurden (um alte Daten zu entfernen)
     // Wir müssen alle bekannten zusätzlichen Entities prüfen, nicht nur die in allEntityIds
     const allAdditionalEntities = this.findAdditionalEntities(this._config.entity);
@@ -861,7 +861,7 @@ export class CalendarView extends ViewBase {
         }
       }
     }
-    
+
       // Wenn noch Daten übrig sind, die nicht gespeichert werden konnten
       if (remainingData.length > 0) {
         console.error(`distributeDataToEntities: WARNUNG - ${remainingData.length} Zeichen konnten nicht gespeichert werden!`, remainingData);
@@ -880,7 +880,7 @@ export class CalendarView extends ViewBase {
 
   async toggleDay(month, day, year = null) {
     console.log('toggleDay aufgerufen', { month, day, year, hass: !!this._hass, config: !!this._config });
-    
+
     // Stelle sicher, dass month und day Zahlen sind
     const monthNum = parseInt(month);
     const dayNum = parseInt(day);
@@ -889,19 +889,19 @@ export class CalendarView extends ViewBase {
       console.error('toggleDay: Ungültige Werte', { month, day, monthNum, dayNum });
       return;
     }
-    
+
     // Prüfe ob dieser Monat der Vormonat ist (schreibgeschützt)
     const now = new Date();
     const currentMonth = now.getMonth() + 1; // 1-12
     const currentYearFull = now.getFullYear();
     const currentYear = currentYearFull % 100;
-    
+
     // Bestimme das Jahr (Kurzform, z.B. 25 für 2025)
     if (!year) {
       year = currentYear;
     }
     const yearNum = parseInt(year);
-    
+
     let isPreviousMonth = false;
     if (currentMonth === 1) {
       // Aktuell ist Januar, Vormonat ist Dezember des Vorjahres
@@ -910,7 +910,7 @@ export class CalendarView extends ViewBase {
       // Vormonat ist aktueller Monat - 1 im gleichen Jahr
       isPreviousMonth = (monthNum === currentMonth - 1 && yearNum === currentYear);
     }
-    
+
     if (isPreviousMonth) {
       console.log('toggleDay: Vormonat ist schreibgeschützt, Aktion abgebrochen');
       return;
@@ -920,7 +920,7 @@ export class CalendarView extends ViewBase {
       console.error('toggleDay: hass oder config fehlt', { hass: !!this._hass, config: !!this._config, entity: this._config?.entity });
       return;
     }
-    
+
     // yearNum wurde bereits oben deklariert
     const key = `${this.formatTwoDigits(yearNum)}:${this.formatTwoDigits(monthNum)}`;
 
@@ -934,7 +934,7 @@ export class CalendarView extends ViewBase {
     console.log('toggleDay: Ausgewählter Kalender-Shortcut:', selectedCalendarShortcut);
     console.log('toggleDay: Vorher - workingDays[key]:', this._workingDays[key]);
     console.log('toggleDay: Vorher - Tag', dayNum, 'hat:', this._workingDays[key]?.[dayNum]);
-    
+
     if (!selectedCalendarShortcut) {
       // Fallback: Standardkalender (a)
       const defaultShortcut = 'a';
@@ -959,14 +959,14 @@ export class CalendarView extends ViewBase {
       if (!this._workingDays[key][dayNum]) {
         this._workingDays[key][dayNum] = [];
       }
-      
+
       // WICHTIG: Erstelle eine Kopie des Arrays, um sicherzustellen, dass wir mit dem richtigen Array arbeiten
       const elements = [...(this._workingDays[key][dayNum] || [])];
       console.log('toggleDay: Vor Toggle - elements:', elements);
       console.log('toggleDay: Soll Kalender hinzufügen/entfernen:', selectedCalendarShortcut);
-      
+
       const elementIndex = elements.indexOf(selectedCalendarShortcut);
-      
+
       if (elementIndex > -1) {
         // Kalender entfernen
         console.log('toggleDay: Entferne Kalender', selectedCalendarShortcut, 'von Tag', dayNum);
@@ -993,12 +993,12 @@ export class CalendarView extends ViewBase {
       }
       console.log('toggleDay: Nach Toggle - elements:', this._workingDays[key][dayNum]);
     }
-    
+
     console.log('toggleDay: Nachher - workingDays[key]:', this._workingDays[key]);
 
     const serializedData = this.serializeWorkingDays();
     console.log('toggleDay: Neue Werte', { monthNum, yearNum, dayNum, workingDays: this._workingDays[key], serializedData, entity: this._config.entity });
-    
+
     // Verteile die Daten auf mehrere Entities, falls nötig
     await this.distributeDataToEntities(serializedData);
 
@@ -1049,17 +1049,17 @@ export class CalendarView extends ViewBase {
     const today = now.getDate();
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
-    
+
     const dayElements = this._getDayElements(key, currentDay);
     const isWorking = workingDays.includes(parseInt(currentDay));
     const isToday = (year === currentYear && month === currentMonth && currentDay === today);
-    
+
         // Prüfe ob der ausgewählte Kalender an diesem Tag aktiv ist
         const selectedShortcut = this._getSelectedCalendarShortcut();
         const hasSelectedShift = selectedShortcut && dayElements.includes(selectedShortcut);
         const selectedCalendar = this._getCalendarByShortcut(selectedShortcut);
         let buttonStyle = '';
-        
+
         // Im Modus "single": Verwende Orange für ausgewählte Tage
         if (this._config?.mode === 'single' && isWorking) {
           buttonStyle = `background-color: ${CalendarView.DEFAULT_SELECTED_DAY_COLOR};`;
@@ -1067,7 +1067,7 @@ export class CalendarView extends ViewBase {
           // In Advanced-Modi: Verwende die Farbe des ausgewählten Kalenders
           buttonStyle = `background-color: ${selectedCalendar.color};`;
         }
-        
+
         // Erstelle visuelle Darstellung der Kalender (alle außer dem ausgewählten)
         const shiftIndicators = dayElements
           .filter(shortcut => shortcut !== selectedShortcut) // Filtere den ausgewählten Kalender heraus
@@ -1075,8 +1075,8 @@ export class CalendarView extends ViewBase {
             const calendar = this._getCalendarByShortcut(shortcut);
             if (calendar && calendar.color) {
               return html`
-                <span 
-                  class="shift-indicator" 
+                <span
+                  class="shift-indicator"
                   style="background-color: ${calendar.color};"
                   title="${calendar.name || `Kalender ${shortcut.toUpperCase()}`}">
                 </span>
@@ -1084,15 +1084,15 @@ export class CalendarView extends ViewBase {
             }
             return html`<span class="shift-indicator" title="${shortcut}">${shortcut}</span>`;
           });
-    
+
     return html`
       <td>
-        <button 
+        <button
           class="day-button ${isWorking ? 'working' : ''} ${isToday ? 'today' : ''} ${isPreviousMonth ? 'readonly' : ''}"
           style="${buttonStyle}"
           @click=${() => !isPreviousMonth && this.toggleDay(monthKey, currentDay, yearKey)}
           ?disabled=${isPreviousMonth}
-          data-month="${monthKey}" 
+          data-month="${monthKey}"
           data-day="${currentDay}"
           data-year="${yearKey}">
           <span class="day-number">${currentDay}</span>
@@ -1110,7 +1110,7 @@ export class CalendarView extends ViewBase {
     const monthKey = month + 1;
     const yearKey = year % 100; // Kurzform, z.B. 25 für 2025
     const key = `${this.formatTwoDigits(yearKey)}:${this.formatTwoDigits(monthKey)}`;
-    
+
     // Hole alle Tage für diesen Monat (neue Struktur: {day: [elements]})
     let workingDays = [];
     if (this._workingDays[key]) {
@@ -1129,7 +1129,7 @@ export class CalendarView extends ViewBase {
     const today = now.getDate();
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
-    
+
     // Prüfe ob dieser Monat der Vormonat ist (schreibgeschützt)
     let isPreviousMonth = false;
     if (currentMonth === 0) {
@@ -1214,15 +1214,15 @@ export class CalendarView extends ViewBase {
     const maxMonths = this._config?.numberOfMonths || 14;
     const displayedMonths = this._displayedMonths || 2;
     const currentOffset = this._startMonthOffset || 0;
-    
+
     // Berechne die Grenzen für die Navigation
     // Minimum: -1 (Vormonat)
     // Maximum: maxMonths - displayedMonths (damit der letzte angezeigte Monat nicht über maxMonths hinausgeht)
     const minOffset = -1;
     const maxOffset = maxMonths - displayedMonths;
-    
+
     const newOffset = Math.max(minOffset, Math.min(maxOffset, currentOffset + delta));
-    
+
     if (newOffset !== currentOffset) {
       this._startMonthOffset = newOffset;
       this.requestUpdate();
@@ -1233,10 +1233,10 @@ export class CalendarView extends ViewBase {
     const maxMonths = this._config?.numberOfMonths || 14;
     const displayedMonths = this._displayedMonths || 2;
     const currentOffset = this._startMonthOffset || 0;
-    
+
     const minOffset = -1;
     const maxOffset = maxMonths - displayedMonths;
-    
+
     return {
       canGoBack: currentOffset > minOffset,
       canGoForward: currentOffset < maxOffset
@@ -1247,49 +1247,49 @@ export class CalendarView extends ViewBase {
     // Gibt den Shortcut des ausgewählten Kalenders zurück
     // console.log('_getSelectedCalendarShortcut: _selectedCalendar =', this._selectedCalendar);
     // console.log('_getSelectedCalendarShortcut: config.selectedCalendar =', this._config?.selectedCalendar);
-    
+
     // Prüfe zuerst _selectedCalendar
     if (this._selectedCalendar !== null && this._selectedCalendar !== undefined && this._selectedCalendar !== '') {
       // console.log('_getSelectedCalendarShortcut: Verwende _selectedCalendar:', this._selectedCalendar);
       return this._selectedCalendar;
     }
-    
+
     // Falls _selectedCalendar nicht gesetzt ist, prüfe die Config
     if (this._config?.selectedCalendar) {
       this._selectedCalendar = this._config.selectedCalendar;
       // console.log('_getSelectedCalendarShortcut: Verwende selectedCalendar aus Config:', this._selectedCalendar);
       return this._selectedCalendar;
     }
-    
+
     // Fallback: Standardkalender (a)
     // console.log('_getSelectedCalendarShortcut: Fallback zu Standardkalender (a)');
     return 'a';
   }
-  
+
   _getCalendarByShortcut(shortcut) {
     // Gibt das Kalender-Objekt für einen gegebenen Shortcut zurück
     if (!this._config?.calendars) {
       return null;
     }
-    
+
     return this._config.calendars.find(cal => cal.shortcut === shortcut) || null;
   }
-  
+
   _getAllCalendars() {
     // Gibt nur aktivierte Kalender zurück
     if (!this._config?.calendars) {
       return [];
     }
-    
+
     // Filtere nur aktivierte Kalender und sortiere nach Shortcut (a, b, c, d, e)
     return this._config.calendars
       .filter(cal => cal && cal.shortcut && (cal.enabled === true || cal.enabled === 'true' || cal.enabled === 1))
       .sort((a, b) => a.shortcut.localeCompare(b.shortcut));
   }
-  
+
   _getSelectedCalendarValue() {
     const allCalendars = this._getAllCalendars();
-    
+
     if (allCalendars.length === 0) {
       // Wenn keine Kalender aktiviert sind, verwende Standardkalender (a)
       // Stelle sicher, dass Standardkalender immer verfügbar ist
@@ -1302,7 +1302,7 @@ export class CalendarView extends ViewBase {
       }
       return 'a';
     }
-    
+
     // Wenn _selectedCalendar noch nicht gesetzt ist, setze es auf den ersten aktivierten Kalender
     if (this._selectedCalendar === null || this._selectedCalendar === undefined) {
       this._selectedCalendar = allCalendars[0].shortcut;
@@ -1314,7 +1314,7 @@ export class CalendarView extends ViewBase {
       this.requestUpdate();
       return this._selectedCalendar;
     }
-    
+
     // Prüfe ob der ausgewählte Kalender aktiviert ist
     const exists = allCalendars.some(cal => cal.shortcut === this._selectedCalendar);
     if (!exists) {
@@ -1326,21 +1326,21 @@ export class CalendarView extends ViewBase {
       this.requestUpdate();
       return this._selectedCalendar;
     }
-    
+
     return this._selectedCalendar;
   }
-  
+
   _onCalendarSelectedByIndex(shortcut) {
     if (shortcut !== '' && shortcut !== null && shortcut !== undefined) {
       this._selectedCalendar = shortcut;
-      
+
       // Aktualisiere die Config mit der neuen Auswahl
       if (this._config) {
         this._config = {
           ...this._config,
           selectedCalendar: shortcut,
         };
-        
+
         // Dispatch config-changed Event, damit die Card die Config aktualisiert
         this.dispatchEvent(
           new CustomEvent('config-changed', {
@@ -1350,7 +1350,7 @@ export class CalendarView extends ViewBase {
           })
         );
       }
-      
+
       this.requestUpdate();
     }
   }
@@ -1360,12 +1360,12 @@ export class CalendarView extends ViewBase {
     if (!this._workingDays[monthKey] || typeof this._workingDays[monthKey] !== 'object') {
       return [];
     }
-    
+
     if (Array.isArray(this._workingDays[monthKey])) {
       // Altes Format: Array von Tagen
       return [];
     }
-    
+
     return this._workingDays[monthKey][day] || [];
   }
 
@@ -1374,7 +1374,7 @@ export class CalendarView extends ViewBase {
     if (!this._config?.elements) {
       return null;
     }
-    
+
     return this._config.elements.find(e => e.shortcut === shortcut && e.aktiv) || null;
   }
 
@@ -1382,7 +1382,7 @@ export class CalendarView extends ViewBase {
     if (!this._config?.useElements || !this._config?.elements) {
       return [];
     }
-    
+
     // Filtere nur aktive Elemente und behalte den ursprünglichen Index
     const activeElements = this._config.elements
       .map((element, index) => {
@@ -1392,17 +1392,17 @@ export class CalendarView extends ViewBase {
       })
       .filter(({ isActive }) => isActive)
       .map(({ element, originalIndex }) => ({ element, originalIndex }));
-    
+
     return activeElements;
   }
 
   _getSelectedElementValue() {
     const activeElements = this._getActiveElements();
-    
+
     if (activeElements.length === 0) {
       return '';
     }
-    
+
     // Wenn _selectedElement noch nicht gesetzt ist, setze es auf das erste aktive Element
     if (this._selectedElement === null || this._selectedElement === undefined) {
       this._selectedElement = activeElements[0].originalIndex;
@@ -1414,10 +1414,10 @@ export class CalendarView extends ViewBase {
       this.requestUpdate();
       return '1'; // 1-basiert: erstes Element = 1
     }
-    
+
     // Prüfe ob das ausgewählte Element auch aktiv ist
     const foundIndex = activeElements.findIndex(({ originalIndex }) => originalIndex === this._selectedElement);
-    
+
     // Wenn das Element nicht in der aktiven Liste gefunden wird, verwende das erste Element
     if (foundIndex < 0) {
       this._selectedElement = activeElements[0].originalIndex;
@@ -1436,15 +1436,15 @@ export class CalendarView extends ViewBase {
       this.requestUpdate();
       return '1'; // 1-basiert: erstes Element = 1
     }
-    
+
     // 1-basiert: foundIndex 0 -> Wert 1, foundIndex 1 -> Wert 2, etc.
     const value = String(foundIndex + 1);
-    
+
     // Stelle sicher, dass der Wert nicht leer ist
     if (value === '' || value === 'undefined' || value === 'null' || isNaN(foundIndex)) {
       return '1';
     }
-    
+
     return value;
   }
 
@@ -1452,7 +1452,7 @@ export class CalendarView extends ViewBase {
     // ha-select verwendet event.detail.value für value-changed
     const value = event.detail?.value !== undefined ? event.detail.value : event.target.value;
     let selectedIndex = null;
-    
+
     if (value !== '' && value !== null && value !== undefined) {
       // Der Wert ist 1-basiert (1 = erstes Element, 2 = zweites Element, etc.)
       // Wir müssen ihn in einen 0-basierten Index umwandeln
@@ -1473,16 +1473,16 @@ export class CalendarView extends ViewBase {
         selectedIndex = activeElements[0].originalIndex;
       }
     }
-    
+
     this._selectedElement = selectedIndex;
-    
+
     // Aktualisiere die Config mit der neuen Auswahl
     if (this._config && selectedIndex !== null) {
       this._config = {
         ...this._config,
         selectedElement: selectedIndex,
       };
-      
+
       // Dispatch config-changed Event, damit die Card die Config aktualisiert
       this.dispatchEvent(
         new CustomEvent('config-changed', {
@@ -1492,7 +1492,7 @@ export class CalendarView extends ViewBase {
         })
       );
     }
-    
+
     this.requestUpdate();
   }
 
@@ -1516,7 +1516,7 @@ export class CalendarView extends ViewBase {
 
     const hasWarning = this._storageWarning && this._storageWarning.show;
     const navBounds = this.getNavigationBounds();
-    
+
     return html`
       <div class="calendar-wrapper ${hasWarning ? 'storage-warning-active' : ''}">
         ${hasWarning
@@ -1537,14 +1537,14 @@ export class CalendarView extends ViewBase {
             `
           : ''}
         <div class="menu-bar">
-          <button 
+          <button
             class="menu-button navigation-button"
             @click=${() => this.changeStartMonth(-1)}
             ?disabled=${!navBounds.canGoBack}
             title="Vorheriger Monat">
             ←
           </button>
-          <button 
+          <button
             class="menu-button decrease-button"
             @click=${() => this.changeDisplayedMonths(-1)}
             ?disabled=${displayedMonths <= 1}
@@ -1552,14 +1552,14 @@ export class CalendarView extends ViewBase {
             −
           </button>
           <div class="menu-number">${displayedMonths}</div>
-          <button 
+          <button
             class="menu-button increase-button"
             @click=${() => this.changeDisplayedMonths(1)}
             ?disabled=${displayedMonths >= maxMonths}
             title="Mehr Monate anzeigen">
             +
           </button>
-          <button 
+          <button
             class="menu-button navigation-button"
             @click=${() => this.changeStartMonth(1)}
             ?disabled=${!navBounds.canGoForward}

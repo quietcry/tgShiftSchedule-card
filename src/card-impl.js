@@ -113,7 +113,7 @@ export class CardImpl extends CardBase {
         // View existiert bereits, aktualisiere nur die Config
         this._debug('setConfig: Aktualisiere bestehende Calendar-View');
       }
-      
+
       // Aktualisiere die Config der View (wichtig: auch wenn View bereits existiert)
       this._view.config = this.config;
 
