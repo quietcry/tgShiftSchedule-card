@@ -1,0 +1,146 @@
+blueprint:
+  name: TG Schichtplan - Schichtprüfung
+  description: |
+    Prüft ob heute eine der ausgewählten Schichten im Schichtplan aktiv ist.
+    Basierend auf der TG Schichtplan Card.
+  domain: automation
+  input:
+    text_entity:
+      name: Text-Entity (Schichtplan)
+      description: Die input_text Entity, die den Schichtplan enthält
+      selector:
+        entity:
+          domain: input_text
+    schicht_a:
+      name: Standardschicht (a) prüfen
+      description: Prüfe ob die Standardschicht (a) aktiv ist
+      default: true
+      selector:
+        boolean: {}
+    schicht_b:
+      name: Schicht B prüfen
+      description: Prüfe ob Schicht B aktiv ist
+      default: false
+      selector:
+        boolean: {}
+    schicht_c:
+      name: Schicht C prüfen
+      description: Prüfe ob Schicht C aktiv ist
+      default: false
+      selector:
+        boolean: {}
+    schicht_d:
+      name: Schicht D prüfen
+      description: Prüfe ob Schicht D aktiv ist
+      default: false
+      selector:
+        boolean: {}
+    schicht_e:
+      name: Schicht E prüfen
+      description: Prüfe ob Schicht E aktiv ist
+      default: false
+      selector:
+        boolean: {}
+    action_wenn_schicht_aktiv:
+      name: Aktion wenn Schicht aktiv
+      description: Aktion die ausgeführt wird, wenn heute eine der ausgewählten Schichten aktiv ist
+      default: []
+      selector:
+        action: {}
+    action_wenn_keine_schicht:
+      name: Aktion wenn keine Schicht aktiv
+      description: Aktion die ausgeführt wird, wenn heute keine der ausgewählten Schichten aktiv ist
+      default: []
+      selector:
+        action: {}
+
+trigger:
+  - platform: time
+    at: "00:00:00"
+  - platform: state
+    entity_id: !input text_entity
+
+condition: []
+
+action:
+  - variables:
+      heute_jahr: "{{ now().strftime('%y') }}"
+      heute_monat: "{{ now().strftime('%m') }}"
+      heute_tag: "{{ now().strftime('%d') }}"
+      haupt_entity: "{{ !input text_entity }}"
+      zusaetzliche_entities: >
+        {% set base_entity = !input text_entity %}
+        {% set entity_parts = base_entity.split('.') %}
+        {% set zusatz = [] %}
+        {% if entity_parts|length == 2 %}
+          {% set domain = entity_parts[0] %}
+          {% set base_name = entity_parts[1] %}
+          {% set moegliche_suffixe = ['001', '002', '003', '004', '005', '006', '007', '008', '009', '010', '011', '012', '013', '014', '015', '016', '017', '018', '019', '020'] %}
+          {% for suffix in moegliche_suffixe %}
+            {% set entity_id = domain + '.' + base_name + '_' + suffix %}
+            {% if states(entity_id) is defined and states(entity_id) is not none %}
+              {% set _ = zusatz.append(entity_id) %}
+            {% else %}
+              {% break %}
+            {% endif %}
+          {% endfor %}
+        {% endif %}
+        {{ zusatz }}
+      alle_entities: >
+        {% set alle = [haupt_entity] %}
+        {% for entity in zusaetzliche_entities %}
+          {% set _ = alle.append(entity) %}
+        {% endfor %}
+        {{ alle }}
+      schichtplan_teile: >
+        {% set teile = [] %}
+        {% for entity_id in alle_entities %}
+          {% set entity_state = states(entity_id) %}
+          {% if entity_state and entity_state|string|trim != '' %}
+            {% set _ = teile.append(entity_state|string) %}
+          {% endif %}
+        {% endfor %}
+        {{ teile }}
+      schichtplan: "{{ schichtplan_teile|join(';') }}"
+      aktive_schichten: >
+        {% set schichten = [] %}
+        {% if !input schicht_a %}{% set _ = schichten.append('a') %}{% endif %}
+        {% if !input schicht_b %}{% set _ = schichten.append('b') %}{% endif %}
+        {% if !input schicht_c %}{% set _ = schichten.append('c') %}{% endif %}
+        {% if !input schicht_d %}{% set _ = schichten.append('d') %}{% endif %}
+        {% if !input schicht_e %}{% set _ = schichten.append('e') %}{% endif %}
+        {{ schichten }}
+      schicht_aktiv: >
+        {% set monat_key = heute_jahr + ':' + heute_monat %}
+        {% set monate = schichtplan.split(';') if schichtplan else [] %}
+        {% set gefunden = false %}
+        {% for monat in monate %}
+          {% if monat and monat.startswith(monat_key + ':') %}
+            {% set tage_teil = monat.split(':', 2)[2] if ':' in monat else '' %}
+            {% if tage_teil %}
+              {% set tage_liste = tage_teil.split(',') %}
+              {% for tag_entry in tage_liste %}
+                {% if tag_entry and tag_entry.startswith(heute_tag) %}
+                  {% for schicht in aktive_schichten %}
+                    {% if schicht in tag_entry %}
+                      {% set gefunden = true %}
+                    {% endif %}
+                  {% endfor %}
+                {% endif %}
+              {% endfor %}
+            {% endif %}
+          {% endif %}
+        {% endfor %}
+        {{ gefunden }}
+
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ schicht_aktiv }}"
+        sequence: !input action_wenn_schicht_aktiv
+      - conditions:
+          - condition: template
+            value_template: "{{ not schicht_aktiv }}"
+        sequence: !input action_wenn_keine_schicht
+
+
