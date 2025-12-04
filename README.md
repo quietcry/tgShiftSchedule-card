@@ -23,7 +23,7 @@ Eine Schichtplan-Karte für Home Assistant zur Verwaltung von Arbeitszeiten und 
 2. Gehe zu "Dashboard" → "Karten"
 3. Klicke auf das Menü (drei Punkte oben rechts) → "Benutzerdefinierte Repositories"
 4. Füge folgendes Repository hinzu:
-   - Repository: `https://github.com/dein-username/tgcalendar` (oder deine Repository-URL)
+   - Repository: `https://github.com/quietcry/tgShiftSchedule-card`
    - Kategorie: `Dashboard`
 5. Suche nach "TG Schichtplan Card" und installiere sie
 6. Starte Home Assistant neu
@@ -140,4 +140,20 @@ Die kompilierte Datei wird in `dist/tgshiftschedule-card.js` erstellt.
 
 ## Version
 
-Aktuelle Version: 2025.12-0005
+Aktuelle Version: 2025.12-0009
+
+## Changelog
+
+### v2025.12.0009
+- Fix: Event-Propagation für ha-select @selected Event
+- Verhindert, dass Home Assistant's Card-Picker das Event verarbeitet
+- Null-Checks für Event-Handler hinzugefügt
+
+### v2025.12.0008
+- HACS-Installation vorbereitet
+- Blueprints aus Repository entfernt (separate Installation)
+
+### v2025.12.0007
+- Feiertags-Konfiguration im Editor
+- Status relevant Schalter für jede Schicht
+- Verbessertes Anzeigeverhalten für nicht-ausgewählte Schichten
