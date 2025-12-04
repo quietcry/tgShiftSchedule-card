@@ -1900,10 +1900,21 @@ export class ShiftScheduleView extends ViewBase {
                   <ha-select
                     .value=${selectedValue || 'a'}
                     @selected=${(e) => {
-                      const index = e.detail?.index;
-                      if (index !== undefined && index !== null && index >= 0 && allCalendars[index]) {
+                      // Verhindere Event-Propagation zu Home Assistant's Card-Picker
+                      if (e) {
+                        if (e.stopPropagation) {
+                          e.stopPropagation();
+                        }
+                        if (e.stopImmediatePropagation) {
+                          e.stopImmediatePropagation();
+                        }
+                      }
+                      const index = e?.detail?.index;
+                      if (index !== undefined && index !== null && index >= 0 && allCalendars && allCalendars[index]) {
                         const selectedCalendar = allCalendars[index];
-                        this._onCalendarSelectedByIndex(selectedCalendar.shortcut);
+                        if (selectedCalendar && selectedCalendar.shortcut) {
+                          this._onCalendarSelectedByIndex(selectedCalendar.shortcut);
+                        }
                       }
                     }}
                     naturalMenuWidth
