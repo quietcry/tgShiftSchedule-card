@@ -12,15 +12,32 @@ export class EditorImpl extends EditorBase {
       entity: 'input_text.arbeitszeiten',
       numberOfMonths: 14,
       initialDisplayedMonths: 2,
-      mode: 'single',
       selectedCalendar: 'a',
       calendars: [
-        { shortcut: 'a', name: 'Standardschicht', color: '#ff9800', enabled: true },
-        { shortcut: 'b', name: 'Schicht B', color: '#ff0000', enabled: false },
-        { shortcut: 'c', name: 'Schicht C', color: '#00ff00', enabled: false },
-        { shortcut: 'd', name: 'Schicht D', color: '#0000ff', enabled: false },
-        { shortcut: 'e', name: 'Schicht E', color: '#ffff00', enabled: false },
+        { shortcut: 'a', name: 'Schicht A', color: '#ff9800', enabled: true, statusRelevant: true },
+        { shortcut: 'b', name: 'Schicht B', color: '#ff0000', enabled: false, statusRelevant: true },
+        { shortcut: 'c', name: 'Schicht C', color: '#00ff00', enabled: false, statusRelevant: true },
+        { shortcut: 'd', name: 'Schicht D', color: '#0000ff', enabled: false, statusRelevant: true },
+        { shortcut: 'e', name: 'Schicht E', color: '#ffff00', enabled: false, statusRelevant: true },
       ],
+      holidays: {
+        neujahr: true,
+        heilige_drei_koenige: true,
+        tag_der_arbeit: true,
+        friedensfest: true,
+        mariae_himmelfahrt: true,
+        tag_der_deutschen_einheit: true,
+        reformationstag: true,
+        allerheiligen: true,
+        weihnachten_1: true,
+        weihnachten_2: true,
+        karfreitag: true,
+        ostermontag: true,
+        christi_himmelfahrt: true,
+        pfingstmontag: true,
+        fronleichnam: true,
+        busstag: true,
+      },
     });
 
     this._debug(`EditorImpl-Modul wird geladen`);
@@ -44,21 +61,21 @@ export class EditorImpl extends EditorBase {
     // Stelle sicher, dass calendars Array vorhanden ist und alle 5 Kalender enthält
     if (!this.config.calendars || !Array.isArray(this.config.calendars)) {
       this.config.calendars = [
-        { shortcut: 'a', name: 'Standardschicht', color: '#ff9800', enabled: true },
-        { shortcut: 'b', name: 'Schicht B', color: '#ff0000', enabled: false },
-        { shortcut: 'c', name: 'Schicht C', color: '#00ff00', enabled: false },
-        { shortcut: 'd', name: 'Schicht D', color: '#0000ff', enabled: false },
-        { shortcut: 'e', name: 'Schicht E', color: '#ffff00', enabled: false },
+        { shortcut: 'a', name: 'Schicht A', color: '#ff9800', enabled: false, statusRelevant: true },
+        { shortcut: 'b', name: 'Schicht B', color: '#ff0000', enabled: false, statusRelevant: true },
+        { shortcut: 'c', name: 'Schicht C', color: '#00ff00', enabled: false, statusRelevant: true },
+        { shortcut: 'd', name: 'Schicht D', color: '#0000ff', enabled: false, statusRelevant: true },
+        { shortcut: 'e', name: 'Schicht E', color: '#ffff00', enabled: false, statusRelevant: true },
       ];
     }
 
     // Stelle sicher, dass genau 5 Kalender vorhanden sind (a, b, c, d, e)
     const defaultCalendars = [
-      { shortcut: 'a', name: 'Standardkalender', color: '#ff9800', enabled: true }, // Fix: Standardkalender
-      { shortcut: 'b', name: 'Kalender B', color: '#ff0000', enabled: false },
-      { shortcut: 'c', name: 'Kalender C', color: '#00ff00', enabled: false },
-      { shortcut: 'd', name: 'Kalender D', color: '#0000ff', enabled: false },
-      { shortcut: 'e', name: 'Kalender E', color: '#ffff00', enabled: false },
+      { shortcut: 'a', name: 'Schicht A', color: '#ff9800', enabled: false, statusRelevant: true },
+      { shortcut: 'b', name: 'Schicht B', color: '#ff0000', enabled: false, statusRelevant: true },
+      { shortcut: 'c', name: 'Schicht C', color: '#00ff00', enabled: false, statusRelevant: true },
+      { shortcut: 'd', name: 'Schicht D', color: '#0000ff', enabled: false, statusRelevant: true },
+      { shortcut: 'e', name: 'Schicht E', color: '#ffff00', enabled: false, statusRelevant: true },
     ];
 
     // Initialisiere oder aktualisiere Kalender-Array
@@ -69,12 +86,14 @@ export class EditorImpl extends EditorBase {
     this.config.calendars = defaultCalendars.map(defaultCal => {
       const existing = calendarsMap.get(defaultCal.shortcut);
       if (existing) {
-        // Für Standardkalender (a): Immer fixe Werte verwenden
-        if (defaultCal.shortcut === 'a') {
-          return { shortcut: 'a', name: 'Standardkalender', color: '#ff9800', enabled: true };
-        }
-        // Für andere Kalender: Behalte konfigurierte Werte, aber stelle sicher, dass shortcut fix bleibt
-        return { ...existing, shortcut: defaultCal.shortcut };
+        // Behalte konfigurierte Werte, aber stelle sicher, dass shortcut fix bleibt
+        // Stelle sicher, dass statusRelevant vorhanden ist (Default: true)
+        return {
+          ...defaultCal,
+          ...existing,
+          shortcut: defaultCal.shortcut,
+          statusRelevant: existing.statusRelevant !== undefined ? existing.statusRelevant : true
+        };
       }
       return defaultCal;
     });
@@ -89,43 +108,13 @@ export class EditorImpl extends EditorBase {
           @value-changed=${this._valueChanged}
         ></ha-form>
         <div class="elements-section">
-          <div class="elements-header">
-            <ha-combo-box
-              label="Modus"
-              .value=${this.config.mode || 'single'}
-              .items=${[
-                { value: 'single', label: 'Single (Standard)' },
-                { value: 'advanced-additive', label: 'Advanced (Additiv)' },
-                { value: 'advanced-competitive', label: 'Advanced (Competitive)' }
-              ]}
-              @value-changed=${(e) => {
-                const value = e.detail?.value;
-                if (value) {
-                  this.config = {
-                    ...this.config,
-                    mode: value,
-                  };
-                  this.dispatchEvent(
-                    new CustomEvent('config-changed', {
-                      detail: { config: this.config },
-                      bubbles: true,
-                      composed: true,
-                    })
-                  );
-                  this.requestUpdate();
-                }
-              }}
-            ></ha-combo-box>
+          <div class="calendars-list">
+            ${this.config.calendars
+              .map((calendar, index) => this._renderCalendar(index, calendar))}
           </div>
-          ${this.config.mode !== 'single'
-            ? html`
-                <div class="calendars-list">
-                  ${this.config.calendars
-                    .filter(calendar => calendar.shortcut !== 'a') // Standardkalender (a) ist fix und wird nicht angezeigt
-                    .map((calendar, index) => this._renderCalendar(index, calendar))}
-                </div>
-              `
-            : ''}
+        </div>
+        <div class="elements-section">
+          ${this._renderHolidays()}
         </div>
       </div>
     `;
@@ -168,13 +157,87 @@ export class EditorImpl extends EditorBase {
     ];
   }
 
+  _validateTime(timeString) {
+    if (!timeString || timeString.trim() === '') {
+      return true; // Leer ist erlaubt (optional)
+    }
+    const timePattern = /^([0-1][0-9]|2[0-3]):[0-5][0-9]$/;
+    return timePattern.test(timeString.trim());
+  }
+
+  _validateTimeRange(range) {
+    if (!range || !Array.isArray(range) || range.length < 2) {
+      return { isValid: true, message: '' }; // Leer ist erlaubt
+    }
+    const start = range[0];
+    const end = range[1];
+    const hasStart = start && start.trim() !== '';
+    const hasEnd = end && end.trim() !== '';
+
+    // Beide leer = OK (optional)
+    if (!hasStart && !hasEnd) {
+      return { isValid: true, message: '' };
+    }
+
+    // Beide gesetzt = prüfe Format
+    if (hasStart && hasEnd) {
+      const startValid = this._validateTime(start);
+      const endValid = this._validateTime(end);
+      if (!startValid) {
+        return { isValid: false, message: 'Ungültiges Format für Startzeit. Bitte HH:MM verwenden (z.B. 08:30)' };
+      }
+      if (!endValid) {
+        return { isValid: false, message: 'Ungültiges Format für Endzeit. Bitte HH:MM verwenden (z.B. 17:00)' };
+      }
+      return { isValid: true, message: '' };
+    }
+
+    // Nur eine Zeit gesetzt = Fehler
+    if (hasStart && !hasEnd) {
+      return { isValid: false, message: 'Bitte auch die Endzeit angeben' };
+    }
+    if (!hasStart && hasEnd) {
+      return { isValid: false, message: 'Bitte auch die Startzeit angeben' };
+    }
+
+    return { isValid: true, message: '' };
+  }
+
   _renderCalendar(index, calendar) {
     const colorOptions = this._getColorOptions();
     const currentColor = calendar.color || '#ff0000';
+    const timeRanges = calendar.timeRanges || [[null, null], [null, null]];
+
+    const shiftName = calendar.name || `Schicht ${calendar.shortcut.toUpperCase()}`;
+    const isEnabled = calendar.enabled || false;
+
+    // Validiere Zeiträume für visuelles Feedback
+    const range1Validation = this._validateTimeRange(timeRanges[0]);
+    const range2Validation = this._validateTimeRange(timeRanges[1]);
+
+    // Prüfe einzelne Zeiten für Format-Validierung
+    const isValidTimeRange1Start = !timeRanges[0] || !timeRanges[0][0] || this._validateTime(timeRanges[0][0]);
+    const isValidTimeRange1End = !timeRanges[0] || !timeRanges[0][1] || this._validateTime(timeRanges[0][1]);
+    const isValidTimeRange2Start = !timeRanges[1] || !timeRanges[1][0] || this._validateTime(timeRanges[1][0]);
+    const isValidTimeRange2End = !timeRanges[1] || !timeRanges[1][1] || this._validateTime(timeRanges[1][1]);
+
+    // Kombiniere Format- und Vollständigkeits-Validierung
+    const range1StartError = !isValidTimeRange1Start || !range1Validation.isValid;
+    const range1EndError = !isValidTimeRange1End || !range1Validation.isValid;
+    const range2StartError = !isValidTimeRange2Start || !range2Validation.isValid;
+    const range2EndError = !isValidTimeRange2End || !range2Validation.isValid;
 
     return html`
-      <div class="calendar-item">
-        <h4>Schicht ${calendar.shortcut.toUpperCase()}</h4>
+      <details class="calendar-item">
+        <summary class="calendar-summary">
+          <span class="calendar-summary-title">Schicht ${calendar.shortcut.toUpperCase()}: ${shiftName}</span>
+          <span class="calendar-summary-status">
+            ${isEnabled
+              ? html`<span class="status-badge status-enabled">Aktiviert</span>`
+              : html`<span class="status-badge status-disabled">Deaktiviert</span>`
+            }
+          </span>
+        </summary>
         <div class="calendar-fields">
           <ha-textfield
             label="Name"
@@ -182,11 +245,20 @@ export class EditorImpl extends EditorBase {
             maxlength="30"
             @input=${(e) => this._updateCalendar(calendar.shortcut, 'name', e.target.value)}
           ></ha-textfield>
-          <ha-switch
-            label="Aktiviert"
-            .checked=${calendar.enabled || false}
-            @change=${(e) => this._updateCalendar(calendar.shortcut, 'enabled', e.target.checked)}
-          ></ha-switch>
+          <div class="switch-item">
+            <label class="switch-label">Aktiviert</label>
+            <ha-switch
+              .checked=${calendar.enabled || false}
+              @change=${(e) => this._updateCalendar(calendar.shortcut, 'enabled', e.target.checked)}
+            ></ha-switch>
+          </div>
+          <div class="switch-item">
+            <label class="switch-label">Status relevant</label>
+            <ha-switch
+              .checked=${calendar.statusRelevant !== false}
+              @change=${(e) => this._updateCalendar(calendar.shortcut, 'statusRelevant', e.target.checked)}
+            ></ha-switch>
+          </div>
           <div class="color-selector">
             <div class="color-selector-label">Farbe</div>
             <ha-combo-box
@@ -208,20 +280,312 @@ export class EditorImpl extends EditorBase {
               <span class="color-selected-value">${currentColor}</span>
             </div>
           </div>
+          <div class="time-ranges">
+            <div class="time-range-label">Zeiträume (optional)</div>
+            <div class="time-range-item">
+              <ha-textfield
+                label="Startzeit 1"
+                .value=${timeRanges[0] && timeRanges[0][0] ? timeRanges[0][0] : ''}
+                placeholder="HH:MM"
+                pattern="^([0-1][0-9]|2[0-3]):[0-5][0-9]$"
+                .error=${range1StartError}
+                .helper=${range1StartError ? (range1Validation.message || 'Ungültiges Format. Bitte HH:MM verwenden (z.B. 08:30)') : ''}
+                @input=${(e) => {
+                  const value = e.target.value.trim() || null;
+                  const formatValid = !value || this._validateTime(value);
+                  this._updateTimeRange(calendar.shortcut, 0, 0, value);
+                  // Prüfe Vollständigkeit nach Update
+                  setTimeout(() => {
+                    const updatedCal = this.config.calendars?.find(c => c.shortcut === calendar.shortcut);
+                    const updatedRange = updatedCal?.timeRanges?.[0] || [null, null];
+                    const rangeValidation = this._validateTimeRange(updatedRange);
+                    const hasError = !formatValid || !rangeValidation.isValid;
+                    e.target.error = hasError;
+                    e.target.helper = hasError ? (rangeValidation.message || 'Ungültiges Format. Bitte HH:MM verwenden (z.B. 08:30)') : '';
+                    this.requestUpdate();
+                  }, 0);
+                }}
+                @blur=${(e) => {
+                  const value = e.target.value.trim() || null;
+                  const formatValid = !value || this._validateTime(value);
+                  const updatedCal = this.config.calendars?.find(c => c.shortcut === calendar.shortcut);
+                  const updatedRange = updatedCal?.timeRanges?.[0] || [null, null];
+                  const rangeValidation = this._validateTimeRange(updatedRange);
+                  const hasError = !formatValid || !rangeValidation.isValid;
+                  e.target.error = hasError;
+                  e.target.helper = hasError ? (rangeValidation.message || 'Ungültiges Format. Bitte HH:MM verwenden (z.B. 08:30)') : '';
+                  this.requestUpdate();
+                }}
+              ></ha-textfield>
+              <span class="time-separator">-</span>
+              <ha-textfield
+                label="Endzeit 1"
+                .value=${timeRanges[0] && timeRanges[0][1] ? timeRanges[0][1] : ''}
+                placeholder="HH:MM"
+                pattern="^([0-1][0-9]|2[0-3]):[0-5][0-9]$"
+                .error=${range1EndError}
+                .helper=${range1EndError ? (range1Validation.message || 'Ungültiges Format. Bitte HH:MM verwenden (z.B. 17:00)') : ''}
+                @input=${(e) => {
+                  const value = e.target.value.trim() || null;
+                  const formatValid = !value || this._validateTime(value);
+                  this._updateTimeRange(calendar.shortcut, 0, 1, value);
+                  setTimeout(() => {
+                    const updatedCal = this.config.calendars?.find(c => c.shortcut === calendar.shortcut);
+                    const updatedRange = updatedCal?.timeRanges?.[0] || [null, null];
+                    const rangeValidation = this._validateTimeRange(updatedRange);
+                    const hasError = !formatValid || !rangeValidation.isValid;
+                    e.target.error = hasError;
+                    e.target.helper = hasError ? (rangeValidation.message || 'Ungültiges Format. Bitte HH:MM verwenden (z.B. 17:00)') : '';
+                    this.requestUpdate();
+                  }, 0);
+                }}
+                @blur=${(e) => {
+                  const value = e.target.value.trim() || null;
+                  const formatValid = !value || this._validateTime(value);
+                  const updatedCal = this.config.calendars?.find(c => c.shortcut === calendar.shortcut);
+                  const updatedRange = updatedCal?.timeRanges?.[0] || [null, null];
+                  const rangeValidation = this._validateTimeRange(updatedRange);
+                  const hasError = !formatValid || !rangeValidation.isValid;
+                  e.target.error = hasError;
+                  e.target.helper = hasError ? (rangeValidation.message || 'Ungültiges Format. Bitte HH:MM verwenden (z.B. 17:00)') : '';
+                  this.requestUpdate();
+                }}
+              ></ha-textfield>
+            </div>
+            <div class="time-range-item">
+              <ha-textfield
+                label="Startzeit 2"
+                .value=${timeRanges[1] && timeRanges[1][0] ? timeRanges[1][0] : ''}
+                placeholder="HH:MM"
+                pattern="^([0-1][0-9]|2[0-3]):[0-5][0-9]$"
+                .error=${range2StartError}
+                .helper=${range2StartError ? (range2Validation.message || 'Ungültiges Format. Bitte HH:MM verwenden (z.B. 08:30)') : ''}
+                @input=${(e) => {
+                  const value = e.target.value.trim() || null;
+                  const formatValid = !value || this._validateTime(value);
+                  this._updateTimeRange(calendar.shortcut, 1, 0, value);
+                  setTimeout(() => {
+                    const updatedCal = this.config.calendars?.find(c => c.shortcut === calendar.shortcut);
+                    const updatedRange = updatedCal?.timeRanges?.[1] || [null, null];
+                    const rangeValidation = this._validateTimeRange(updatedRange);
+                    const hasError = !formatValid || !rangeValidation.isValid;
+                    e.target.error = hasError;
+                    e.target.helper = hasError ? (rangeValidation.message || 'Ungültiges Format. Bitte HH:MM verwenden (z.B. 08:30)') : '';
+                    this.requestUpdate();
+                  }, 0);
+                }}
+                @blur=${(e) => {
+                  const value = e.target.value.trim() || null;
+                  const formatValid = !value || this._validateTime(value);
+                  const updatedCal = this.config.calendars?.find(c => c.shortcut === calendar.shortcut);
+                  const updatedRange = updatedCal?.timeRanges?.[1] || [null, null];
+                  const rangeValidation = this._validateTimeRange(updatedRange);
+                  const hasError = !formatValid || !rangeValidation.isValid;
+                  e.target.error = hasError;
+                  e.target.helper = hasError ? (rangeValidation.message || 'Ungültiges Format. Bitte HH:MM verwenden (z.B. 08:30)') : '';
+                  this.requestUpdate();
+                }}
+              ></ha-textfield>
+              <span class="time-separator">-</span>
+              <ha-textfield
+                label="Endzeit 2"
+                .value=${timeRanges[1] && timeRanges[1][1] ? timeRanges[1][1] : ''}
+                placeholder="HH:MM"
+                pattern="^([0-1][0-9]|2[0-3]):[0-5][0-9]$"
+                .error=${range2EndError}
+                .helper=${range2EndError ? (range2Validation.message || 'Ungültiges Format. Bitte HH:MM verwenden (z.B. 17:00)') : ''}
+                @input=${(e) => {
+                  const value = e.target.value.trim() || null;
+                  const formatValid = !value || this._validateTime(value);
+                  this._updateTimeRange(calendar.shortcut, 1, 1, value);
+                  setTimeout(() => {
+                    const updatedCal = this.config.calendars?.find(c => c.shortcut === calendar.shortcut);
+                    const updatedRange = updatedCal?.timeRanges?.[1] || [null, null];
+                    const rangeValidation = this._validateTimeRange(updatedRange);
+                    const hasError = !formatValid || !rangeValidation.isValid;
+                    e.target.error = hasError;
+                    e.target.helper = hasError ? (rangeValidation.message || 'Ungültiges Format. Bitte HH:MM verwenden (z.B. 17:00)') : '';
+                    this.requestUpdate();
+                  }, 0);
+                }}
+                @blur=${(e) => {
+                  const value = e.target.value.trim() || null;
+                  const formatValid = !value || this._validateTime(value);
+                  const updatedCal = this.config.calendars?.find(c => c.shortcut === calendar.shortcut);
+                  const updatedRange = updatedCal?.timeRanges?.[1] || [null, null];
+                  const rangeValidation = this._validateTimeRange(updatedRange);
+                  const hasError = !formatValid || !rangeValidation.isValid;
+                  e.target.error = hasError;
+                  e.target.helper = hasError ? (rangeValidation.message || 'Ungültiges Format. Bitte HH:MM verwenden (z.B. 17:00)') : '';
+                  this.requestUpdate();
+                }}
+              ></ha-textfield>
+            </div>
+          </div>
         </div>
-      </div>
+      </details>
     `;
   }
 
-  _updateCalendar(shortcut, property, value) {
-    // Standardkalender (a) ist fix und kann nicht geändert werden
-    if (shortcut === 'a') {
-      return;
+  _renderHolidays() {
+    // Stelle sicher, dass holidays Konfiguration existiert
+    if (!this.config.holidays) {
+      this.config.holidays = {
+        neujahr: true,
+        heilige_drei_koenige: true,
+        tag_der_arbeit: true,
+        friedensfest: true,
+        mariae_himmelfahrt: true,
+        tag_der_deutschen_einheit: true,
+        reformationstag: true,
+        allerheiligen: true,
+        weihnachten_1: true,
+        weihnachten_2: true,
+        karfreitag: true,
+        ostermontag: true,
+        christi_himmelfahrt: true,
+        pfingstmontag: true,
+        fronleichnam: true,
+        busstag: true,
+      };
     }
 
+    const holidays = [
+      { key: 'neujahr', label: 'Neujahr (1. Januar)' },
+      { key: 'heilige_drei_koenige', label: 'Heilige Drei Könige (6. Januar)' },
+      { key: 'tag_der_arbeit', label: 'Tag der Arbeit (1. Mai)' },
+      { key: 'friedensfest', label: 'Friedensfest (8. August)' },
+      { key: 'mariae_himmelfahrt', label: 'Mariä Himmelfahrt (15. August)' },
+      { key: 'tag_der_deutschen_einheit', label: 'Tag der Deutschen Einheit (3. Oktober)' },
+      { key: 'reformationstag', label: 'Reformationstag (31. Oktober)' },
+      { key: 'allerheiligen', label: 'Allerheiligen (1. November)' },
+      { key: 'weihnachten_1', label: '1. Weihnachtsfeiertag (25. Dezember)' },
+      { key: 'weihnachten_2', label: '2. Weihnachtsfeiertag (26. Dezember)' },
+      { key: 'karfreitag', label: 'Karfreitag' },
+      { key: 'ostermontag', label: 'Ostermontag' },
+      { key: 'christi_himmelfahrt', label: 'Christi Himmelfahrt' },
+      { key: 'pfingstmontag', label: 'Pfingstmontag' },
+      { key: 'fronleichnam', label: 'Fronleichnam' },
+      { key: 'busstag', label: 'Buß- und Bettag' },
+    ];
+
+    return html`
+      <details class="holidays-item">
+        <summary class="holidays-summary">
+          <span class="holidays-summary-title">Feiertage</span>
+        </summary>
+        <div class="holidays-fields">
+          ${holidays.map(holiday => html`
+            <div class="holiday-switch-item">
+              <label class="holiday-label">${holiday.label}</label>
+              <ha-switch
+                .checked=${this.config.holidays[holiday.key] !== false}
+                @change=${(e) => this._updateHoliday(holiday.key, e.target.checked)}
+              ></ha-switch>
+            </div>
+          `)}
+        </div>
+      </details>
+    `;
+  }
+
+  _updateHoliday(key, enabled) {
+    if (!this.config.holidays) {
+      this.config.holidays = {};
+    }
+
+    // Aktualisiere die Config direkt (immutable update)
+    const newConfig = {
+      ...this.config,
+      holidays: {
+        ...this.config.holidays,
+        [key]: enabled,
+      },
+    };
+
+    // Aktualisiere die Config direkt
+    this.config = newConfig;
+
+    // Aktualisiere die Ansicht sofort
+    this.requestUpdate();
+
+    // Dispatch config-changed Event
+    setTimeout(() => {
+      this.dispatchEvent(
+        new CustomEvent('config-changed', {
+          detail: { config: newConfig },
+          bubbles: true,
+          composed: true,
+        })
+      );
+    }, 0);
+  }
+
+  _updateTimeRange(shortcut, rangeIndex, timeIndex, value) {
+    // rangeIndex: 0 oder 1 (erster oder zweiter Zeitraum)
+    // timeIndex: 0 oder 1 (Start oder End)
     if (!this.config.calendars) {
       this.config.calendars = [
-        { shortcut: 'a', name: 'Standardschicht', color: '#ff9800', enabled: true },
+        { shortcut: 'a', name: 'Schicht A', color: '#ff9800', enabled: false },
+        { shortcut: 'b', name: 'Schicht B', color: '#ff0000', enabled: false },
+        { shortcut: 'c', name: 'Schicht C', color: '#00ff00', enabled: false },
+        { shortcut: 'd', name: 'Schicht D', color: '#0000ff', enabled: false },
+        { shortcut: 'e', name: 'Schicht E', color: '#ffff00', enabled: false },
+      ];
+    }
+
+    // Erstelle eine neue Kopie des Arrays und aktualisiere den betroffenen Kalender
+    const newCalendars = this.config.calendars.map(cal => {
+      if (cal.shortcut === shortcut) {
+        // Stelle sicher, dass timeRanges Array existiert
+        const timeRanges = cal.timeRanges || [[null, null], [null, null]];
+        // Erstelle eine Kopie des timeRanges Arrays
+        const newTimeRanges = timeRanges.map((range, idx) => {
+          if (idx === rangeIndex) {
+            // Erstelle eine Kopie des Zeitraums
+            const newRange = [...range];
+            newRange[timeIndex] = value || null;
+            return newRange;
+          }
+          return range;
+        });
+
+        return {
+          ...cal,
+          timeRanges: newTimeRanges,
+        };
+      }
+      return cal;
+    });
+
+    // Aktualisiere die Config direkt (immutable update)
+    const newConfig = {
+      ...this.config,
+      calendars: newCalendars,
+    };
+
+    // Aktualisiere die Config direkt
+    this.config = newConfig;
+
+    // Aktualisiere die Ansicht sofort
+    this.requestUpdate();
+
+    // Dispatch config-changed Event
+    setTimeout(() => {
+      this.dispatchEvent(
+        new CustomEvent('config-changed', {
+          detail: { config: newConfig },
+          bubbles: true,
+          composed: true,
+        })
+      );
+    }, 0);
+  }
+
+  _updateCalendar(shortcut, property, value) {
+    if (!this.config.calendars) {
+      this.config.calendars = [
+        { shortcut: 'a', name: 'Schicht A', color: '#ff9800', enabled: false },
         { shortcut: 'b', name: 'Schicht B', color: '#ff0000', enabled: false },
         { shortcut: 'c', name: 'Schicht C', color: '#00ff00', enabled: false },
         { shortcut: 'd', name: 'Schicht D', color: '#0000ff', enabled: false },
@@ -236,10 +600,6 @@ export class EditorImpl extends EditorBase {
           ...cal,
           [property]: value,
         };
-      }
-      // Stelle sicher, dass Standardkalender (a) immer fixe Werte hat
-      if (cal.shortcut === 'a') {
-        return { shortcut: 'a', name: 'Standardkalender', color: '#ff9800', enabled: true };
       }
       return cal;
     });
@@ -346,30 +706,111 @@ export class EditorImpl extends EditorBase {
       }
 
       .calendar-item {
-        margin-bottom: 20px;
-        padding: 15px;
+        margin-bottom: 12px;
         background-color: var(--card-background-color, #ffffff);
         border: 1px solid var(--divider-color, #e0e0e0);
         border-radius: 4px;
+        overflow: hidden;
       }
 
-      .calendar-item h4 {
-        margin: 0 0 15px 0;
+      .calendar-item[open] {
+        border-color: var(--primary-color, #03a9f4);
+      }
+
+      .calendar-summary {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 15px;
+        cursor: pointer;
+        list-style: none;
+        user-select: none;
+        background-color: var(--card-background-color, #ffffff);
+        transition: background-color 0.2s ease;
+      }
+
+      .calendar-summary::-webkit-details-marker {
+        display: none;
+      }
+
+      .calendar-summary::before {
+        content: '▶';
+        display: inline-block;
+        margin-right: 8px;
+        transition: transform 0.2s ease;
+        color: var(--primary-color, #03a9f4);
+        font-size: 10px;
+      }
+
+      .calendar-item[open] .calendar-summary::before {
+        transform: rotate(90deg);
+      }
+
+      .calendar-summary:hover {
+        background-color: var(--divider-color, #f5f5f5);
+      }
+
+      .calendar-summary-title {
         font-size: 14px;
         font-weight: 500;
         color: var(--primary-text-color, #000000);
+        flex: 1;
+      }
+
+      .calendar-summary-status {
+        display: flex;
+        align-items: center;
+        margin-left: 12px;
+      }
+
+      .status-badge {
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-size: 11px;
+        font-weight: 500;
+        text-transform: uppercase;
+      }
+
+      .status-enabled {
+        background-color: var(--success-color, #4caf50);
+        color: white;
+      }
+
+      .status-disabled {
+        background-color: var(--disabled-color, #9e9e9e);
+        color: white;
       }
 
       .calendar-fields {
         display: grid;
         grid-template-columns: 1fr;
         gap: 15px;
+        padding: 15px;
+        border-top: 1px solid var(--divider-color, #e0e0e0);
       }
 
       .calendar-fields ha-textfield,
       .calendar-fields ha-switch,
       .calendar-fields .color-selector {
         width: 100%;
+      }
+
+      .switch-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .switch-label {
+        flex: 1;
+        font-size: 14px;
+        color: var(--primary-text-color, #000000);
+        cursor: pointer;
+      }
+
+      .calendar-fields ha-switch {
+        flex-shrink: 0;
       }
 
       ha-switch {
@@ -445,6 +886,119 @@ export class EditorImpl extends EditorBase {
         color: var(--primary-text-color, #000000);
         font-weight: 500;
       }
+
+      .time-ranges {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        margin-top: 15px;
+        padding: 12px;
+        background-color: var(--card-background-color, #f5f5f5);
+        border-radius: 4px;
+        border: 1px solid var(--divider-color, #e0e0e0);
+      }
+
+      .time-range-label {
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--primary-text-color, #000000);
+        margin-bottom: 8px;
+      }
+
+      .time-range-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .time-range-item ha-textfield {
+        flex: 1;
+      }
+
+      .time-separator {
+        font-size: 16px;
+        font-weight: 500;
+        color: var(--primary-text-color, #000000);
+        flex-shrink: 0;
+      }
+
+      .holidays-item {
+        margin-bottom: 12px;
+        background-color: var(--card-background-color, #ffffff);
+        border: 1px solid var(--divider-color, #e0e0e0);
+        border-radius: 4px;
+        overflow: hidden;
+      }
+
+      .holidays-item[open] {
+        border-color: var(--primary-color, #03a9f4);
+      }
+
+      .holidays-summary {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 15px;
+        cursor: pointer;
+        list-style: none;
+        user-select: none;
+        background-color: var(--card-background-color, #ffffff);
+        transition: background-color 0.2s ease;
+      }
+
+      .holidays-summary::-webkit-details-marker {
+        display: none;
+      }
+
+      .holidays-summary::before {
+        content: '▶';
+        display: inline-block;
+        margin-right: 8px;
+        transition: transform 0.2s ease;
+        color: var(--primary-color, #03a9f4);
+        font-size: 10px;
+      }
+
+      .holidays-item[open] .holidays-summary::before {
+        transform: rotate(90deg);
+      }
+
+      .holidays-summary:hover {
+        background-color: var(--divider-color, #f5f5f5);
+      }
+
+      .holidays-summary-title {
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--primary-text-color, #000000);
+        flex: 1;
+      }
+
+      .holidays-fields {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 12px;
+        padding: 15px;
+        border-top: 1px solid var(--divider-color, #e0e0e0);
+      }
+
+      .holiday-switch-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .holiday-label {
+        flex: 1;
+        font-size: 14px;
+        color: var(--primary-text-color, #000000);
+        cursor: pointer;
+      }
+
+      .holidays-fields ha-switch {
+        flex-shrink: 0;
+      }
     `,
   ];
 
@@ -458,7 +1012,6 @@ export class EditorImpl extends EditorBase {
       numberOfMonths: 14,
       initialDisplayedMonths: 2,
       useElements: false,
-      mode: 'single',
       selectedElement: null,
       elements: [
         { benennung: 'Element 1', aktiv: true, color: '#ff0000', shortcut: '1' },
@@ -466,6 +1019,24 @@ export class EditorImpl extends EditorBase {
         { benennung: 'Element 3', aktiv: true, color: '#0000ff', shortcut: '3' },
         { benennung: 'Element 4', aktiv: true, color: '#ffff00', shortcut: '4' },
       ],
+      holidays: {
+        neujahr: true,
+        heilige_drei_koenige: true,
+        tag_der_arbeit: true,
+        friedensfest: true,
+        mariae_himmelfahrt: true,
+        tag_der_deutschen_einheit: true,
+        reformationstag: true,
+        allerheiligen: true,
+        weihnachten_1: true,
+        weihnachten_2: true,
+        karfreitag: true,
+        ostermontag: true,
+        christi_himmelfahrt: true,
+        pfingstmontag: true,
+        fronleichnam: true,
+        busstag: true,
+      },
     };
   }
 

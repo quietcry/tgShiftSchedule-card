@@ -1,0 +1,556 @@
+
+blueprint:
+  name: Extened person states
+  domain: automation
+  description: >-
+    Provides a text entity with a configurable state.<br>The configured state conditions are checked in turn and the last one that is true is returned
+  input:
+    debugmode:
+      name: "debug mode"
+      description: Configuration
+      default: false
+      selector:
+        boolean:
+
+    linked_person:
+      name: Person entity [mandatory]
+      description: a person entity, preferably linked to a tracker
+      selector:
+        entity:
+          multiple: false
+          filter:
+            domain: person
+    linked_activitybutton:
+      name: is activ button [optional]
+      description: a Boolean helper that indicates whether the person's state is tracked by this blueprint
+      default: "-"
+      selector:
+        entity:
+          multiple: false
+          filter:
+            domain: input_boolean
+    linked_field:
+      name: state text-entity [optional]
+      description: The determined status is written into this text entity
+      default: "-"
+      selector:
+        entity:
+          multiple: false
+          filter:
+            domain: input_text
+    addPersonName:
+      name: add person name to state [default = false]
+      description: if true, the state text in textfield starts with the username<br>e.g. user!home
+      default: false
+      selector:
+        boolean:
+    linked_text_inputs:
+      name: Text inputs [optional]
+      description: List of text input entities whose values will be appended to the state text with "|" as separator
+      default: []
+      selector:
+        entity:
+          multiple: true
+          filter:
+            domain: input_text
+    text_input_mode:
+      name: Text input mode
+      description: 'How to handle text inputs: "append" adds them to the existing state, "replace" replaces the state with text inputs'
+      default: replace
+      selector:
+        select:
+          options:
+            - append
+            - replace
+
+
+
+    status_1:
+      name: state 1 [optional]
+      icon: mdi:cog
+      collapsed: true
+      description: Configuration state
+      input:
+        status_1_name:
+          name: State [optional]
+          description: if set, this will be returned as status as soon as at least one of the linked devices is true<br>e.g. homeoffice
+          default:
+        status_1_basisstatus:
+          name: refers to state [optional]
+          description: if set, the status is only set if the person entity has the status specified here<br>e.g. home
+          default:
+        status_1_linked_devices:
+          name: devices [optional]
+          description: linked devices (trackers or binary sensors) that provides an on/off state
+          default: "-"
+          selector:
+            entity:
+              multiple: true
+              filter:
+                domain:
+                  - device_tracker
+                  - binary_sensor
+        status_1_schedule:
+          name: Schedule [optional]
+          description: If set, the state will only be set when the schedule is enabled
+          default: "-"
+          selector:
+            entity:
+              filter:
+                domain: schedule
+    status_2:
+      name: state 2 [optional]
+      icon: mdi:cog
+      collapsed: true
+      description: Configuration state
+      input:
+        status_2_name:
+          name: State [optional]
+          description: if set, this will be returned as status as soon as at least one of the linked devices is true<br>e.g. homeoffice
+          default:
+        status_2_basisstatus:
+          name: refers to state [optional]
+          description: if set, the status is only set if the person entity has the status specified here<br>e.g. home
+          default:
+        status_2_linked_devices:
+          name: devices [optional]
+          description: linked devices (trackers or binary sensors) that provides an on/off state
+          default: "-"
+          selector:
+            entity:
+              multiple: true
+              filter:
+                domain:
+                  - device_tracker
+                  - binary_sensor
+        status_2_schedule:
+          name: Schedule [optional]
+          description: If set, the state will only be set when the schedule is enabled
+          default: "-"
+          selector:
+            entity:
+              filter:
+                domain: schedule
+    status_3:
+      name: state 3 [optional]
+      icon: mdi:cog
+      collapsed: true
+      description: Configuration state
+      input:
+        status_3_name:
+          name: State [optional]
+          description: if set, this will be returned as status as soon as at least one of the linked devices is true<br>e.g. homeoffice
+          default:
+        status_3_basisstatus:
+          name: refers to state [optional]
+          description: if set, the status is only set if the person entity has the status specified here<br>e.g. home
+          default:
+        status_3_linked_devices:
+          name: devices [optional]
+          description: linked devices (trackers or binary sensors) that provides an on/off state
+          default: "-"
+          selector:
+            entity:
+              multiple: true
+              filter:
+                domain:
+                  - device_tracker
+                  - binary_sensor
+        status_3_schedule:
+          name: Schedule [optional]
+          description: If set, the state will only be set when the schedule is enabled
+          default: "-"
+          selector:
+            entity:
+              filter:
+                domain: schedule
+
+    status_4:
+      name: state 4 [optional]
+      icon: mdi:cog
+      collapsed: true
+      description: Configuration state
+      input:
+        status_4_name:
+          name: State [optional]
+          description: if set, this will be returned as status as soon as at least one of the linked devices is true<br>e.g. homeoffice
+          default:
+        status_4_basisstatus:
+          name: refers to state [optional]
+          description: if set, the status is only set if the person entity has the status specified here<br>e.g. home
+          default:
+        status_4_linked_devices:
+          name: devices [optional]
+          description: linked devices (trackers or binary sensors) that provides an on/off state
+          default: "-"
+          selector:
+            entity:
+              multiple: true
+              filter:
+                domain:
+                  - device_tracker
+                  - binary_sensor
+        status_4_schedule:
+          name: Schedule [optional]
+          description: If set, the state will only be set when the schedule is enabled
+          default: "-"
+          selector:
+            entity:
+              filter:
+                domain: schedule
+    status_5:
+      name: state 5 [optional]
+      icon: mdi:cog
+      collapsed: true
+      description: Configuration state
+      input:
+        status_5_name:
+          name: State [optional]
+          description: if set, this will be returned as status as soon as at least one of the linked devices is true<br>e.g. homeoffice
+          default:
+        status_5_basisstatus:
+          name: refers to state [optional]
+          description: if set, the status is only set if the person entity has the status specified here<br>e.g. home
+          default:
+        status_5_linked_devices:
+          name: devices [optional]
+          description: linked devices (trackers or binary sensors) that provides an on/off state
+          default: "-"
+          selector:
+            entity:
+              multiple: true
+              filter:
+                domain:
+                  - device_tracker
+                  - binary_sensor
+        status_5_schedule:
+          name: Schedule [optional]
+          description: If set, the state will only be set when the schedule is enabled
+          default: "-"
+          selector:
+            entity:
+              filter:
+                domain: schedule
+
+
+
+
+variables:
+
+  linked_person: !input linked_person
+  linked_field: !input linked_field
+  linked_activitybutton: !input linked_activitybutton
+  addPersonName: !input addPersonName
+  linked_text_inputs: !input linked_text_inputs
+  text_input_mode: !input text_input_mode
+  debugmode: !input debugmode
+  debugMsg: ""
+  active_status: inactive
+
+
+  observable: [
+              {
+              'status': !input status_1_name,
+              'basisstatus': !input status_1_basisstatus,
+              'devices': !input status_1_linked_devices,
+              'schedule': !input status_1_schedule,
+              },
+              {
+              'status': !input status_2_name,
+              'basisstatus': !input status_2_basisstatus,
+              'devices': !input status_2_linked_devices,
+              'schedule': !input status_2_schedule,
+              },
+              {
+              'status': !input status_3_name,
+              'basisstatus': !input status_3_basisstatus,
+              'devices': !input status_3_linked_devices,
+              'schedule': !input status_3_schedule,
+              },
+              {
+              'status': !input status_4_name,
+              'basisstatus': !input status_4_basisstatus,
+              'devices': !input status_4_linked_devices,
+              'schedule': !input status_4_schedule,
+              },
+              {
+              'status': !input status_5_name,
+              'basisstatus': !input status_5_basisstatus,
+              'devices': !input status_5_linked_devices,
+              'schedule': !input status_5_schedule,
+              }
+              ]
+  observed: >-
+    {%- macro observer(itemlist) -%}
+    {%- for item in itemlist -%}
+      {%- if item.status is defined and item.status and item.status != "-" -%}
+        {%- set test = item.schedule -%}
+        {%- if test and test != "-" and states(test) != 'unknown' -%}
+          {%- set ns.myEntities = ns.myEntities + [test] -%}
+        {%- endif -%}
+        {%- set test = item.devices -%}
+        {%- if test and test is string and test != "-" and states(test) != 'unknown' -%}
+          {%- set ns.myEntities = ns.myEntities + [test] -%}
+        {%- elif test and test is list -%}
+          {%- for device in test -%}
+            {%- if device and device != "-" and states(device) != 'unknown' -%}
+              {%- set ns.myEntities = ns.myEntities + [device] -%}
+            {%- endif -%}
+          {%- endfor -%}
+        {%- endif -%}
+      {%- endif -%}
+    {%- endfor -%}
+    {%- endmacro -%}
+    {%- set ns = namespace(myEntities=[])%}
+    {%- set ns.myEntities = ns.myEntities + [linked_person] + [linked_activitybutton]%}
+    {%- if linked_text_inputs is defined and linked_text_inputs is iterable -%}
+      {%- for text_input in linked_text_inputs -%}
+        {%- if text_input and text_input != "-" and states(text_input) != 'unknown' -%}
+          {%- set ns.myEntities = ns.myEntities + [text_input] -%}
+        {%- endif -%}
+      {%- endfor -%}
+    {%- endif -%}
+
+    {%- set status = observer(observable)  -%}
+    {{- ns.myEntities -}}
+
+  sendmessage: true
+
+
+trigger:
+  - platform: homeassistant
+    event: start
+    id: haStart
+  - platform: time
+    at: "00:00:00"
+    id: time_trigger
+  - platform: event
+    event_type: state_changed
+  - platform: state
+    entity_id: input_boolean.reloadconfig
+    from: "on"
+    to: "off"
+    id: "reloadConfig"
+
+condition:
+  - condition: or
+    conditions:
+      - condition: trigger
+        id:
+          - haStart
+          - time_trigger
+          - reloadConfig
+      - condition: template
+        value_template: >-
+          {%- if trigger.event is defined and trigger.event.data is defined and trigger.event.data.entity_id is defined -%}
+            {%- if trigger.event.data.entity_id in observed -%}
+              true
+            {%- endif -%}
+          {%- endif -%}
+
+action:
+  - variables:
+      my_status: >-
+        {%- macro getStatus(item, person) -%}
+          {%- set tmp = namespace(isError = false) -%}
+          {%- set tmp.debug = "<ul>" -%}
+          {%- set tmp.schedule = "non" -%}
+          {%- set mystate = namespace() -%}
+          {%- set mystate.state = "-" -%}
+          {# Test BasisStatus#}
+          {%- if item.basisstatus -%}
+            {%- set basestats = item.basisstatus.split(';') -%}
+            {%- set personstate = states(person) -%}
+            {%- if not personstate in basestats -%}
+              {%- set tmp.isError = true -%}
+              {%- set tmp.debug = tmp.debug ~ "<li>state " ~ personstate ~ " not in basestates" ~ basestats ~ "</li>" -%}
+            {%- else -%}
+              {%- set tmp.debug = tmp.debug ~ "<li>state " ~ personstate ~ " in basestates" ~ basestats ~ "</li>" -%}
+            {%- endif -%}
+          {%- else -%}
+            {%- set tmp.debug = tmp.debug ~ "<li>basestate not set" ~ "</li>" -%}
+          {%- endif -%}
+
+          {# Test Status is set#}
+          {%- if item.status is not defined or not item.status or item.status == "-" -%}
+            {%- set tmp.isError = true -%}
+            {%- set tmp.debug = tmp.debug ~ "<li>non resulted state defined " ~ "</li>" -%}
+          {%- endif -%}
+
+
+          {# Test schedule is not set or aktive #}
+          {%- if item.schedule is not defined or item.schedule == "-" or item.schedule == "" -%}
+            {%- set tmp.debug = tmp.debug ~ "<li>non schedule defined " ~ "</li>" -%}
+          {%- elif states(item.schedule) == 'on' -%}
+            {%- set tmp.debug = tmp.debug ~ "<li>schedule is on " ~ "</li>" -%}
+            {%- set tmp.schedule = "on" -%}
+
+          {%- elif states(item.schedule) == 'off' -%}
+            {%- set tmp.debug = tmp.debug ~ "<li>schedule is off " ~ "</li>" -%}
+            {%- set tmp.schedule = "off" -%}
+
+          {%- else -%}
+            {%- set tmp.debug = tmp.debug ~ "<li>schedule is wrong" ~ "</li>" -%}
+            {%- set tmp.schedule = "wrong" -%}
+
+          {%- endif -%}
+
+          {# Test devices is aktive #}
+          {%- if tmp.isError == false and tmp.schedule not in ["off","wrong"] -%}
+            {%- if item.devices and item.devices is string and item.devices != "-" -%}
+              {%- set test = [item.devices] -%}
+            {%- elif item.devices and item.devices is list -%}
+              {%- set test = item.devices -%}
+            {%- else -%}
+              {%- set test = [] -%}
+            {%- endif -%}
+            {%- for device in test -%}
+              {%- if device and device != "-" -%}
+                {%- set stat = states(device) -%}
+                {%- set tmp.debug = tmp.debug ~ "<li>test devicestate " ~ device ~ "=" ~ stat ~ "</li>" -%}
+                {%- if stat in ["on", "home"] -%}
+                  {%- set mystate.state = item.status -%}
+                  {%- set tmp.debug = tmp.debug ~ "<li>set state to " ~ mystate.state ~ "</li>" -%}
+                  {%- break -%}
+                {%- endif -%}
+              {%- endif -%}
+            {%- endfor -%}
+          {%- endif -%}
+          {%- set ns.debug = ns.debug + [ tmp.debug ~ "</ul>" ] -%}
+
+          {%- if mystate.state != "-" -%}
+            {{- mystate.state -}}
+          {%- endif -%}
+
+        {%- endmacro -%}
+        {#-------------------------------------------#}
+        {%- set ns = namespace() -%}
+        {%- set ns.state = states(linked_person) -%}
+        {%- set name = state_attr(linked_person, "friendly_name")  -%}
+        {%- set ns.debugmsg = "set extended state for " ~ name ~ "<hr>" -%}
+        {%- set ns.debug = [] -%}
+        {%- if linked_activitybutton and linked_activitybutton != "-" and linked_activitybutton != "" and states(linked_activitybutton) != "on" -%}
+          {%- set ns.debug = ns.debug + ["active button is off or wrong set in config"] -%}
+          {%- set ns.state = "inactive" -%}
+        {%- else -%}
+          {%- set ns.debug = ns.debug + ["active button is on or not set"] -%}
+          {%- for line in observable -%}
+            {%- set ns.debug = ns.debug + ["test state condition " ~ loop.index] -%}
+            {%- set status = getStatus(line, linked_person)  -%}
+            {%- if status is defined and status -%}
+              {%- set ns.state = status  -%}
+            {%- endif -%}
+          {%- endfor -%}
+        {%- endif -%}
+        {%- if addPersonName is defined and addPersonName -%}
+          {%- set ns.state = name~"!" ~ ns.state  -%}
+        {%- endif -%}
+
+
+        {%- if linked_text_inputs is defined and linked_text_inputs is iterable -%}
+          {%- for text_input in linked_text_inputs -%}
+            {%- if text_input and text_input != "-" -%}
+              {%- set text_value = states(text_input) -%}
+              {%- if text_value is defined and text_value is not none and text_value != 'unknown' and text_value|string|trim != '' -%}
+                {%- if text_input_mode is defined and text_input_mode == "replace" -%}
+                  {# Replace mode: Each text input REPLACES the state completely #}
+                  {%- set ns.state = text_value|string|trim -%}
+                {%- else -%}
+                  {# Append mode: Text inputs are appended to the state #}
+                  {%- if ns.state is defined and ns.state is not none and ns.state|string|trim != '' and ns.state|string|trim != 'unknown' -%}
+                    {%- set ns.state = ns.state ~ "|" ~ text_value|string|trim -%}
+                  {%- else -%}
+                    {%- set ns.state = text_value|string|trim -%}
+                  {%- endif -%}
+                {%- endif -%}
+              {%- endif -%}
+            {%- endif -%}
+          {%- endfor -%}
+        {%- endif -%}
+        {{- {"state":ns.state, "debugMsg":ns.debugmsg, "debug":ns.debug } -}}
+  - if:
+      - condition: template
+        value_template: "{{states(linked_field) != my_status.state}}"
+    then:
+      - action: input_text.set_value
+        metadata: {}
+        data:
+          value: "{{my_status.state}}"
+        target:
+          entity_id: "{{linked_field}}"
+  - if:
+      - condition: template
+        value_template: "{{debugmode}}"
+    then:
+      - action: notify.persistent_notification
+        metadata: {}
+        data:
+          title: "Debug TgPersonState"
+          message: >-
+            {# ___________________________________________________ #}
+            {%- macro dumpToHTML(val, filter=[], maxSteps=3, testJson=false, details=0, thisStep=0) -%}
+              {%- set patternMap = '^[\s]*\{[\S\s]*\}[\s]*$' -%}
+              {%- set patternList = '^[\s]*\[[\S\s]*\][\s]*$' -%}
+
+              {%- set dump = namespace() -%}
+              {%- set dump.tmp="" -%}
+              {%- set dump.val=val -%}
+              {%- set dump.valType=none -%}
+              {%- set myFilter=filter -%}
+              {%- set filter=[] -%}
+              {%- set thisStep=thisStep + 1 -%}
+
+              {%- if thisStep > maxSteps -%}
+                {%- if dump.val is list or dump.val is mapping -%} {%- set dump.tmp = dump.val|to_json -%} {%- else -%} {%- set dump.tmp = dump.val -%} {%- endif -%}
+                {%- set dump.valType="json" -%}
+              {%- else -%}
+                {%- if dump.val is string and testJson == true and ( dump.val is search(patternMap) or dump.val is search(patternList) )-%}
+                  {%- set dump.val=dump.val|replace("'", '"')|from_json -%}
+                {%- endif -%}
+                {%- if dump.val is list -%}
+                  {%- set dump.valType="list" -%}
+                  {%- set dump.tmp = dump.tmp ~ "<ul>" -%}
+                  {%- for item in dump.val -%}
+                    {%- set myDump = dumpToHTML(item, filter, maxSteps, testJson, details, thisStep)|from_json -%}
+                    {%- set dump.tmp = dump.tmp ~ "<li>" ~ myDump[1] ~ "</li>" -%}
+                  {%- endfor -%}
+                  {%- set dump.tmp = dump.tmp ~ "</ul>" -%}
+                {%- elif dump.val is mapping -%}
+                  {%- set dump.valType="dict" -%}
+                  {%- set dump.tmp = dump.tmp ~ "<ul>" -%}
+                  {%- for name, item in dump.val.items() -%}
+                    {%- if thisStep > 1 or name not in myFilter -%}
+                      {%- set preTxt = "<li>" -%}
+                      {%- set postTxt = "</li>" -%}
+                      {%- set nameTxtStart = "<b>" -%}
+                      {%- set NameTxtEnd = "</b>" -%}
+                      {%- set myDump = dumpToHTML(item, filter, maxSteps, testJson, details, thisStep)|from_json -%}
+                      {%- if details == thisStep and myDump[0] == "dict" -%}
+                        {%- set preTxt = preTxt ~ "<details>" -%}
+                        {%- set postTxt = "</details>" ~ postTxt -%}
+                        {%- set nameTxtStart = "<summary>" ~ nameTxtStart -%}
+                        {%- set NameTxtEnd = NameTxtEnd ~ "</summary>" -%}
+                      {%- endif -%}
+
+                      {%- set dump.tmp = dump.tmp ~ preTxt ~ nameTxtStart ~ name ~ ": " ~ NameTxtEnd ~ myDump[1] ~ postTxt -%}
+                    {%- endif -%}
+                  {%- endfor -%}
+                  {%- set dump.tmp = dump.tmp ~ "</ul>" -%}
+                {%- elif dump.val is string or dump.val is number -%}
+                  {%- set dump.tmp = dump.tmp ~ " " ~ dump.val ~ "" -%}
+                  {%- set dump.valType="string" -%}
+                {%- endif -%}
+              {%- endif -%}
+
+              {%- if thisStep == 1 -%}
+                {{- dump.tmp -}}
+              {%- else -%}
+                {{- [dump.valType, dump.tmp]|to_json -}}
+              {%- endif -%}
+            {%- endmacro -%}
+            {{ my_status.debugMsg ~ dumpToHTML(my_status, ["debugMsg"], 5, true, 2) }}
+            <hr>triggered by: <ul><li>{%- if "id" in trigger -%}{{- trigger["id"] }}{%- endif %} [<i>{%- if "entity_id" in trigger -%}{{- trigger["entity_id"] }}{%- else -%}{{- trigger -}}{%- endif -%}</i>]</li></ul>
+
+
+
+mode: single

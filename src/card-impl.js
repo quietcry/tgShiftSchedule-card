@@ -25,7 +25,6 @@ export class CardImpl extends CardBase {
       numberOfMonths: 14,
       initialDisplayedMonths: 2,
       useElements: false,
-      mode: 'single',
       selectedElement: null,
       elements: [
         { benennung: 'Element 1', aktiv: true, color: '#ff0000', shortcut: '1' },
@@ -50,14 +49,13 @@ export class CardImpl extends CardBase {
       entity: 'input_text.arbeitszeiten',
       numberOfMonths: 14,
       initialDisplayedMonths: 2,
-      mode: 'single',
-      selectedCalendar: 'a', // Standardkalender
+      selectedCalendar: 'a', // Erster aktivierter Kalender
       calendars: [
-        { shortcut: 'a', name: 'Standardkalender', color: '#ff9800', enabled: true },
-        { shortcut: 'b', name: 'Kalender B', color: '#ff0000', enabled: false },
-        { shortcut: 'c', name: 'Kalender C', color: '#00ff00', enabled: false },
-        { shortcut: 'd', name: 'Kalender D', color: '#0000ff', enabled: false },
-        { shortcut: 'e', name: 'Kalender E', color: '#ffff00', enabled: false },
+        { shortcut: 'a', name: 'Kalender A', color: '#ff9800', enabled: true, statusRelevant: true },
+        { shortcut: 'b', name: 'Kalender B', color: '#ff0000', enabled: false, statusRelevant: true },
+        { shortcut: 'c', name: 'Kalender C', color: '#00ff00', enabled: false, statusRelevant: true },
+        { shortcut: 'd', name: 'Kalender D', color: '#0000ff', enabled: false, statusRelevant: true },
+        { shortcut: 'e', name: 'Kalender E', color: '#ffff00', enabled: false, statusRelevant: true },
       ],
     };
   }

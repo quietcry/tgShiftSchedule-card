@@ -7,9 +7,9 @@ export class ShiftScheduleView extends ViewBase {
   // Zentrale Definition der Standardfarbe für ausgewählte Tage im Single-Modus
   static DEFAULT_SELECTED_DAY_COLOR = '#ff9800'; // Orange
 
-  // Fixe Schicht-Definition: Standard (a) + 4 weitere (b, c, d, e)
+  // Fixe Schicht-Definition: 5 gleichberechtigte Schichten (a, b, c, d, e)
   static CALENDARS = [
-    { shortcut: 'a', name: 'Standardschicht', defaultColor: '#ff9800' },
+    { shortcut: 'a', name: 'Schicht A', defaultColor: '#ff9800' },
     { shortcut: 'b', name: 'Schicht B', defaultColor: '#ff0000' },
     { shortcut: 'c', name: 'Schicht C', defaultColor: '#00ff00' },
     { shortcut: 'd', name: 'Schicht D', defaultColor: '#0000ff' },
@@ -23,6 +23,7 @@ export class ShiftScheduleView extends ViewBase {
       config: { type: Object },
       _workingDays: { type: Object },
       _storageWarning: { type: Object },
+      _configWarning: { type: Object },
       _displayedMonths: { type: Number },
       _startMonthOffset: { type: Number },
       _selectedCalendar: { type: String },
@@ -33,18 +34,174 @@ export class ShiftScheduleView extends ViewBase {
     super();
     this._workingDays = {}; // {"year:month": {day: [elements]}} - z.B. {"25:11": {1: ["a"], 2: ["a", "h"], 3: ["b"]}}
     this._storageWarning = null; // { show: boolean, currentLength: number, maxLength: number, percentage: number }
+    this._configWarning = null; // { show: boolean, configEntityId: string }
     this._knownEntityIds = null; // Cache für bekannte Entities [mainEntity, ...additionalEntities]
     this._cleanupDone = false; // Flag, ob die Bereinigung bereits beim initialen Laden ausgeführt wurde
     this._displayedMonths = 2; // Anzahl der angezeigten Monate (wird aus config.numberOfMonths initialisiert)
     this._startMonthOffset = 0; // Offset für den Startmonat (0 = aktueller Monat, -1 = Vormonat, +1 = nächster Monat)
     this._isWriting = false; // Flag, ob gerade geschrieben wird
     this._writeLockTimer = null; // Timer für das 5-Sekunden-Lock nach dem Schreiben
-    this._selectedCalendar = 'a'; // Shortcut des ausgewählten Kalenders (Standard: 'a')
+    this._selectedCalendar = null; // Shortcut des ausgewählten Kalenders (wird beim Setzen der Config initialisiert)
   }
 
   // Formatiert eine Zahl auf zwei Ziffern (z.B. 1 -> "01", 25 -> "25")
   formatTwoDigits(num) {
     return String(num).padStart(2, '0');
+  }
+
+  // Berechnet die Kontrastfarbe (schwarz oder weiß) für eine gegebene Hintergrundfarbe
+  _getContrastColor(hexColor) {
+    if (!hexColor) return '#000000';
+
+    // Entferne # falls vorhanden
+    const hex = hexColor.replace('#', '');
+
+    // Konvertiere zu RGB
+    const r = parseInt(hex.substr(0, 2), 16);
+    const g = parseInt(hex.substr(2, 2), 16);
+    const b = parseInt(hex.substr(4, 2), 16);
+
+    // Berechne relative Luminanz (nach WCAG)
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+
+    // Wenn Luminanz > 0.5, verwende schwarz, sonst weiß
+    return luminance > 0.5 ? '#000000' : '#ffffff';
+  }
+
+  // Berechnet das Osterdatum für ein gegebenes Jahr (nach Gauß-Algorithmus)
+  _getEasterDate(year) {
+    const a = year % 19;
+    const b = Math.floor(year / 100);
+    const c = year % 100;
+    const d = Math.floor(b / 4);
+    const e = b % 4;
+    const f = Math.floor((b + 8) / 25);
+    const g = Math.floor((b - f + 1) / 3);
+    const h = (19 * a + b - d - g + 15) % 30;
+    const i = Math.floor(c / 4);
+    const k = c % 4;
+    const l = (32 + 2 * e + 2 * i - h - k) % 7;
+    const m = Math.floor((a + 11 * h + 22 * l) / 451);
+    const month = Math.floor((h + l - 7 * m + 114) / 31);
+    const day = ((h + l - 7 * m + 114) % 31) + 1;
+    return new Date(year, month - 1, day);
+  }
+
+  // Prüft ob ein Datum ein Feiertag ist
+  // Versucht zuerst Home Assistant Holiday-Sensoren zu verwenden, falls vorhanden
+  _isHoliday(year, month, day) {
+    // Prüfe ob Home Assistant Holiday-Sensoren verfügbar sind
+    if (this._hass && this._hass.states) {
+      // Suche nach Holiday-Sensoren (z.B. sensor.germany_holidays, sensor.holidays, etc.)
+      const holidayEntities = Object.keys(this._hass.states).filter(entityId => {
+        return entityId.startsWith('sensor.') &&
+               (entityId.includes('holiday') || entityId.includes('feiertag')) &&
+               this._hass.states[entityId].state === 'on';
+      });
+
+      if (holidayEntities.length > 0) {
+        // Prüfe ob das Datum in den Holiday-Attributen enthalten ist
+        for (const entityId of holidayEntities) {
+          const entity = this._hass.states[entityId];
+          if (entity && entity.attributes) {
+            // Prüfe verschiedene mögliche Attribute-Formate
+            const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            const dateStrShort = `${String(day).padStart(2, '0')}.${String(month + 1).padStart(2, '0')}.${year}`;
+
+            // Prüfe verschiedene Attribute-Namen
+            const possibleAttrs = ['dates', 'holidays', 'feiertage', 'date', 'next_date', 'upcoming'];
+            for (const attr of possibleAttrs) {
+              if (entity.attributes[attr]) {
+                const attrValue = entity.attributes[attr];
+                if (Array.isArray(attrValue)) {
+                  if (attrValue.some(d => d === dateStr || d === dateStrShort || d.includes(dateStr) || d.includes(dateStrShort))) {
+                    return true;
+                  }
+                } else if (typeof attrValue === 'string') {
+                  if (attrValue.includes(dateStr) || attrValue.includes(dateStrShort)) {
+                    return true;
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Hole Feiertags-Konfiguration aus der Config (Standard: alle aktiviert)
+    const holidaysConfig = this.config?.holidays || {};
+    const isHolidayEnabled = (key) => holidaysConfig[key] !== false; // Default: true wenn nicht gesetzt
+
+    // Fallback: Berechne deutsche Feiertage selbst
+    const easter = this._getEasterDate(year);
+
+    // Feste Feiertage mit Konfigurationsprüfung
+    const fixedHolidays = [
+      { month: 0, day: 1, key: 'neujahr' },   // Neujahr
+      { month: 0, day: 6, key: 'heilige_drei_koenige' },   // Heilige Drei Könige
+      { month: 4, day: 1, key: 'tag_der_arbeit' },   // Tag der Arbeit
+      { month: 7, day: 8, key: 'friedensfest' },   // Friedensfest (nur in Augsburg)
+      { month: 7, day: 15, key: 'mariae_himmelfahrt' },  // Mariä Himmelfahrt
+      { month: 9, day: 3, key: 'tag_der_deutschen_einheit' },   // Tag der Deutschen Einheit
+      { month: 9, day: 31, key: 'reformationstag' },  // Reformationstag
+      { month: 10, day: 1, key: 'allerheiligen' },  // Allerheiligen
+      { month: 11, day: 25, key: 'weihnachten_1' }, // 1. Weihnachtsfeiertag
+      { month: 11, day: 26, key: 'weihnachten_2' }, // 2. Weihnachtsfeiertag
+    ];
+
+    // Prüfe feste Feiertage
+    for (const holiday of fixedHolidays) {
+      if (month === holiday.month && day === holiday.day && isHolidayEnabled(holiday.key)) {
+        return true;
+      }
+    }
+
+    // Bewegliche Feiertage (abhängig von Ostern)
+    const easterTime = easter.getTime();
+    const oneDay = 24 * 60 * 60 * 1000;
+
+    // Buß- und Bettag: Mittwoch vor dem 23. November (oder am 23. November, falls es ein Mittwoch ist)
+    const nov23 = new Date(year, 10, 23); // 23. November (month ist 0-basiert)
+    const dayOfWeekNov23 = nov23.getDay(); // 0 = Sonntag, 1 = Montag, ..., 3 = Mittwoch, ..., 6 = Samstag
+    // Berechne wie viele Tage zurück zum Mittwoch
+    // Wenn Mittwoch (3): 0 Tage zurück
+    // Wenn Donnerstag (4): 1 Tag zurück → 4 - 3 = 1
+    // Wenn Freitag (5): 2 Tage zurück → 5 - 3 = 2
+    // Wenn Samstag (6): 3 Tage zurück → 6 - 3 = 3
+    // Wenn Sonntag (0): 4 Tage zurück → (0 + 7) - 3 = 4
+    // Wenn Montag (1): 5 Tage zurück → (1 + 7) - 3 = 5
+    // Wenn Dienstag (2): 6 Tage zurück → (2 + 7) - 3 = 6
+    const daysToSubtract = dayOfWeekNov23 <= 3 ? (3 - dayOfWeekNov23) : ((dayOfWeekNov23 + 7) - 3);
+    const busstag = new Date(year, 10, 23 - daysToSubtract);
+
+    const movableHolidays = [
+      { date: new Date(easterTime - 2 * oneDay), key: 'karfreitag' },  // Karfreitag
+      { date: new Date(easterTime + 1 * oneDay), key: 'ostermontag' },  // Ostermontag
+      { date: new Date(easterTime + 39 * oneDay), key: 'christi_himmelfahrt' }, // Christi Himmelfahrt
+      { date: new Date(easterTime + 50 * oneDay), key: 'pfingstmontag' }, // Pfingstmontag
+      { date: new Date(easterTime + 60 * oneDay), key: 'fronleichnam' }, // Fronleichnam (nur in bestimmten Bundesländern)
+      { date: busstag, key: 'busstag' }, // Buß- und Bettag (nur in Sachsen)
+    ];
+
+    // Prüfe bewegliche Feiertage
+    for (const holiday of movableHolidays) {
+      if (holiday.date.getFullYear() === year &&
+          holiday.date.getMonth() === month &&
+          holiday.date.getDate() === day &&
+          isHolidayEnabled(holiday.key)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  // Prüft ob ein Datum ein Wochenende ist
+  _isWeekend(year, month, day) {
+    const date = new Date(year, month, day);
+    const dayOfWeek = date.getDay();
+    return dayOfWeek === 0 || dayOfWeek === 6; // Sonntag = 0, Samstag = 6
   }
 
   set hass(hass) {
@@ -79,6 +236,8 @@ export class ShiftScheduleView extends ViewBase {
       if (hasAnyEntityChanged) {
         this.loadWorkingDays();
       }
+      // Prüfe Config-Entity bei jedem hass-Update (kann sich ändern)
+      this.checkConfigEntity();
     }
     this.requestUpdate();
   }
@@ -142,17 +301,25 @@ export class ShiftScheduleView extends ViewBase {
             );
           }
         } else {
-          // Fallback: Standardkalender (a) - sollte immer aktiviert sein
-          this._selectedCalendar = 'a';
-          if (config) {
-            config.selectedCalendar = 'a';
-            this.dispatchEvent(
-              new CustomEvent('config-changed', {
-                detail: { config: config },
-                bubbles: true,
-                composed: true,
-              })
-            );
+          // Ausgewählter Kalender ist nicht aktiviert, verwende den ersten aktivierten
+          if (allCalendars.length > 0) {
+            this._selectedCalendar = allCalendars[0].shortcut;
+            if (config) {
+              config.selectedCalendar = this._selectedCalendar;
+              this.dispatchEvent(
+                new CustomEvent('config-changed', {
+                  detail: { config: config },
+                  bubbles: true,
+                  composed: true,
+                })
+              );
+            }
+          } else {
+            // Kein Kalender aktiviert - keine automatische Aktivierung
+            this._selectedCalendar = null;
+            if (config) {
+              config.selectedCalendar = null;
+            }
           }
         }
       }
@@ -171,23 +338,18 @@ export class ShiftScheduleView extends ViewBase {
           );
         }
       } else {
-        // Fallback: Standardkalender (a)
-        this._selectedCalendar = 'a';
+        // Kein Kalender aktiviert - keine automatische Aktivierung
+        this._selectedCalendar = null;
         if (config) {
-          config.selectedCalendar = 'a';
-          this.dispatchEvent(
-            new CustomEvent('config-changed', {
-              detail: { config: config },
-              bubbles: true,
-              composed: true,
-            })
-          );
+          config.selectedCalendar = null;
         }
       }
     }
 
     if (this._hass) {
       this.loadWorkingDays();
+      this.checkConfigEntity();
+      this.saveConfigToEntity();
     }
     this.requestUpdate();
   }
@@ -562,6 +724,195 @@ export class ShiftScheduleView extends ViewBase {
     this.requestUpdate();
   }
 
+  getConfigEntityId() {
+    // Leite die Config-Entity-ID aus der Haupt-Entity ab
+    if (!this._config || !this._config.entity) {
+      return null;
+    }
+    // Füge "_config" an die Entity-ID an
+    // z.B. "input_text.arbeitszeiten" -> "input_text.arbeitszeiten_config"
+    return this._config.entity + '_config';
+  }
+
+  checkConfigEntity() {
+    // Prüfe ob die Config-Entity existiert
+    if (!this._hass || !this._config || !this._config.entity) {
+      this._configWarning = null;
+      this.requestUpdate();
+      return;
+    }
+
+    const configEntityId = this.getConfigEntityId();
+    if (!configEntityId) {
+      this._configWarning = null;
+      this.requestUpdate();
+      return;
+    }
+
+    const configEntity = this._hass.states[configEntityId];
+    if (!configEntity) {
+      this._configWarning = {
+        show: true,
+        type: 'missing',
+        configEntityId: configEntityId,
+      };
+    } else {
+      // Prüfe ob es eine Größen-Warnung gibt, die beibehalten werden soll
+      if (this._configWarning && this._configWarning.type === 'size') {
+        // Behalte die Größen-Warnung
+      } else {
+        this._configWarning = null;
+      }
+    }
+
+    this.requestUpdate();
+  }
+
+  async saveConfigToEntity() {
+    // Speichere die Konfiguration in der Config-Entity
+    if (!this._hass || !this._config || !this._config.entity) {
+      return;
+    }
+
+    const configEntityId = this.getConfigEntityId();
+    if (!configEntityId) {
+      return;
+    }
+
+    // Prüfe ob die Entity existiert
+    const configEntity = this._hass.states[configEntityId];
+    if (!configEntity) {
+      // Entity existiert nicht, zeige Warnung
+      this.checkConfigEntity();
+      return;
+    }
+
+    // Sammle aktive Schichten als Array mit Subarrays [shortcut, name, start1, end1, start2, end2, statusRelevant]
+    // Reihenfolge: [0] = shortcut, [1] = name, [2] = Startzeit 1, [3] = Endzeit 1, [4] = Startzeit 2, [5] = Endzeit 2, [6] = statusRelevant (0 oder 1)
+    // Leere Positionen bleiben leer (null) wenn Zeiträume nicht gesetzt sind
+    const activeShifts = [];
+    if (this._config.calendars) {
+      for (const calendar of this._config.calendars) {
+        if (calendar && calendar.shortcut && (calendar.enabled === true || calendar.enabled === 'true' || calendar.enabled === 1)) {
+          const shiftData = [
+            calendar.shortcut,
+            calendar.name || `Schicht ${calendar.shortcut.toUpperCase()}`,
+          ];
+
+          // Füge Zeiträume hinzu (feste Positionen, flach ohne Verschachtelung)
+          if (calendar.timeRanges && Array.isArray(calendar.timeRanges)) {
+            // Zeitraum 1: [2] = Startzeit 1, [3] = Endzeit 1
+            const range1 = calendar.timeRanges[0];
+            if (range1 && Array.isArray(range1) && range1.length >= 2) {
+              const start1 = range1[0] && range1[0].trim() !== '' ? range1[0].trim() : null;
+              const end1 = range1[1] && range1[1].trim() !== '' ? range1[1].trim() : null;
+              // Nur hinzufügen wenn beide Zeiten gesetzt sind (vollständiger Zeitraum)
+              if (start1 && end1) {
+                shiftData.push(start1, end1);
+              } else {
+                shiftData.push(null, null);
+              }
+            } else {
+              shiftData.push(null, null);
+            }
+
+            // Zeitraum 2: [4] = Startzeit 2, [5] = Endzeit 2
+            const range2 = calendar.timeRanges[1];
+            if (range2 && Array.isArray(range2) && range2.length >= 2) {
+              const start2 = range2[0] && range2[0].trim() !== '' ? range2[0].trim() : null;
+              const end2 = range2[1] && range2[1].trim() !== '' ? range2[1].trim() : null;
+              // Nur hinzufügen wenn beide Zeiten gesetzt sind (vollständiger Zeitraum)
+              if (start2 && end2) {
+                shiftData.push(start2, end2);
+              } else {
+                shiftData.push(null, null);
+              }
+            } else {
+              shiftData.push(null, null);
+            }
+          } else {
+            // Keine Zeiträume definiert, füge leere Positionen hinzu
+            shiftData.push(null, null, null, null);
+          }
+
+          // Füge statusRelevant hinzu: [6] = statusRelevant (0 oder 1)
+          // Default: true (1), wenn nicht explizit auf false gesetzt
+          const statusRelevant = calendar.statusRelevant !== false ? 1 : 0;
+          shiftData.push(statusRelevant);
+
+          activeShifts.push(shiftData);
+        }
+      }
+    }
+
+    // Speichere als JSON (direktes Array, kein Objekt-Wrapper)
+    let configJson = JSON.stringify(activeShifts);
+
+    // Entferne die äußere Klammer (erstes [ und letztes ])
+    if (configJson.startsWith('[') && configJson.endsWith(']')) {
+      configJson = configJson.slice(1, -1);
+    }
+
+    // Entferne "null" aus dem String (behalte Kommas)
+    // Wiederhole die Ersetzung, bis keine null mehr vorhanden sind (für mehrere null hintereinander)
+    let previousLength;
+    do {
+      previousLength = configJson.length;
+      // Ersetze ,null, durch ,, (mehrfach, bis keine null mehr vorhanden sind)
+      configJson = configJson.replace(/,null,/g, ',,');
+      // Ersetze ,null] durch ,] (falls am Ende eines Arrays)
+      configJson = configJson.replace(/,null\]/g, ',]');
+      // Ersetze [null, durch [, (falls am Anfang eines Arrays)
+      configJson = configJson.replace(/\[null,/g, '[,');
+      // Ersetze ,null, am Ende des Strings (falls letztes Element null ist)
+      configJson = configJson.replace(/,null$/g, ',');
+    } while (configJson.length !== previousLength);
+
+    // Entferne Anführungszeichen um Strings
+    // Ersetze "," durch , (Anführungszeichen um Kommas)
+    configJson = configJson.replace(/","/g, ',');
+    // Ersetze [" durch [ (Anführungszeichen am Anfang eines Arrays)
+    configJson = configJson.replace(/\["/g, '[');
+    // Ersetze "] durch ] (Anführungszeichen am Ende eines Arrays)
+    configJson = configJson.replace(/"\]/g, ']');
+    // Ersetze ," durch , (Anführungszeichen nach Komma)
+    configJson = configJson.replace(/,"/g, ',');
+    // Ersetze ", durch , (Anführungszeichen vor Komma)
+    configJson = configJson.replace(/",/g, ',');
+
+    const configJsonLength = configJson.length;
+
+    // Prüfe ob der JSON-Text in das Entity passt
+    const maxLength = this.getEntityMaxLength(configEntityId);
+    if (maxLength !== null && configJsonLength > maxLength) {
+      // JSON ist zu lang, zeige Warnung
+      const percentage = (configJsonLength / maxLength) * 100;
+      this._configWarning = {
+        show: true,
+        type: 'size',
+        configEntityId: configEntityId,
+        currentLength: configJsonLength,
+        maxLength: maxLength,
+        percentage: Math.round(percentage * 10) / 10,
+      };
+      this.requestUpdate();
+      return;
+    }
+
+    try {
+      await this._hass.callService('input_text', 'set_value', {
+        entity_id: configEntityId,
+        value: configJson,
+      });
+      // Warnung entfernen, da Entity existiert und erfolgreich beschrieben wurde
+      this._configWarning = null;
+      this.requestUpdate();
+    } catch (error) {
+      // Fehler beim Schreiben - könnte bedeuten, dass Entity nicht existiert
+      this.checkConfigEntity();
+    }
+  }
+
   serializeWorkingDays() {
     const parts = [];
     // Sortiere nach Jahr:Monat
@@ -858,26 +1209,11 @@ export class ShiftScheduleView extends ViewBase {
     const selectedCalendarShortcut = this._getSelectedCalendarShortcut();
 
     if (!selectedCalendarShortcut) {
-      // Fallback: Standardkalender (a)
-      const defaultShortcut = 'a';
-      if (!this._workingDays[key][dayNum]) {
-        this._workingDays[key][dayNum] = [];
-      }
-      const elements = this._workingDays[key][dayNum];
-      const elementIndex = elements.indexOf(defaultShortcut);
-      if (elementIndex > -1) {
-        elements.splice(elementIndex, 1);
-        if (elements.length === 0) {
-          delete this._workingDays[key][dayNum];
-          if (Object.keys(this._workingDays[key]).length === 0) {
-            delete this._workingDays[key];
-          }
-        }
-      } else {
-        elements.push(defaultShortcut);
-      }
-    } else {
-      // Tag mit Kalender
+      // Kein Kalender ausgewählt - kann nicht togglen
+      return;
+    }
+
+    // Tag mit Kalender
       if (!this._workingDays[key][dayNum]) {
         this._workingDays[key][dayNum] = [];
       }
@@ -909,8 +1245,6 @@ export class ShiftScheduleView extends ViewBase {
           this._workingDays[key][dayNum] = elements;
         }
       }
-    }
-
 
     const serializedData = this.serializeWorkingDays();
 
@@ -974,21 +1308,49 @@ export class ShiftScheduleView extends ViewBase {
     const selectedCalendar = this._getCalendarByShortcut(selectedShortcut);
     let buttonStyle = '';
 
-    // isWorking sollte nur true sein, wenn der ausgewählte Kalender aktiv ist
-    const isWorking = hasSelectedShift;
-
-    // Im Modus "single": Verwende Orange für ausgewählte Tage (nur wenn Kalender "a" aktiv ist)
-    if (this._config?.mode === 'single' && isWorking) {
-      buttonStyle = `background-color: ${ShiftScheduleView.DEFAULT_SELECTED_DAY_COLOR};`;
-    } else if (hasSelectedShift && selectedCalendar && selectedCalendar.color) {
-      // In Advanced-Modi: Verwende die Farbe des ausgewählten Kalenders
-      buttonStyle = `background-color: ${selectedCalendar.color};`;
+    // Finde die erste aktivierte Schicht (in der Reihenfolge a, b, c, d, e)
+    // die an diesem Tag aktiv ist
+    let firstActiveShift = null;
+    const shiftOrder = ['a', 'b', 'c', 'd', 'e'];
+    for (const shortcut of shiftOrder) {
+      if (dayElements.includes(shortcut)) {
+        const calendar = this._getCalendarByShortcut(shortcut);
+        if (calendar && calendar.enabled) {
+          firstActiveShift = shortcut;
+          break;
+        }
+      }
     }
 
-        // Erstelle visuelle Darstellung der Kalender (alle außer dem ausgewählten)
+    // Bestimme welche Schicht den Tag färben soll
+    let activeShiftForColor = null;
+    if (hasSelectedShift && selectedCalendar && selectedCalendar.enabled) {
+      // Wenn der ausgewählte Kalender aktiv ist, verwende diesen
+      activeShiftForColor = selectedShortcut;
+    } else if (firstActiveShift) {
+      // Ansonsten verwende die erste aktivierte Schicht
+      activeShiftForColor = firstActiveShift;
+    }
+
+    // isWorking ist true, wenn eine Schicht den Tag färbt
+    const isWorking = activeShiftForColor !== null;
+
+    // Verwende die Farbe der aktiven Schicht
+    if (activeShiftForColor) {
+      const activeCalendar = this._getCalendarByShortcut(activeShiftForColor);
+      if (activeCalendar && activeCalendar.color) {
+        buttonStyle = `background-color: ${activeCalendar.color};`;
+      }
+    }
+
+    // Prüfe ob es ein Wochenende oder Feiertag ist
+    const isWeekend = this._isWeekend(year, month, currentDay);
+    const isHoliday = this._isHoliday(year, month, currentDay);
+
+        // Erstelle visuelle Darstellung der Kalender (alle außer der Schicht, die den Tag färbt)
         // Nur aktivierte Kalender werden angezeigt
         const shiftIndicators = dayElements
-          .filter(shortcut => shortcut !== selectedShortcut) // Filtere den ausgewählten Kalender heraus
+          .filter(shortcut => shortcut !== activeShiftForColor) // Filtere die Schicht heraus, die den Tag färbt
           .map(shortcut => {
             const calendar = this._getCalendarByShortcut(shortcut);
             // Nur anzeigen, wenn der Kalender aktiviert ist
@@ -1008,7 +1370,7 @@ export class ShiftScheduleView extends ViewBase {
     return html`
       <td>
         <button
-          class="day-button ${isWorking ? 'working' : ''} ${isToday ? 'today' : ''} ${isPreviousMonth ? 'readonly' : ''}"
+          class="day-button ${isWorking ? 'working' : ''} ${isToday ? 'today' : ''} ${isPreviousMonth ? 'readonly' : ''} ${isWeekend ? 'weekend' : ''} ${isHoliday ? 'holiday' : ''}"
           style="${buttonStyle}"
           @click=${() => !isPreviousMonth && this.toggleDay(monthKey, currentDay, yearKey)}
           ?disabled=${isPreviousMonth}
@@ -1177,8 +1539,13 @@ export class ShiftScheduleView extends ViewBase {
       return this._selectedCalendar;
     }
 
-    // Fallback: Standardkalender (a)
-    return 'a';
+    // Fallback: Verwende den ersten aktivierten Kalender
+    const allCalendars = this._getAllCalendars();
+    if (allCalendars.length > 0) {
+      return allCalendars[0].shortcut;
+    }
+    // Wenn kein Kalender aktiviert ist, gibt es keinen Fallback
+    return null;
   }
 
   _getCalendarByShortcut(shortcut) {
@@ -1206,16 +1573,15 @@ export class ShiftScheduleView extends ViewBase {
     const allCalendars = this._getAllCalendars();
 
     if (allCalendars.length === 0) {
-      // Wenn keine Kalender aktiviert sind, verwende Standardkalender (a)
-      // Stelle sicher, dass Standardkalender immer verfügbar ist
-      if (this._selectedCalendar !== 'a') {
-        this._selectedCalendar = 'a';
+      // Wenn keine Kalender aktiviert sind, gibt es keinen ausgewählten Kalender
+      if (this._selectedCalendar !== null) {
+        this._selectedCalendar = null;
         if (this._config) {
-          this._config.selectedCalendar = 'a';
+          this._config.selectedCalendar = null;
         }
         this.requestUpdate();
       }
-      return 'a';
+      return null;
     }
 
     // Wenn _selectedCalendar noch nicht gesetzt ist, setze es auf den ersten aktivierten Kalender
@@ -1264,6 +1630,8 @@ export class ShiftScheduleView extends ViewBase {
             composed: true,
           })
         );
+        // Speichere die Config in die Entity
+        this.saveConfigToEntity();
       }
 
       this.requestUpdate();
@@ -1347,6 +1715,8 @@ export class ShiftScheduleView extends ViewBase {
           composed: true,
         })
       );
+      // Speichere die Config in die Entity
+      this.saveConfigToEntity();
       // Aktualisiere die Ansicht, damit der Dropdown den Wert anzeigt
       this.requestUpdate();
       return '1'; // 1-basiert: erstes Element = 1
@@ -1406,6 +1776,8 @@ export class ShiftScheduleView extends ViewBase {
           composed: true,
         })
       );
+      // Speichere die Config in die Entity
+      this.saveConfigToEntity();
     }
 
     this.requestUpdate();
@@ -1429,12 +1801,13 @@ export class ShiftScheduleView extends ViewBase {
       months.push({ year, month });
     }
 
-    const hasWarning = this._storageWarning && this._storageWarning.show;
+    const hasStorageWarning = this._storageWarning && this._storageWarning.show;
+    const hasConfigWarning = this._configWarning && this._configWarning.show;
     const navBounds = this.getNavigationBounds();
 
     return html`
-      <div class="calendar-wrapper ${hasWarning ? 'storage-warning-active' : ''}">
-        ${hasWarning
+      <div class="calendar-wrapper ${hasStorageWarning ? 'storage-warning-active' : ''}">
+        ${hasStorageWarning
           ? html`
               <div class="storage-warning">
                 <div class="warning-icon">⚠️</div>
@@ -1447,6 +1820,44 @@ export class ShiftScheduleView extends ViewBase {
                   <div class="warning-action">
                     Bitte legen Sie ein zusätzliches Input-Text-Feld an (z.B. ${this._config.entity}_${String(this.findAdditionalEntities(this._config.entity).length + 1).padStart(3, '0')}).
                   </div>
+                </div>
+              </div>
+            `
+          : ''}
+        ${hasConfigWarning
+          ? html`
+              <div class="storage-warning">
+                <div class="warning-icon">⚠️</div>
+                <div class="warning-content">
+                  ${this._configWarning.type === 'missing'
+                    ? html`
+                        <div class="warning-title">Konfigurations-Entity fehlt!</div>
+                        <div class="warning-message">
+                          Die Konfigurations-Entity <code>${this._configWarning.configEntityId}</code> wurde nicht gefunden.
+                        </div>
+                        <div class="warning-action">
+                          Bitte legen Sie diese Entity in Ihrer <code>configuration.yaml</code> an:
+                          <pre>input_text:
+  ${this._configWarning.configEntityId.replace('input_text.', '')}:
+    name: Schichtplan Konfiguration
+    initial: ""</pre>
+                        </div>
+                      `
+                    : html`
+                        <div class="warning-title">Konfigurations-Entity zu klein!</div>
+                        <div class="warning-message">
+                          Die Konfiguration passt nicht in die Entity <code>${this._configWarning.configEntityId}</code>.
+                          ${this._configWarning.percentage}% der verfügbaren Speicherkapazität benötigt
+                          (${this._configWarning.currentLength} / ${this._configWarning.maxLength} Zeichen).
+                        </div>
+                        <div class="warning-action">
+                          Bitte erhöhen Sie die maximale Länge der Entity in Ihrer <code>configuration.yaml</code>:
+                          <pre>input_text:
+  ${this._configWarning.configEntityId.replace('input_text.', '')}:
+    name: Schichtplan Konfiguration
+    max: ${Math.ceil(this._configWarning.currentLength * 1.2)}</pre>
+                        </div>
+                      `}
                 </div>
               </div>
             `
@@ -1481,36 +1892,40 @@ export class ShiftScheduleView extends ViewBase {
             title="Nächster Monat">
             →
           </button>
-          ${this._config?.mode !== 'single'
-            ? (() => {
-                const allCalendars = this._getAllCalendars();
-                const selectedValue = this._getSelectedCalendarValue();
-                return html`
-                  <div class="calendar-selector">
-                    <ha-select
-                      .value=${selectedValue || 'a'}
-                      @selected=${(e) => {
-                        const index = e.detail?.index;
-                        if (index !== undefined && index !== null && index >= 0 && allCalendars[index]) {
-                          const selectedCalendar = allCalendars[index];
-                          this._onCalendarSelectedByIndex(selectedCalendar.shortcut);
-                        }
-                      }}
-                      naturalMenuWidth
-                      fixedMenuPosition
-                    >
-                      ${allCalendars.map(calendar => {
-                        return html`
-                          <mwc-list-item value="${calendar.shortcut}">
-                            ${calendar.name || `Schicht ${calendar.shortcut.toUpperCase()}`}
-                          </mwc-list-item>
-                        `;
-                      })}
-                    </ha-select>
-                  </div>
-                `;
-              })()
-            : ''}
+          ${(() => {
+              const allCalendars = this._getAllCalendars();
+              const selectedValue = this._getSelectedCalendarValue();
+              return html`
+                <div class="calendar-selector">
+                  <ha-select
+                    .value=${selectedValue || 'a'}
+                    @selected=${(e) => {
+                      const index = e.detail?.index;
+                      if (index !== undefined && index !== null && index >= 0 && allCalendars[index]) {
+                        const selectedCalendar = allCalendars[index];
+                        this._onCalendarSelectedByIndex(selectedCalendar.shortcut);
+                      }
+                    }}
+                    naturalMenuWidth
+                    fixedMenuPosition
+                  >
+                    ${allCalendars.map(calendar => {
+                      const bgColor = calendar.color || '';
+                      const textColor = calendar.color ? this._getContrastColor(calendar.color) : '';
+                      return html`
+                        <mwc-list-item
+                          value="${calendar.shortcut}"
+                          data-calendar-color="${bgColor}"
+                          data-calendar-text-color="${textColor}"
+                          style="${bgColor ? `--calendar-bg-color: ${bgColor}; --calendar-text-color: ${textColor};` : ''}">
+                          ${calendar.name || `Schicht ${calendar.shortcut.toUpperCase()}`}
+                        </mwc-list-item>
+                      `;
+                    })}
+                  </ha-select>
+                </div>
+              `;
+            })()}
         </div>
         <div class="calendar-container">
           ${months.map(({ year, month }) => this.renderMonth(year, month))}
@@ -1599,6 +2014,38 @@ export class ShiftScheduleView extends ViewBase {
 
       .calendar-selector ha-select {
         width: 100%;
+      }
+
+      /* Stelle sicher, dass alle Items die Schichtfarbe als Hintergrund haben */
+      .calendar-selector mwc-list-item[data-calendar-color] {
+        background-color: var(--calendar-bg-color) !important;
+        color: var(--calendar-text-color) !important;
+      }
+
+      /* Stelle sicher, dass auch das ausgewählte/aktivierte Item die Schichtfarbe behält */
+      .calendar-selector mwc-list-item[data-calendar-color][selected],
+      .calendar-selector mwc-list-item[data-calendar-color][activated],
+      .calendar-selector mwc-list-item[data-calendar-color].selected,
+      .calendar-selector mwc-list-item[data-calendar-color].activated {
+        background-color: var(--calendar-bg-color) !important;
+        color: var(--calendar-text-color) !important;
+        --mdc-list-item-selected-background-color: var(--calendar-bg-color) !important;
+        --mdc-list-item-activated-background-color: var(--calendar-bg-color) !important;
+      }
+
+      /* Überschreibe die Standard-Hintergrundfarbe für ausgewählte Items (::before Pseudo-Element) */
+      .calendar-selector mwc-list-item[data-calendar-color][selected]::before,
+      .calendar-selector mwc-list-item[data-calendar-color][activated]::before,
+      .calendar-selector mwc-list-item[data-calendar-color].selected::before,
+      .calendar-selector mwc-list-item[data-calendar-color].activated::before {
+        background-color: var(--calendar-bg-color) !important;
+        opacity: 1 !important;
+      }
+
+      /* Überschreibe auch für den Hover-State */
+      .calendar-selector mwc-list-item[data-calendar-color]:hover {
+        background-color: var(--calendar-bg-color) !important;
+        opacity: 0.9 !important;
       }
 
       .calendar-container {
@@ -1705,7 +2152,34 @@ export class ShiftScheduleView extends ViewBase {
       }
 
       .day-button.today {
-        border: 2px solid var(--primary-color, #03a9f4);
+        border: 4px solid var(--primary-color, #03a9f4);
+      }
+
+      .day-button.weekend {
+        border: 4px solid var(--secondary-color, #757575);
+      }
+
+      /* Feiertage haben Vorrang vor Wochenenden */
+      .day-button.holiday {
+        border: 4px solid var(--error-color, #f44336);
+      }
+
+      /* Wenn sowohl Wochenende als auch Feiertag, verwende Feiertagsfarbe (stärkere Umrandung) */
+      .day-button.weekend.holiday {
+        border: 5px solid var(--error-color, #f44336);
+      }
+
+      /* Heute-Markierung hat Vorrang, aber kombiniert mit anderen Markierungen */
+      .day-button.today.weekend {
+        border: 5px solid var(--secondary-color, #757575);
+      }
+
+      .day-button.today.holiday {
+        border: 5px solid var(--error-color, #f44336);
+      }
+
+      .day-button.today.weekend.holiday {
+        border: 6px solid var(--error-color, #f44336);
       }
 
       .day-button.readonly,

@@ -64,15 +64,32 @@ export class CardBase extends SuperBase {
       entity: 'input_text.arbeitszeiten',
       numberOfMonths: 14,
       initialDisplayedMonths: 2,
-      mode: 'single',
-      selectedCalendar: 'a', // Standardschicht
+      selectedCalendar: 'a', // Erster aktivierter Kalender
       calendars: [
-        { shortcut: 'a', name: 'Standardkalender', color: '#ff9800', enabled: true },
-        { shortcut: 'b', name: 'Kalender B', color: '#ff0000', enabled: false },
-        { shortcut: 'c', name: 'Kalender C', color: '#00ff00', enabled: false },
-        { shortcut: 'd', name: 'Kalender D', color: '#0000ff', enabled: false },
-        { shortcut: 'e', name: 'Kalender E', color: '#ffff00', enabled: false },
+        { shortcut: 'a', name: 'Kalender A', color: '#ff9800', enabled: true, statusRelevant: true },
+        { shortcut: 'b', name: 'Kalender B', color: '#ff0000', enabled: false, statusRelevant: true },
+        { shortcut: 'c', name: 'Kalender C', color: '#00ff00', enabled: false, statusRelevant: true },
+        { shortcut: 'd', name: 'Kalender D', color: '#0000ff', enabled: false, statusRelevant: true },
+        { shortcut: 'e', name: 'Kalender E', color: '#ffff00', enabled: false, statusRelevant: true },
       ],
+      holidays: {
+        neujahr: true,
+        heilige_drei_koenige: true,
+        tag_der_arbeit: true,
+        friedensfest: true,
+        mariae_himmelfahrt: true,
+        tag_der_deutschen_einheit: true,
+        reformationstag: true,
+        allerheiligen: true,
+        weihnachten_1: true,
+        weihnachten_2: true,
+        karfreitag: true,
+        ostermontag: true,
+        christi_himmelfahrt: true,
+        pfingstmontag: true,
+        fronleichnam: true,
+        busstag: true,
+      },
     };
   }
 
