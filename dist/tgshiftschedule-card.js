@@ -7668,7 +7668,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   Version: () => (/* binding */ Version),
 /* harmony export */   showVersion: () => (/* binding */ showVersion)
 /* harmony export */ });
-const Version = '2025.12-0006';
+const Version = '2025.12-0007';
 const CardRegname = 'tgshiftschedule-card';
 const CardName = 'TG Schichtplan Card';
 const CardDescription = 'Eine Schichtplan-Karte für Arbeitszeiten';
@@ -12020,7 +12020,7 @@ _defineProperty(ViewBase, "styles", [_superPropGet(_ViewBase, "styles", _ViewBas
 /************************************************************************/
 /******/ 	// The module cache
 /******/ 	var __webpack_module_cache__ = {};
-/******/
+/******/ 	
 /******/ 	// The require function
 /******/ 	function __webpack_require__(moduleId) {
 /******/ 		// Check if module is in cache
@@ -12034,26 +12034,26 @@ _defineProperty(ViewBase, "styles", [_superPropGet(_ViewBase, "styles", _ViewBas
 /******/ 			// no module.loaded needed
 /******/ 			exports: {}
 /******/ 		};
-/******/
+/******/ 	
 /******/ 		// Execute the module function
 /******/ 		var execOptions = { id: moduleId, module: module, factory: __webpack_modules__[moduleId], require: __webpack_require__ };
 /******/ 		__webpack_require__.i.forEach(function(handler) { handler(execOptions); });
 /******/ 		module = execOptions.module;
 /******/ 		execOptions.factory.call(module.exports, module, module.exports, execOptions.require);
-/******/
+/******/ 	
 /******/ 		// Return the exports of the module
 /******/ 		return module.exports;
 /******/ 	}
-/******/
+/******/ 	
 /******/ 	// expose the modules object (__webpack_modules__)
 /******/ 	__webpack_require__.m = __webpack_modules__;
-/******/
+/******/ 	
 /******/ 	// expose the module cache
 /******/ 	__webpack_require__.c = __webpack_module_cache__;
-/******/
+/******/ 	
 /******/ 	// expose the module execution interceptor
 /******/ 	__webpack_require__.i = [];
-/******/
+/******/ 	
 /************************************************************************/
 /******/ 	/* webpack/runtime/compat get default export */
 /******/ 	(() => {
@@ -12066,7 +12066,7 @@ _defineProperty(ViewBase, "styles", [_superPropGet(_ViewBase, "styles", _ViewBas
 /******/ 			return getter;
 /******/ 		};
 /******/ 	})();
-/******/
+/******/ 	
 /******/ 	/* webpack/runtime/define property getters */
 /******/ 	(() => {
 /******/ 		// define getter functions for harmony exports
@@ -12078,7 +12078,7 @@ _defineProperty(ViewBase, "styles", [_superPropGet(_ViewBase, "styles", _ViewBas
 /******/ 			}
 /******/ 		};
 /******/ 	})();
-/******/
+/******/ 	
 /******/ 	/* webpack/runtime/ensure chunk */
 /******/ 	(() => {
 /******/ 		__webpack_require__.f = {};
@@ -12091,7 +12091,7 @@ _defineProperty(ViewBase, "styles", [_superPropGet(_ViewBase, "styles", _ViewBas
 /******/ 			}, []));
 /******/ 		};
 /******/ 	})();
-/******/
+/******/ 	
 /******/ 	/* webpack/runtime/get javascript chunk filename */
 /******/ 	(() => {
 /******/ 		// This function allow to reference all chunks
@@ -12102,7 +12102,7 @@ _defineProperty(ViewBase, "styles", [_superPropGet(_ViewBase, "styles", _ViewBas
 /******/ 			return "" + chunkId + ".tgshiftschedule-card.js";
 /******/ 		};
 /******/ 	})();
-/******/
+/******/ 	
 /******/ 	/* webpack/runtime/get javascript update chunk filename */
 /******/ 	(() => {
 /******/ 		// This function allow to reference all chunks
@@ -12111,17 +12111,17 @@ _defineProperty(ViewBase, "styles", [_superPropGet(_ViewBase, "styles", _ViewBas
 /******/ 			return "" + chunkId + "." + __webpack_require__.h() + ".hot-update.js";
 /******/ 		};
 /******/ 	})();
-/******/
+/******/ 	
 /******/ 	/* webpack/runtime/get update manifest filename */
 /******/ 	(() => {
 /******/ 		__webpack_require__.hmrF = () => ("main." + __webpack_require__.h() + ".hot-update.json");
 /******/ 	})();
-/******/
+/******/ 	
 /******/ 	/* webpack/runtime/getFullHash */
 /******/ 	(() => {
-/******/ 		__webpack_require__.h = () => ("f6e7deb3361aad0766b7")
+/******/ 		__webpack_require__.h = () => ("b8c4d2d8afe4226344df")
 /******/ 	})();
-/******/
+/******/ 	
 /******/ 	/* webpack/runtime/global */
 /******/ 	(() => {
 /******/ 		__webpack_require__.g = (function() {
@@ -12133,12 +12133,12 @@ _defineProperty(ViewBase, "styles", [_superPropGet(_ViewBase, "styles", _ViewBas
 /******/ 			}
 /******/ 		})();
 /******/ 	})();
-/******/
+/******/ 	
 /******/ 	/* webpack/runtime/hasOwnProperty shorthand */
 /******/ 	(() => {
 /******/ 		__webpack_require__.o = (obj, prop) => (Object.prototype.hasOwnProperty.call(obj, prop))
 /******/ 	})();
-/******/
+/******/ 	
 /******/ 	/* webpack/runtime/load script */
 /******/ 	(() => {
 /******/ 		var inProgress = {};
@@ -12157,14 +12157,14 @@ _defineProperty(ViewBase, "styles", [_superPropGet(_ViewBase, "styles", _ViewBas
 /******/ 			if(!script) {
 /******/ 				needAttach = true;
 /******/ 				script = document.createElement('script');
-/******/
+/******/ 		
 /******/ 				script.charset = 'utf-8';
 /******/ 				script.timeout = 120;
 /******/ 				if (__webpack_require__.nc) {
 /******/ 					script.setAttribute("nonce", __webpack_require__.nc);
 /******/ 				}
 /******/ 				script.setAttribute("data-webpack", dataWebpackPrefix + key);
-/******/
+/******/ 		
 /******/ 				script.src = url;
 /******/ 			}
 /******/ 			inProgress[url] = [done];
@@ -12184,7 +12184,7 @@ _defineProperty(ViewBase, "styles", [_superPropGet(_ViewBase, "styles", _ViewBas
 /******/ 			needAttach && document.head.appendChild(script);
 /******/ 		};
 /******/ 	})();
-/******/
+/******/ 	
 /******/ 	/* webpack/runtime/make namespace object */
 /******/ 	(() => {
 /******/ 		// define __esModule on exports
@@ -12195,30 +12195,30 @@ _defineProperty(ViewBase, "styles", [_superPropGet(_ViewBase, "styles", _ViewBas
 /******/ 			Object.defineProperty(exports, '__esModule', { value: true });
 /******/ 		};
 /******/ 	})();
-/******/
+/******/ 	
 /******/ 	/* webpack/runtime/hot module replacement */
 /******/ 	(() => {
 /******/ 		var currentModuleData = {};
 /******/ 		var installedModules = __webpack_require__.c;
-/******/
+/******/ 		
 /******/ 		// module and require creation
 /******/ 		var currentChildModule;
 /******/ 		var currentParents = [];
-/******/
+/******/ 		
 /******/ 		// status
 /******/ 		var registeredStatusHandlers = [];
 /******/ 		var currentStatus = "idle";
-/******/
+/******/ 		
 /******/ 		// while downloading
 /******/ 		var blockingPromises = 0;
 /******/ 		var blockingPromisesWaiting = [];
-/******/
+/******/ 		
 /******/ 		// The update info
 /******/ 		var currentUpdateApplyHandlers;
 /******/ 		var queuedInvalidatedModules;
-/******/
+/******/ 		
 /******/ 		__webpack_require__.hmrD = currentModuleData;
-/******/
+/******/ 		
 /******/ 		__webpack_require__.i.push(function (options) {
 /******/ 			var module = options.module;
 /******/ 			var require = createRequire(options.require, options.id);
@@ -12228,10 +12228,10 @@ _defineProperty(ViewBase, "styles", [_superPropGet(_ViewBase, "styles", _ViewBas
 /******/ 			currentParents = [];
 /******/ 			options.require = require;
 /******/ 		});
-/******/
+/******/ 		
 /******/ 		__webpack_require__.hmrC = {};
 /******/ 		__webpack_require__.hmrI = {};
-/******/
+/******/ 		
 /******/ 		function createRequire(require, moduleId) {
 /******/ 			var me = installedModules[moduleId];
 /******/ 			if (!me) return require;
@@ -12282,7 +12282,7 @@ _defineProperty(ViewBase, "styles", [_superPropGet(_ViewBase, "styles", _ViewBas
 /******/ 			};
 /******/ 			return fn;
 /******/ 		}
-/******/
+/******/ 		
 /******/ 		function createModuleHotObject(moduleId, me) {
 /******/ 			var _main = currentChildModule !== moduleId;
 /******/ 			var hot = {
@@ -12300,7 +12300,7 @@ _defineProperty(ViewBase, "styles", [_superPropGet(_ViewBase, "styles", _ViewBas
 /******/ 					currentChildModule = _main ? undefined : moduleId;
 /******/ 					__webpack_require__(moduleId);
 /******/ 				},
-/******/
+/******/ 		
 /******/ 				// Module API
 /******/ 				active: true,
 /******/ 				accept: function (dep, callback, errorHandler) {
@@ -12367,7 +12367,7 @@ _defineProperty(ViewBase, "styles", [_superPropGet(_ViewBase, "styles", _ViewBas
 /******/ 							break;
 /******/ 					}
 /******/ 				},
-/******/
+/******/ 		
 /******/ 				// Management API
 /******/ 				check: hotCheck,
 /******/ 				apply: hotApply,
@@ -12382,24 +12382,24 @@ _defineProperty(ViewBase, "styles", [_superPropGet(_ViewBase, "styles", _ViewBas
 /******/ 					var idx = registeredStatusHandlers.indexOf(l);
 /******/ 					if (idx >= 0) registeredStatusHandlers.splice(idx, 1);
 /******/ 				},
-/******/
+/******/ 		
 /******/ 				// inherit from previous dispose call
 /******/ 				data: currentModuleData[moduleId]
 /******/ 			};
 /******/ 			currentChildModule = undefined;
 /******/ 			return hot;
 /******/ 		}
-/******/
+/******/ 		
 /******/ 		function setStatus(newStatus) {
 /******/ 			currentStatus = newStatus;
 /******/ 			var results = [];
-/******/
+/******/ 		
 /******/ 			for (var i = 0; i < registeredStatusHandlers.length; i++)
 /******/ 				results[i] = registeredStatusHandlers[i].call(null, newStatus);
-/******/
+/******/ 		
 /******/ 			return Promise.all(results).then(function () {});
 /******/ 		}
-/******/
+/******/ 		
 /******/ 		function unblock() {
 /******/ 			if (--blockingPromises === 0) {
 /******/ 				setStatus("ready").then(function () {
@@ -12413,7 +12413,7 @@ _defineProperty(ViewBase, "styles", [_superPropGet(_ViewBase, "styles", _ViewBas
 /******/ 				});
 /******/ 			}
 /******/ 		}
-/******/
+/******/ 		
 /******/ 		function trackBlockingPromise(promise) {
 /******/ 			switch (currentStatus) {
 /******/ 				case "ready":
@@ -12427,7 +12427,7 @@ _defineProperty(ViewBase, "styles", [_superPropGet(_ViewBase, "styles", _ViewBas
 /******/ 					return promise;
 /******/ 			}
 /******/ 		}
-/******/
+/******/ 		
 /******/ 		function waitForBlockingPromises(fn) {
 /******/ 			if (blockingPromises === 0) return fn();
 /******/ 			return new Promise(function (resolve) {
@@ -12436,7 +12436,7 @@ _defineProperty(ViewBase, "styles", [_superPropGet(_ViewBase, "styles", _ViewBas
 /******/ 				});
 /******/ 			});
 /******/ 		}
-/******/
+/******/ 		
 /******/ 		function hotCheck(applyOnUpdate) {
 /******/ 			if (currentStatus !== "idle") {
 /******/ 				throw new Error("check() is only allowed in idle status");
@@ -12451,11 +12451,11 @@ _defineProperty(ViewBase, "styles", [_superPropGet(_ViewBase, "styles", _ViewBas
 /******/ 							}
 /******/ 						);
 /******/ 					}
-/******/
+/******/ 		
 /******/ 					return setStatus("prepare").then(function () {
 /******/ 						var updatedModules = [];
 /******/ 						currentUpdateApplyHandlers = [];
-/******/
+/******/ 		
 /******/ 						return Promise.all(
 /******/ 							Object.keys(__webpack_require__.hmrC).reduce(function (
 /******/ 								promises,
@@ -12484,7 +12484,7 @@ _defineProperty(ViewBase, "styles", [_superPropGet(_ViewBase, "styles", _ViewBas
 /******/ 					});
 /******/ 				});
 /******/ 		}
-/******/
+/******/ 		
 /******/ 		function hotApply(options) {
 /******/ 			if (currentStatus !== "ready") {
 /******/ 				return Promise.resolve().then(function () {
@@ -12497,44 +12497,44 @@ _defineProperty(ViewBase, "styles", [_superPropGet(_ViewBase, "styles", _ViewBas
 /******/ 			}
 /******/ 			return internalApply(options);
 /******/ 		}
-/******/
+/******/ 		
 /******/ 		function internalApply(options) {
 /******/ 			options = options || {};
-/******/
+/******/ 		
 /******/ 			applyInvalidatedModules();
-/******/
+/******/ 		
 /******/ 			var results = currentUpdateApplyHandlers.map(function (handler) {
 /******/ 				return handler(options);
 /******/ 			});
 /******/ 			currentUpdateApplyHandlers = undefined;
-/******/
+/******/ 		
 /******/ 			var errors = results
 /******/ 				.map(function (r) {
 /******/ 					return r.error;
 /******/ 				})
 /******/ 				.filter(Boolean);
-/******/
+/******/ 		
 /******/ 			if (errors.length > 0) {
 /******/ 				return setStatus("abort").then(function () {
 /******/ 					throw errors[0];
 /******/ 				});
 /******/ 			}
-/******/
+/******/ 		
 /******/ 			// Now in "dispose" phase
 /******/ 			var disposePromise = setStatus("dispose");
-/******/
+/******/ 		
 /******/ 			results.forEach(function (result) {
 /******/ 				if (result.dispose) result.dispose();
 /******/ 			});
-/******/
+/******/ 		
 /******/ 			// Now in "apply" phase
 /******/ 			var applyPromise = setStatus("apply");
-/******/
+/******/ 		
 /******/ 			var error;
 /******/ 			var reportError = function (err) {
 /******/ 				if (!error) error = err;
 /******/ 			};
-/******/
+/******/ 		
 /******/ 			var outdatedModules = [];
 /******/ 			results.forEach(function (result) {
 /******/ 				if (result.apply) {
@@ -12546,7 +12546,7 @@ _defineProperty(ViewBase, "styles", [_superPropGet(_ViewBase, "styles", _ViewBas
 /******/ 					}
 /******/ 				}
 /******/ 			});
-/******/
+/******/ 		
 /******/ 			return Promise.all([disposePromise, applyPromise]).then(function () {
 /******/ 				// handle errors in accept handlers and self accepted module load
 /******/ 				if (error) {
@@ -12554,7 +12554,7 @@ _defineProperty(ViewBase, "styles", [_superPropGet(_ViewBase, "styles", _ViewBas
 /******/ 						throw error;
 /******/ 					});
 /******/ 				}
-/******/
+/******/ 		
 /******/ 				if (queuedInvalidatedModules) {
 /******/ 					return internalApply(options).then(function (list) {
 /******/ 						outdatedModules.forEach(function (moduleId) {
@@ -12563,13 +12563,13 @@ _defineProperty(ViewBase, "styles", [_superPropGet(_ViewBase, "styles", _ViewBas
 /******/ 						return list;
 /******/ 					});
 /******/ 				}
-/******/
+/******/ 		
 /******/ 				return setStatus("idle").then(function () {
 /******/ 					return outdatedModules;
 /******/ 				});
 /******/ 			});
 /******/ 		}
-/******/
+/******/ 		
 /******/ 		function applyInvalidatedModules() {
 /******/ 			if (queuedInvalidatedModules) {
 /******/ 				if (!currentUpdateApplyHandlers) currentUpdateApplyHandlers = [];
@@ -12586,7 +12586,7 @@ _defineProperty(ViewBase, "styles", [_superPropGet(_ViewBase, "styles", _ViewBas
 /******/ 			}
 /******/ 		}
 /******/ 	})();
-/******/
+/******/ 	
 /******/ 	/* webpack/runtime/publicPath */
 /******/ 	(() => {
 /******/ 		var scriptUrl;
@@ -12609,23 +12609,23 @@ _defineProperty(ViewBase, "styles", [_superPropGet(_ViewBase, "styles", _ViewBas
 /******/ 		scriptUrl = scriptUrl.replace(/^blob:/, "").replace(/#.*$/, "").replace(/\?.*$/, "").replace(/\/[^\/]+$/, "/");
 /******/ 		__webpack_require__.p = scriptUrl;
 /******/ 	})();
-/******/
+/******/ 	
 /******/ 	/* webpack/runtime/jsonp chunk loading */
 /******/ 	(() => {
 /******/ 		// no baseURI
-/******/
+/******/ 		
 /******/ 		// object to store loaded and loading chunks
 /******/ 		// undefined = chunk not loaded, null = chunk preloaded/prefetched
 /******/ 		// [resolve, reject, Promise] = chunk loading, 0 = chunk loaded
 /******/ 		var installedChunks = __webpack_require__.hmrS_jsonp = __webpack_require__.hmrS_jsonp || {
 /******/ 			"main": 0
 /******/ 		};
-/******/
+/******/ 		
 /******/ 		__webpack_require__.f.j = (chunkId, promises) => {
 /******/ 				// JSONP chunk loading for javascript
 /******/ 				var installedChunkData = __webpack_require__.o(installedChunks, chunkId) ? installedChunks[chunkId] : undefined;
 /******/ 				if(installedChunkData !== 0) { // 0 means "already installed".
-/******/
+/******/ 		
 /******/ 					// a Promise means "currently loading".
 /******/ 					if(installedChunkData) {
 /******/ 						promises.push(installedChunkData[2]);
@@ -12634,7 +12634,7 @@ _defineProperty(ViewBase, "styles", [_superPropGet(_ViewBase, "styles", _ViewBas
 /******/ 							// setup Promise in chunk cache
 /******/ 							var promise = new Promise((resolve, reject) => (installedChunkData = installedChunks[chunkId] = [resolve, reject]));
 /******/ 							promises.push(installedChunkData[2] = promise);
-/******/
+/******/ 		
 /******/ 							// start chunk loading
 /******/ 							var url = __webpack_require__.p + __webpack_require__.u(chunkId);
 /******/ 							// create error before stack unwound to get useful stacktrace later
@@ -12659,11 +12659,11 @@ _defineProperty(ViewBase, "styles", [_superPropGet(_ViewBase, "styles", _ViewBas
 /******/ 					}
 /******/ 				}
 /******/ 		};
-/******/
+/******/ 		
 /******/ 		// no prefetching
-/******/
+/******/ 		
 /******/ 		// no preloaded
-/******/
+/******/ 		
 /******/ 		var currentUpdatedModulesList;
 /******/ 		var waitingUpdateResolves = {};
 /******/ 		function loadUpdateChunk(chunkId, updatedModulesList) {
@@ -12689,7 +12689,7 @@ _defineProperty(ViewBase, "styles", [_superPropGet(_ViewBase, "styles", _ViewBas
 /******/ 				__webpack_require__.l(url, loadingEnded);
 /******/ 			});
 /******/ 		}
-/******/
+/******/ 		
 /******/ 		self["webpackHotUpdatetgshiftschedule_card"] = (chunkId, moreModules, runtime) => {
 /******/ 			for(var moduleId in moreModules) {
 /******/ 				if(__webpack_require__.o(moreModules, moduleId)) {
@@ -12703,7 +12703,7 @@ _defineProperty(ViewBase, "styles", [_superPropGet(_ViewBase, "styles", _ViewBas
 /******/ 				waitingUpdateResolves[chunkId] = undefined;
 /******/ 			}
 /******/ 		};
-/******/
+/******/ 		
 /******/ 		var currentUpdateChunks;
 /******/ 		var currentUpdate;
 /******/ 		var currentUpdateRemovedChunks;
@@ -12714,7 +12714,7 @@ _defineProperty(ViewBase, "styles", [_superPropGet(_ViewBase, "styles", _ViewBas
 /******/ 			function getAffectedModuleEffects(updateModuleId) {
 /******/ 				var outdatedModules = [updateModuleId];
 /******/ 				var outdatedDependencies = {};
-/******/
+/******/ 		
 /******/ 				var queue = outdatedModules.map(function (id) {
 /******/ 					return {
 /******/ 						chain: [id],
@@ -12772,7 +12772,7 @@ _defineProperty(ViewBase, "styles", [_superPropGet(_ViewBase, "styles", _ViewBas
 /******/ 						});
 /******/ 					}
 /******/ 				}
-/******/
+/******/ 		
 /******/ 				return {
 /******/ 					type: "accepted",
 /******/ 					moduleId: updateModuleId,
@@ -12780,26 +12780,26 @@ _defineProperty(ViewBase, "styles", [_superPropGet(_ViewBase, "styles", _ViewBas
 /******/ 					outdatedDependencies: outdatedDependencies
 /******/ 				};
 /******/ 			}
-/******/
+/******/ 		
 /******/ 			function addAllToSet(a, b) {
 /******/ 				for (var i = 0; i < b.length; i++) {
 /******/ 					var item = b[i];
 /******/ 					if (a.indexOf(item) === -1) a.push(item);
 /******/ 				}
 /******/ 			}
-/******/
+/******/ 		
 /******/ 			// at begin all updates modules are outdated
 /******/ 			// the "outdated" status can propagate to parents if they don't accept the children
 /******/ 			var outdatedDependencies = {};
 /******/ 			var outdatedModules = [];
 /******/ 			var appliedUpdate = {};
-/******/
+/******/ 		
 /******/ 			var warnUnexpectedRequire = function warnUnexpectedRequire(module) {
 /******/ 				console.warn(
 /******/ 					"[HMR] unexpected require(" + module.id + ") to disposed module"
 /******/ 				);
 /******/ 			};
-/******/
+/******/ 		
 /******/ 			for (var moduleId in currentUpdate) {
 /******/ 				if (__webpack_require__.o(currentUpdate, moduleId)) {
 /******/ 					var newModuleFactory = currentUpdate[moduleId];
@@ -12882,7 +12882,7 @@ _defineProperty(ViewBase, "styles", [_superPropGet(_ViewBase, "styles", _ViewBas
 /******/ 				}
 /******/ 			}
 /******/ 			currentUpdate = undefined;
-/******/
+/******/ 		
 /******/ 			// Store self accepted outdated modules to require them later by the module system
 /******/ 			var outdatedSelfAcceptedModules = [];
 /******/ 			for (var j = 0; j < outdatedModules.length; j++) {
@@ -12903,41 +12903,41 @@ _defineProperty(ViewBase, "styles", [_superPropGet(_ViewBase, "styles", _ViewBas
 /******/ 					});
 /******/ 				}
 /******/ 			}
-/******/
+/******/ 		
 /******/ 			var moduleOutdatedDependencies;
-/******/
+/******/ 		
 /******/ 			return {
 /******/ 				dispose: function () {
 /******/ 					currentUpdateRemovedChunks.forEach(function (chunkId) {
 /******/ 						delete installedChunks[chunkId];
 /******/ 					});
 /******/ 					currentUpdateRemovedChunks = undefined;
-/******/
+/******/ 		
 /******/ 					var idx;
 /******/ 					var queue = outdatedModules.slice();
 /******/ 					while (queue.length > 0) {
 /******/ 						var moduleId = queue.pop();
 /******/ 						var module = __webpack_require__.c[moduleId];
 /******/ 						if (!module) continue;
-/******/
+/******/ 		
 /******/ 						var data = {};
-/******/
+/******/ 		
 /******/ 						// Call dispose handlers
 /******/ 						var disposeHandlers = module.hot._disposeHandlers;
 /******/ 						for (j = 0; j < disposeHandlers.length; j++) {
 /******/ 							disposeHandlers[j].call(null, data);
 /******/ 						}
 /******/ 						__webpack_require__.hmrD[moduleId] = data;
-/******/
+/******/ 		
 /******/ 						// disable module (this disables requires from this module)
 /******/ 						module.hot.active = false;
-/******/
+/******/ 		
 /******/ 						// remove module from cache
 /******/ 						delete __webpack_require__.c[moduleId];
-/******/
+/******/ 		
 /******/ 						// when disposing there is no need to call dispose handler
 /******/ 						delete outdatedDependencies[moduleId];
-/******/
+/******/ 		
 /******/ 						// remove "parents" references from all children
 /******/ 						for (j = 0; j < module.children.length; j++) {
 /******/ 							var child = __webpack_require__.c[module.children[j]];
@@ -12948,7 +12948,7 @@ _defineProperty(ViewBase, "styles", [_superPropGet(_ViewBase, "styles", _ViewBas
 /******/ 							}
 /******/ 						}
 /******/ 					}
-/******/
+/******/ 		
 /******/ 					// remove outdated dependency from module children
 /******/ 					var dependency;
 /******/ 					for (var outdatedModuleId in outdatedDependencies) {
@@ -12973,12 +12973,12 @@ _defineProperty(ViewBase, "styles", [_superPropGet(_ViewBase, "styles", _ViewBas
 /******/ 							__webpack_require__.m[updateModuleId] = appliedUpdate[updateModuleId];
 /******/ 						}
 /******/ 					}
-/******/
+/******/ 		
 /******/ 					// run new runtime modules
 /******/ 					for (var i = 0; i < currentUpdateRuntime.length; i++) {
 /******/ 						currentUpdateRuntime[i](__webpack_require__);
 /******/ 					}
-/******/
+/******/ 		
 /******/ 					// call accept handlers
 /******/ 					for (var outdatedModuleId in outdatedDependencies) {
 /******/ 						if (__webpack_require__.o(outdatedDependencies, outdatedModuleId)) {
@@ -13045,7 +13045,7 @@ _defineProperty(ViewBase, "styles", [_superPropGet(_ViewBase, "styles", _ViewBas
 /******/ 							}
 /******/ 						}
 /******/ 					}
-/******/
+/******/ 		
 /******/ 					// Load self accepted modules
 /******/ 					for (var o = 0; o < outdatedSelfAcceptedModules.length; o++) {
 /******/ 						var item = outdatedSelfAcceptedModules[o];
@@ -13087,7 +13087,7 @@ _defineProperty(ViewBase, "styles", [_superPropGet(_ViewBase, "styles", _ViewBas
 /******/ 							}
 /******/ 						}
 /******/ 					}
-/******/
+/******/ 		
 /******/ 					return outdatedModules;
 /******/ 				}
 /******/ 			};
@@ -13143,7 +13143,7 @@ _defineProperty(ViewBase, "styles", [_superPropGet(_ViewBase, "styles", _ViewBas
 /******/ 				};
 /******/ 			}
 /******/ 		};
-/******/
+/******/ 		
 /******/ 		__webpack_require__.hmrM = () => {
 /******/ 			if (typeof fetch === "undefined") throw new Error("No browser support: need fetch API");
 /******/ 			return fetch(__webpack_require__.p + __webpack_require__.hmrF()).then((response) => {
@@ -13152,9 +13152,9 @@ _defineProperty(ViewBase, "styles", [_superPropGet(_ViewBase, "styles", _ViewBas
 /******/ 				return response.json();
 /******/ 			});
 /******/ 		};
-/******/
+/******/ 		
 /******/ 		// no on chunks loaded
-/******/
+/******/ 		
 /******/ 		// install a JSONP callback for chunk loading
 /******/ 		var webpackJsonpCallback = (parentChunkLoadingFunction, data) => {
 /******/ 			var [chunkIds, moreModules, runtime] = data;
@@ -13177,23 +13177,23 @@ _defineProperty(ViewBase, "styles", [_superPropGet(_ViewBase, "styles", _ViewBas
 /******/ 				}
 /******/ 				installedChunks[chunkId] = 0;
 /******/ 			}
-/******/
+/******/ 		
 /******/ 		}
-/******/
+/******/ 		
 /******/ 		var chunkLoadingGlobal = self["webpackChunktgshiftschedule_card"] = self["webpackChunktgshiftschedule_card"] || [];
 /******/ 		chunkLoadingGlobal.forEach(webpackJsonpCallback.bind(null, 0));
 /******/ 		chunkLoadingGlobal.push = webpackJsonpCallback.bind(null, chunkLoadingGlobal.push.bind(chunkLoadingGlobal));
 /******/ 	})();
-/******/
+/******/ 	
 /************************************************************************/
-/******/
+/******/ 	
 /******/ 	// module cache are used so entry inlining is disabled
 /******/ 	// startup
 /******/ 	// Load entry module and return exports
 /******/ 	__webpack_require__("./node_modules/webpack-dev-server/client/index.js?protocol=ws%3A&hostname=localhost&port=9000&pathname=%2Fws&logging=verbose&progress=true&overlay=%7B%22errors%22%3Atrue%2C%22warnings%22%3Atrue%7D&reconnect=10&hot=true&live-reload=true");
 /******/ 	__webpack_require__("./node_modules/webpack/hot/dev-server.js");
 /******/ 	var __webpack_exports__ = __webpack_require__("./src/card.js");
-/******/
+/******/ 	
 /******/ })()
 ;
 //# sourceMappingURL=tgshiftschedule-card.js.map
