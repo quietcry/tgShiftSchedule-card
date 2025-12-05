@@ -1856,8 +1856,11 @@ export class ShiftScheduleView extends ViewBase {
     const isEditorMode = this._isInEditorMode();
     // Speicherwarnung wird immer angezeigt (auch im normalen Modus)
     const hasStorageWarning = this._storageWarning && this._storageWarning.show;
-    // Config-Warnung wird nur im Editor-Modus angezeigt
-    const hasConfigWarning = this._configWarning && this._configWarning.show && isEditorMode;
+    // Config-Warnung: "missing" nur im Editor, "size" immer (auch im normalen Modus)
+    const hasConfigWarning = this._configWarning && this._configWarning.show && (
+      this._configWarning.type === 'size' || // Speicherplatz-Warnung immer anzeigen
+      (this._configWarning.type === 'missing' && isEditorMode) // Fehlende Entity nur im Editor
+    );
     const navBounds = this.getNavigationBounds();
 
     return html`
