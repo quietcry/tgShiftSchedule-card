@@ -1964,6 +1964,25 @@ export class ShiftScheduleView extends ViewBase {
               </div>
             `
           : ''}
+        ${hasStatusWarning
+          ? html`
+              <div class="storage-warning">
+                <div class="warning-icon">⚠️</div>
+                <div class="warning-content">
+                  <div class="warning-title">Status-Entity fehlt!</div>
+                  <div class="warning-message">
+                    Die Status-Entity <code>${this._statusWarning.statusEntityId}</code> wurde nicht gefunden.
+                  </div>
+                  <div class="warning-action">
+                    Bitte legen Sie diese Entity in Ihrer <code>configuration.yaml</code> an:
+                    <pre>input_text:
+  ${this._statusWarning.statusEntityId.replace('input_text.', '')}:
+    name: Schichtplan Status</pre>
+                  </div>
+                </div>
+              </div>
+            `
+          : ''}
         <div class="menu-bar">
           <button
             class="menu-button navigation-button"
