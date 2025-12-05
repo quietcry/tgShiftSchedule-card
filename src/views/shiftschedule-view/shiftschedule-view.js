@@ -1900,21 +1900,32 @@ export class ShiftScheduleView extends ViewBase {
                   <ha-select
                     .value=${selectedValue || 'a'}
                     @selected=${(e) => {
-                      // Verhindere Event-Propagation zu Home Assistant's Card-Picker
-                      if (e) {
-                        if (e.stopPropagation) {
-                          e.stopPropagation();
+                      try {
+                        // Verhindere Event-Propagation zu Home Assistant's Card-Picker
+                        if (e) {
+                          if (typeof e.stopPropagation === 'function') {
+                            e.stopPropagation();
+                          }
+                          if (typeof e.stopImmediatePropagation === 'function') {
+                            e.stopImmediatePropagation();
+                          }
                         }
-                        if (e.stopImmediatePropagation) {
-                          e.stopImmediatePropagation();
+
+                        if (!e || !e.detail) {
+                          return;
                         }
-                      }
-                      const index = e?.detail?.index;
-                      if (index !== undefined && index !== null && index >= 0 && allCalendars && allCalendars[index]) {
-                        const selectedCalendar = allCalendars[index];
-                        if (selectedCalendar && selectedCalendar.shortcut) {
-                          this._onCalendarSelectedByIndex(selectedCalendar.shortcut);
+
+                        const index = e.detail.index;
+                        if (index !== undefined && index !== null && index >= 0 && allCalendars && allCalendars[index]) {
+                          const selectedCalendar = allCalendars[index];
+                          if (selectedCalendar && selectedCalendar.shortcut) {
+                            if (typeof this._onCalendarSelectedByIndex === 'function') {
+                              this._onCalendarSelectedByIndex(selectedCalendar.shortcut);
+                            }
+                          }
                         }
+                      } catch (error) {
+                        console.error('Error in calendar selection handler:', error);
                       }
                     }}
                     naturalMenuWidth
