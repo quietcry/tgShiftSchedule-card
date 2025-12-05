@@ -10,6 +10,7 @@ export class CardImpl extends CardBase {
       ...super.properties,
       config: { type: Object },
       hass: { type: Object },
+      lovelace: { type: Object },
       _view: { type: Object },
       _viewType: { type: String },
     };
@@ -102,10 +103,14 @@ export class CardImpl extends CardBase {
           }
         });
 
-        // Übergebe hass an die View, falls es bereits gesetzt wurde
+        // Übergebe hass und lovelace an die View, falls sie bereits gesetzt wurden
         if (this._hass) {
           this._debug('setConfig: Übergebe gespeicherten hass an ShiftSchedule-View');
           this._view.hass = this._hass;
+        }
+        if (this.lovelace) {
+          this._debug('setConfig: Übergebe lovelace an ShiftSchedule-View');
+          this._view.lovelace = this.lovelace;
         }
       } else {
         // View existiert bereits, aktualisiere nur die Config
@@ -133,6 +138,17 @@ export class CardImpl extends CardBase {
     } else {
       this._debug('set hass: View noch nicht initialisiert, speichere hass für später');
     }
+  }
+
+  set lovelace(lovelace) {
+    this._lovelace = lovelace;
+    if (this._view) {
+      this._view.lovelace = lovelace;
+    }
+  }
+
+  get lovelace() {
+    return this._lovelace;
   }
 
   get hass() {

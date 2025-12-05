@@ -21,6 +21,7 @@ export class ShiftScheduleView extends ViewBase {
       ...super.properties,
       hass: { type: Object },
       config: { type: Object },
+      lovelace: { type: Object },
       _workingDays: { type: Object },
       _storageWarning: { type: Object },
       _configWarning: { type: Object },
@@ -47,6 +48,57 @@ export class ShiftScheduleView extends ViewBase {
   // Formatiert eine Zahl auf zwei Ziffern (z.B. 1 -> "01", 25 -> "25")
   formatTwoDigits(num) {
     return String(num).padStart(2, '0');
+  }
+
+  // Prüft, ob die Karte im Editor-Modus angezeigt wird
+  _isInEditorMode() {
+    // Methode 1: Prüfe lovelace.editMode
+    if (this.lovelace?.editMode === true) {
+      return true;
+    }
+
+    // Methode 2: Prüfe, ob die Karte in einem Editor-Container ist
+    let element = this;
+    let depth = 0;
+    const maxDepth = 10; // Begrenze die Suche, um Endlosschleifen zu vermeiden
+
+    while (element && depth < maxDepth) {
+      // Prüfe auf Editor-spezifische Klassen oder Attribute
+      if (
+        element.classList?.contains('card-editor') ||
+        element.classList?.contains('hui-card-editor') ||
+        element.classList?.contains('edit-mode') ||
+        element.getAttribute?.('data-card-editor') === 'true' ||
+        element.tagName?.toLowerCase().includes('editor')
+      ) {
+        return true;
+      }
+
+      // Prüfe auf Editor-spezifische IDs
+      if (element.id && (element.id.includes('editor') || element.id.includes('config'))) {
+        return true;
+      }
+
+      element = element.parentElement || element.parentNode;
+      depth++;
+    }
+
+    // Methode 3: Prüfe, ob die Karte in einem Shadow DOM mit Editor-Klassen ist
+    const root = this.getRootNode();
+    if (root && root !== document) {
+      const host = root.host;
+      if (host) {
+        if (
+          host.classList?.contains('card-editor') ||
+          host.classList?.contains('hui-card-editor') ||
+          host.classList?.contains('edit-mode')
+        ) {
+          return true;
+        }
+      }
+    }
+
+    return false;
   }
 
   // Berechnet die Kontrastfarbe (schwarz oder weiß) für eine gegebene Hintergrundfarbe
@@ -1801,8 +1853,9 @@ export class ShiftScheduleView extends ViewBase {
       months.push({ year, month });
     }
 
-    const hasStorageWarning = this._storageWarning && this._storageWarning.show;
-    const hasConfigWarning = this._configWarning && this._configWarning.show;
+    const isEditorMode = this._isInEditorMode();
+    const hasStorageWarning = this._storageWarning && this._storageWarning.show && isEditorMode;
+    const hasConfigWarning = this._configWarning && this._configWarning.show && isEditorMode;
     const navBounds = this.getNavigationBounds();
 
     return html`
