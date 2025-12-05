@@ -62,7 +62,7 @@ export class ShiftScheduleView extends ViewBase {
     // Methode 2: Prüfe, ob die Karte in einem Editor-Container ist
     let element = this;
     let depth = 0;
-    const maxDepth = 10; // Begrenze die Suche, um Endlosschleifen zu vermeiden
+    const maxDepth = 15; // Erhöht für bessere Erkennung
 
     while (element && depth < maxDepth) {
       // Prüfe auf Editor-spezifische Klassen oder Attribute
@@ -70,14 +70,24 @@ export class ShiftScheduleView extends ViewBase {
         element.classList?.contains('card-editor') ||
         element.classList?.contains('hui-card-editor') ||
         element.classList?.contains('edit-mode') ||
+        element.classList?.contains('hui-card-config-editor') ||
         element.getAttribute?.('data-card-editor') === 'true' ||
-        element.tagName?.toLowerCase().includes('editor')
+        element.tagName?.toLowerCase().includes('editor') ||
+        element.tagName?.toLowerCase() === 'hui-card-element-editor'
       ) {
         return true;
       }
 
       // Prüfe auf Editor-spezifische IDs
       if (element.id && (element.id.includes('editor') || element.id.includes('config'))) {
+        return true;
+      }
+
+      // Prüfe auf Editor-spezifische Attribute
+      if (element.hasAttribute && (
+        element.hasAttribute('data-card-editor') ||
+        element.hasAttribute('data-editor')
+      )) {
         return true;
       }
 
@@ -93,10 +103,20 @@ export class ShiftScheduleView extends ViewBase {
         if (
           host.classList?.contains('card-editor') ||
           host.classList?.contains('hui-card-editor') ||
-          host.classList?.contains('edit-mode')
+          host.classList?.contains('edit-mode') ||
+          host.classList?.contains('hui-card-config-editor') ||
+          host.tagName?.toLowerCase() === 'hui-card-element-editor'
         ) {
           return true;
         }
+      }
+    }
+
+    // Methode 4: Prüfe URL (falls im Editor-Modus)
+    if (typeof window !== 'undefined' && window.location) {
+      const url = window.location.href || window.location.pathname;
+      if (url && (url.includes('/config/lovelace/dashboards') || url.includes('/editor'))) {
+        return true;
       }
     }
 
@@ -802,7 +822,7 @@ export class ShiftScheduleView extends ViewBase {
 
   checkConfigEntity() {
     // Prüfe ob die Config-Entity existiert
-    if (!this._hass || !this._config || !this._config.entity) {
+    if (!this._config || !this._config.entity) {
       this._configWarning = null;
       this.requestUpdate();
       return;
@@ -811,6 +831,21 @@ export class ShiftScheduleView extends ViewBase {
     const configEntityId = this.getConfigEntityId();
     if (!configEntityId) {
       this._configWarning = null;
+      this.requestUpdate();
+      return;
+    }
+
+    // Wenn kein hass vorhanden ist (z.B. im Editor), zeige Warnung im Editor-Modus
+    if (!this._hass) {
+      if (this._isInEditorMode()) {
+        this._configWarning = {
+          show: true,
+          type: 'missing',
+          configEntityId: configEntityId,
+        };
+      } else {
+        this._configWarning = null;
+      }
       this.requestUpdate();
       return;
     }
@@ -836,7 +871,7 @@ export class ShiftScheduleView extends ViewBase {
 
   checkStatusEntity() {
     // Prüfe ob die Status-Entity existiert
-    if (!this._hass || !this._config || !this._config.entity) {
+    if (!this._config || !this._config.entity) {
       this._statusWarning = null;
       this.requestUpdate();
       return;
@@ -845,6 +880,21 @@ export class ShiftScheduleView extends ViewBase {
     const statusEntityId = this.getStatusEntityId();
     if (!statusEntityId) {
       this._statusWarning = null;
+      this.requestUpdate();
+      return;
+    }
+
+    // Wenn kein hass vorhanden ist (z.B. im Editor), zeige Warnung im Editor-Modus
+    if (!this._hass) {
+      if (this._isInEditorMode()) {
+        this._statusWarning = {
+          show: true,
+          type: 'missing',
+          statusEntityId: statusEntityId,
+        };
+      } else {
+        this._statusWarning = null;
+      }
       this.requestUpdate();
       return;
     }
