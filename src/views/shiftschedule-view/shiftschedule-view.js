@@ -25,6 +25,7 @@ export class ShiftScheduleView extends ViewBase {
       _workingDays: { type: Object },
       _storageWarning: { type: Object },
       _configWarning: { type: Object },
+      _statusWarning: { type: Object },
       _displayedMonths: { type: Number },
       _startMonthOffset: { type: Number },
       _selectedCalendar: { type: String },
@@ -36,6 +37,7 @@ export class ShiftScheduleView extends ViewBase {
     this._workingDays = {}; // {"year:month": {day: [elements]}} - z.B. {"25:11": {1: ["a"], 2: ["a", "h"], 3: ["b"]}}
     this._storageWarning = null; // { show: boolean, currentLength: number, maxLength: number, percentage: number }
     this._configWarning = null; // { show: boolean, configEntityId: string }
+    this._statusWarning = null; // { show: boolean, statusEntityId: string }
     this._knownEntityIds = null; // Cache für bekannte Entities [mainEntity, ...additionalEntities]
     this._cleanupDone = false; // Flag, ob die Bereinigung bereits beim initialen Laden ausgeführt wurde
     this._displayedMonths = 2; // Anzahl der angezeigten Monate (wird aus config.numberOfMonths initialisiert)
@@ -288,8 +290,9 @@ export class ShiftScheduleView extends ViewBase {
       if (hasAnyEntityChanged) {
         this.loadWorkingDays();
       }
-      // Prüfe Config-Entity bei jedem hass-Update (kann sich ändern)
+      // Prüfe Config-Entity und Status-Entity bei jedem hass-Update (kann sich ändern)
       this.checkConfigEntity();
+      this.checkStatusEntity();
     }
     this.requestUpdate();
   }
@@ -401,6 +404,7 @@ export class ShiftScheduleView extends ViewBase {
     if (this._hass) {
       this.loadWorkingDays();
       this.checkConfigEntity();
+      this.checkStatusEntity();
       this.saveConfigToEntity();
     }
     this.requestUpdate();
@@ -786,6 +790,16 @@ export class ShiftScheduleView extends ViewBase {
     return this._config.entity + '_config';
   }
 
+  getStatusEntityId() {
+    // Leite die Status-Entity-ID aus der Haupt-Entity ab
+    if (!this._config || !this._config.entity) {
+      return null;
+    }
+    // Füge "_status" an die Entity-ID an
+    // z.B. "input_text.arbeitszeiten" -> "input_text.arbeitszeiten_status"
+    return this._config.entity + '_status';
+  }
+
   checkConfigEntity() {
     // Prüfe ob die Config-Entity existiert
     if (!this._hass || !this._config || !this._config.entity) {
@@ -815,6 +829,35 @@ export class ShiftScheduleView extends ViewBase {
       } else {
         this._configWarning = null;
       }
+    }
+
+    this.requestUpdate();
+  }
+
+  checkStatusEntity() {
+    // Prüfe ob die Status-Entity existiert
+    if (!this._hass || !this._config || !this._config.entity) {
+      this._statusWarning = null;
+      this.requestUpdate();
+      return;
+    }
+
+    const statusEntityId = this.getStatusEntityId();
+    if (!statusEntityId) {
+      this._statusWarning = null;
+      this.requestUpdate();
+      return;
+    }
+
+    const statusEntity = this._hass.states[statusEntityId];
+    if (!statusEntity) {
+      this._statusWarning = {
+        show: true,
+        type: 'missing',
+        statusEntityId: statusEntityId,
+      };
+    } else {
+      this._statusWarning = null;
     }
 
     this.requestUpdate();
@@ -1861,6 +1904,8 @@ export class ShiftScheduleView extends ViewBase {
       this._configWarning.type === 'size' || // Speicherplatz-Warnung immer anzeigen
       (this._configWarning.type === 'missing' && isEditorMode) // Fehlende Entity nur im Editor
     );
+    // Status-Warnung wird nur im Editor-Modus angezeigt
+    const hasStatusWarning = this._statusWarning && this._statusWarning.show && isEditorMode;
     const navBounds = this.getNavigationBounds();
 
     return html`
