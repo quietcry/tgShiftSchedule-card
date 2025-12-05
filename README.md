@@ -44,7 +44,6 @@ Erstelle ein `input_text` Entity in deiner `configuration.yaml`:
 input_text:
   arbeitszeiten:
     name: Arbeitszeiten
-    initial: ""
     max: 255  # Optional: Maximale Länge erhöhen für größere Schichtpläne
 ```
 
@@ -54,7 +53,6 @@ Optional: Erstelle eine Config-Entity für die Schichtkonfiguration:
 input_text:
   arbeitszeiten_config:
     name: Schichtplan Konfiguration
-    initial: ""
     max: 500  # Für Schichtkonfigurationen mit Zeiträumen
 ```
 

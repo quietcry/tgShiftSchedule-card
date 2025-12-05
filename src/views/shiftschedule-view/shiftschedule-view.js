@@ -1839,8 +1839,7 @@ export class ShiftScheduleView extends ViewBase {
                           Bitte legen Sie diese Entity in Ihrer <code>configuration.yaml</code> an:
                           <pre>input_text:
   ${this._configWarning.configEntityId.replace('input_text.', '')}:
-    name: Schichtplan Konfiguration
-    initial: ""</pre>
+    name: Schichtplan Konfiguration</pre>
                         </div>
                       `
                     : html`
