@@ -1854,7 +1854,9 @@ export class ShiftScheduleView extends ViewBase {
     }
 
     const isEditorMode = this._isInEditorMode();
-    const hasStorageWarning = this._storageWarning && this._storageWarning.show && isEditorMode;
+    // Speicherwarnung wird immer angezeigt (auch im normalen Modus)
+    const hasStorageWarning = this._storageWarning && this._storageWarning.show;
+    // Config-Warnung wird nur im Editor-Modus angezeigt
     const hasConfigWarning = this._configWarning && this._configWarning.show && isEditorMode;
     const navBounds = this.getNavigationBounds();
 

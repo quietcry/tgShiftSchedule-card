@@ -1,4 +1,4 @@
-const Version = '2025.12-0015';
+const Version = '2025.12-0016';
 const CardRegname = 'tgshiftschedule-card';
 const CardName = 'TG Schichtplan Card';
 const CardDescription = 'Eine Schichtplan-Karte für Arbeitszeiten';
