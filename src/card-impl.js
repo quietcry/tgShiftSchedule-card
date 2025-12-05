@@ -22,7 +22,7 @@ export class CardImpl extends CardBase {
 
   static getStubConfig() {
     return {
-      entity: 'input_text.arbeitszeiten',
+      entity: '',
       numberOfMonths: 14,
       initialDisplayedMonths: 2,
       useElements: false,
@@ -47,7 +47,7 @@ export class CardImpl extends CardBase {
   getDefaultConfig() {
     this._debug(`CardImpl getDefaultConfig wird aufgerufen`);
     return {
-      entity: 'input_text.arbeitszeiten',
+      entity: '',
       numberOfMonths: 14,
       initialDisplayedMonths: 2,
       selectedCalendar: 'a', // Erster aktivierter Kalender

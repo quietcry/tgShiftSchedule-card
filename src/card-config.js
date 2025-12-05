@@ -1,4 +1,4 @@
-const Version = '2025.12-0020';
+const Version = '2025.12-0021';
 const CardRegname = 'tgshiftschedule-card';
 const CardName = 'TG Schichtplan Card';
 const CardDescription = 'Eine Schichtplan-Karte für Arbeitszeiten';
@@ -9,7 +9,7 @@ const showVersion = false;
 
 // Schichtplan-Konfiguration
 const DefaultConfig = {
-  entity: 'input_text.arbeitszeiten', // input_text Entity für Speicherung
+  entity: '', // input_text Entity für Speicherung (muss konfiguriert werden)
 };
 
 export {

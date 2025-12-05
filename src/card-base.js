@@ -61,7 +61,7 @@ export class CardBase extends SuperBase {
   getDefaultConfig() {
     this._debug('getDefaultConfig wird aufgerufen');
     return {
-      entity: 'input_text.arbeitszeiten',
+      entity: '',
       numberOfMonths: 14,
       initialDisplayedMonths: 2,
       selectedCalendar: 'a', // Erster aktivierter Kalender

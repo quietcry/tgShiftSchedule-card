@@ -54,17 +54,38 @@ export class ShiftScheduleView extends ViewBase {
 
   // Prüft, ob die Karte im Editor-Modus angezeigt wird
   _isInEditorMode() {
-    // Methode 1: Prüfe lovelace.editMode
+    // Methode 1: Prüfe URL-Parameter ?edit=1
+    if (typeof window !== 'undefined' && window.location) {
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('edit') === '1') {
+        return true;
+      }
+    }
+
+    // Methode 2: Prüfe lovelace.editMode
     if (this.lovelace?.editMode === true) {
       return true;
     }
 
-    // Methode 2: Prüfe, ob die Karte in einem Editor-Container ist
+    // Methode 3: Prüfe, ob hui-dialog-edit-card im DOM existiert
+    if (typeof document !== 'undefined') {
+      const editDialog = document.querySelector('hui-dialog-edit-card');
+      if (editDialog) {
+        return true;
+      }
+    }
+
+    // Methode 4: Prüfe, ob die Karte in einem Editor-Container ist
     let element = this;
     let depth = 0;
-    const maxDepth = 15; // Erhöht für bessere Erkennung
+    const maxDepth = 20; // Erhöht für bessere Erkennung
 
     while (element && depth < maxDepth) {
+      // Prüfe auf hui-dialog-edit-card im Parent-Baum
+      if (element.tagName?.toLowerCase() === 'hui-dialog-edit-card') {
+        return true;
+      }
+
       // Prüfe auf Editor-spezifische Klassen oder Attribute
       if (
         element.classList?.contains('card-editor') ||
@@ -95,12 +116,13 @@ export class ShiftScheduleView extends ViewBase {
       depth++;
     }
 
-    // Methode 3: Prüfe, ob die Karte in einem Shadow DOM mit Editor-Klassen ist
+    // Methode 5: Prüfe, ob die Karte in einem Shadow DOM mit Editor-Klassen ist
     const root = this.getRootNode();
     if (root && root !== document) {
       const host = root.host;
       if (host) {
         if (
+          host.tagName?.toLowerCase() === 'hui-dialog-edit-card' ||
           host.classList?.contains('card-editor') ||
           host.classList?.contains('hui-card-editor') ||
           host.classList?.contains('edit-mode') ||
@@ -112,7 +134,7 @@ export class ShiftScheduleView extends ViewBase {
       }
     }
 
-    // Methode 4: Prüfe URL (falls im Editor-Modus)
+    // Methode 6: Prüfe URL-Pfad (falls im Editor-Modus)
     if (typeof window !== 'undefined' && window.location) {
       const url = window.location.href || window.location.pathname;
       if (url && (url.includes('/config/lovelace/dashboards') || url.includes('/editor'))) {
@@ -318,23 +340,7 @@ export class ShiftScheduleView extends ViewBase {
   }
 
   set config(config) {
-    // Setze _config zuerst, damit _getActiveElements() funktioniert
     this._config = config;
-
-    // Initialisiere _displayedMonths aus der Config
-    if (config && config.initialDisplayedMonths) {
-      // Verwende initialDisplayedMonths als Standardwert
-      const maxMonths = config.numberOfMonths || 14;
-      this._displayedMonths = Math.min(config.initialDisplayedMonths, maxMonths);
-    } else if (config && config.numberOfMonths && !this._displayedMonths) {
-      // Fallback: Verwende numberOfMonths, falls initialDisplayedMonths nicht gesetzt ist
-      this._displayedMonths = config.numberOfMonths;
-    } else if (config && config.numberOfMonths) {
-      // Stelle sicher, dass _displayedMonths nicht größer als numberOfMonths ist
-      this._displayedMonths = Math.min(this._displayedMonths || 2, config.numberOfMonths);
-    }
-
-    // Initialisiere _selectedElement - muss nach _config gesetzt werden, damit _getActiveElements() funktioniert
 
     // Initialisiere _displayedMonths aus der Config
     if (config && config.initialDisplayedMonths) {
@@ -867,6 +873,31 @@ export class ShiftScheduleView extends ViewBase {
     }
 
     this.requestUpdate();
+  }
+
+  // Rendert eine Warnung für eine fehlende Entity
+  _renderMissingEntityWarning(entityId, entityName, maxLength = 255, isConfig = false) {
+    const entityNameShort = entityId.replace('input_text.', '');
+    return html`
+      <div class="storage-warning">
+        <div class="warning-icon">⚠️</div>
+        <div class="warning-content">
+          <div class="warning-title">${entityName} fehlt!</div>
+          <div class="warning-message">
+            Die Entity <code>${entityId}</code> wurde nicht gefunden.
+          </div>
+          <div class="warning-action">
+            Bitte legen Sie diese Entity über die UI an:
+            <ul>
+              <li>Einstellungen → Automatisierungen &amp; Szenen → Hilfsmittel</li>
+              <li>Hinzufügen → Text</li>
+              <li>Name: <code>${entityNameShort}</code></li>
+              <li>Maximale Länge: <code>${maxLength}</code> Zeichen</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    `;
   }
 
   checkStatusEntity() {
@@ -1797,137 +1828,6 @@ export class ShiftScheduleView extends ViewBase {
     return this._workingDays[monthKey][day] || [];
   }
 
-  _getElementByShortcut(shortcut) {
-    // Gibt das Element-Objekt für einen gegebenen Shortcut zurück
-    if (!this._config?.elements) {
-      return null;
-    }
-
-    return this._config.elements.find(e => e.shortcut === shortcut && e.aktiv) || null;
-  }
-
-  _getActiveElements() {
-    if (!this._config?.useElements || !this._config?.elements) {
-      return [];
-    }
-
-    // Filtere nur aktive Elemente und behalte den ursprünglichen Index
-    const activeElements = this._config.elements
-      .map((element, index) => {
-        // Prüfe sowohl auf true als auch auf "true" (String)
-        const isActive = element.aktiv === true || element.aktiv === 'true' || element.aktiv === 1;
-        return { element, originalIndex: index, isActive };
-      })
-      .filter(({ isActive }) => isActive)
-      .map(({ element, originalIndex }) => ({ element, originalIndex }));
-
-    return activeElements;
-  }
-
-  _getSelectedElementValue() {
-    const activeElements = this._getActiveElements();
-
-    if (activeElements.length === 0) {
-      return '';
-    }
-
-    // Wenn _selectedElement noch nicht gesetzt ist, setze es auf das erste aktive Element
-    if (this._selectedElement === null || this._selectedElement === undefined) {
-      this._selectedElement = activeElements[0].originalIndex;
-      // Speichere es auch in der Config
-      if (this._config) {
-        this._config.selectedElement = this._selectedElement;
-      }
-      // Aktualisiere die Ansicht, damit der Dropdown den Wert anzeigt
-      this.requestUpdate();
-      return '1'; // 1-basiert: erstes Element = 1
-    }
-
-    // Prüfe ob das ausgewählte Element auch aktiv ist
-    const foundIndex = activeElements.findIndex(({ originalIndex }) => originalIndex === this._selectedElement);
-
-    // Wenn das Element nicht in der aktiven Liste gefunden wird, verwende das erste Element
-    if (foundIndex < 0) {
-      this._selectedElement = activeElements[0].originalIndex;
-      if (this._config) {
-        this._config.selectedElement = this._selectedElement;
-      }
-      // Dispatch config-changed Event, damit die Config gespeichert wird
-      this.dispatchEvent(
-        new CustomEvent('config-changed', {
-          detail: { config: this._config },
-          bubbles: true,
-          composed: true,
-        })
-      );
-      // Speichere die Config in die Entity
-      this.saveConfigToEntity();
-      // Aktualisiere die Ansicht, damit der Dropdown den Wert anzeigt
-      this.requestUpdate();
-      return '1'; // 1-basiert: erstes Element = 1
-    }
-
-    // 1-basiert: foundIndex 0 -> Wert 1, foundIndex 1 -> Wert 2, etc.
-    const value = String(foundIndex + 1);
-
-    // Stelle sicher, dass der Wert nicht leer ist
-    if (value === '' || value === 'undefined' || value === 'null' || isNaN(foundIndex)) {
-      return '1';
-    }
-
-    return value;
-  }
-
-  _onElementSelected(event) {
-    // ha-select verwendet event.detail.value für value-changed
-    const value = event.detail?.value !== undefined ? event.detail.value : event.target.value;
-    let selectedIndex = null;
-
-    if (value !== '' && value !== null && value !== undefined) {
-      // Der Wert ist 1-basiert (1 = erstes Element, 2 = zweites Element, etc.)
-      // Wir müssen ihn in einen 0-basierten Index umwandeln
-      const activeElements = this._getActiveElements();
-      const parsedValue = parseInt(value);
-      // 1-basiert -> 0-basiert: Wert 1 -> Index 0, Wert 2 -> Index 1, etc.
-      const arrayIndex = parsedValue - 1;
-      if (!isNaN(arrayIndex) && arrayIndex >= 0 && activeElements[arrayIndex]) {
-        selectedIndex = activeElements[arrayIndex].originalIndex;
-      } else if (activeElements.length > 0) {
-        // Fallback: erstes aktives Element, falls Wert ungültig
-        selectedIndex = activeElements[0].originalIndex;
-      }
-    } else {
-      // Wenn kein Wert, aber aktive Elemente vorhanden, verwende das erste
-      const activeElements = this._getActiveElements();
-      if (activeElements.length > 0) {
-        selectedIndex = activeElements[0].originalIndex;
-      }
-    }
-
-    this._selectedElement = selectedIndex;
-
-    // Aktualisiere die Config mit der neuen Auswahl
-    if (this._config && selectedIndex !== null) {
-      this._config = {
-        ...this._config,
-        selectedElement: selectedIndex,
-      };
-
-      // Dispatch config-changed Event, damit die Card die Config aktualisiert
-      this.dispatchEvent(
-        new CustomEvent('config-changed', {
-          detail: { config: this._config },
-          bubbles: true,
-          composed: true,
-        })
-      );
-      // Speichere die Config in die Entity
-      this.saveConfigToEntity();
-    }
-
-    this.requestUpdate();
-  }
-
   render() {
     if (!this._config || !this._config.entity) {
       return html`<div class="error">Keine Entity konfiguriert</div>`;
@@ -1977,61 +1877,44 @@ export class ShiftScheduleView extends ViewBase {
               </div>
             `
           : ''}
-        ${hasConfigWarning
+        ${hasConfigWarning && this._configWarning.type === 'size'
           ? html`
               <div class="storage-warning">
                 <div class="warning-icon">⚠️</div>
                 <div class="warning-content">
-                  ${this._configWarning.type === 'missing'
-                    ? html`
-                        <div class="warning-title">Konfigurations-Entity fehlt!</div>
-                        <div class="warning-message">
-                          Die Konfigurations-Entity <code>${this._configWarning.configEntityId}</code> wurde nicht gefunden.
-                        </div>
-                        <div class="warning-action">
-                          Bitte legen Sie diese Entity in Ihrer <code>configuration.yaml</code> an:
-                          <pre>input_text:
-  ${this._configWarning.configEntityId.replace('input_text.', '')}:
-    name: Schichtplan Konfiguration</pre>
-                        </div>
-                      `
-                    : html`
-                        <div class="warning-title">Konfigurations-Entity zu klein!</div>
-                        <div class="warning-message">
-                          Die Konfiguration passt nicht in die Entity <code>${this._configWarning.configEntityId}</code>.
-                          ${this._configWarning.percentage}% der verfügbaren Speicherkapazität benötigt
-                          (${this._configWarning.currentLength} / ${this._configWarning.maxLength} Zeichen).
-                        </div>
-                        <div class="warning-action">
-                          Bitte erhöhen Sie die maximale Länge der Entity in Ihrer <code>configuration.yaml</code>:
-                          <pre>input_text:
-  ${this._configWarning.configEntityId.replace('input_text.', '')}:
-    name: Schichtplan Konfiguration
-    max: ${Math.ceil(this._configWarning.currentLength * 1.2)}</pre>
-                        </div>
-                      `}
+                  <div class="warning-title">Konfigurations-Entity zu klein!</div>
+                  <div class="warning-message">
+                    Die Konfiguration passt nicht in die Entity <code>${this._configWarning.configEntityId}</code>.
+                    ${this._configWarning.percentage}% der verfügbaren Speicherkapazität benötigt
+                    (${this._configWarning.currentLength} / ${this._configWarning.maxLength} Zeichen).
+                  </div>
+                  <div class="warning-action">
+                    Bitte erhöhen Sie die maximale Länge der Entity über die UI:
+                    <ul>
+                      <li>Einstellungen → Automatisierungen &amp; Szenen → Hilfsmittel</li>
+                      <li>Entity <code>${this._configWarning.configEntityId.replace('input_text.', '')}</code> bearbeiten</li>
+                      <li>Maximale Länge auf mindestens <code>${Math.ceil(this._configWarning.currentLength * 1.2)}</code> Zeichen erhöhen</li>
+                    </ul>
+                  </div>
                 </div>
               </div>
             `
           : ''}
+        ${hasConfigWarning && this._configWarning.type === 'missing'
+          ? this._renderMissingEntityWarning(
+              this._configWarning.configEntityId,
+              'Konfigurations-Entity',
+              255,
+              true
+            )
+          : ''}
         ${hasStatusWarning
-          ? html`
-              <div class="storage-warning">
-                <div class="warning-icon">⚠️</div>
-                <div class="warning-content">
-                  <div class="warning-title">Status-Entity fehlt!</div>
-                  <div class="warning-message">
-                    Die Status-Entity <code>${this._statusWarning.statusEntityId}</code> wurde nicht gefunden.
-                  </div>
-                  <div class="warning-action">
-                    Bitte legen Sie diese Entity in Ihrer <code>configuration.yaml</code> an:
-                    <pre>input_text:
-  ${this._statusWarning.statusEntityId.replace('input_text.', '')}:
-    name: Schichtplan Status</pre>
-                  </div>
-                </div>
-              </div>
-            `
+          ? this._renderMissingEntityWarning(
+              this._statusWarning.statusEntityId,
+              'Status-Entity',
+              255,
+              false
+            )
           : ''}
         <div class="menu-bar">
           <button
@@ -2470,6 +2353,25 @@ export class ShiftScheduleView extends ViewBase {
         margin-top: 8px;
         padding-top: 8px;
         border-top: 1px solid rgba(255, 255, 255, 0.3);
+      }
+
+      .warning-action ul {
+        margin: 8px 0 0 0;
+        padding-left: 20px;
+        list-style-type: disc;
+      }
+
+      .warning-action li {
+        margin: 4px 0;
+        line-height: 1.5;
+      }
+
+      .warning-action code {
+        background-color: rgba(0, 0, 0, 0.2);
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-family: 'Courier New', monospace;
+        font-size: 13px;
       }
     `,
   ];

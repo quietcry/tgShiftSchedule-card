@@ -9,7 +9,7 @@ export class EditorImpl extends EditorBase {
 
   constructor() {
     super({
-      entity: 'input_text.arbeitszeiten',
+      entity: '',
       numberOfMonths: 14,
       initialDisplayedMonths: 2,
       selectedCalendar: 'a',
@@ -1008,7 +1008,7 @@ export class EditorImpl extends EditorBase {
 
   static getStubConfig() {
     return {
-      entity: 'input_text.arbeitszeiten',
+      entity: '',
       numberOfMonths: 14,
       initialDisplayedMonths: 2,
       useElements: false,
