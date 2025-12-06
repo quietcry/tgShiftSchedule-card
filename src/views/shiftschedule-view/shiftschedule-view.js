@@ -2400,6 +2400,7 @@ export class ShiftScheduleView extends ViewBase {
         background-color: var(--card-background-color, #ffffff);
         border-radius: 4px;
         border: 1px solid var(--divider-color, #e0e0e0);
+        flex-wrap: wrap;
       }
 
       .menu-button {
@@ -2448,8 +2449,16 @@ export class ShiftScheduleView extends ViewBase {
         min-width: 200px;
       }
 
+      .calendar-selector {
+        flex: 1;
+        min-width: 0;
+        max-width: 100%;
+        margin-left: 12px;
+      }
+
       .calendar-selector ha-select {
         width: 100%;
+        max-width: 100%;
       }
 
       /* Stelle sicher, dass alle Items die Schichtfarbe als Hintergrund haben */
