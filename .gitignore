@@ -7,6 +7,12 @@ yarn-error.log
 # Build output
 dist/*
 !dist/tgshiftschedule-card.js
+!dist/tgshiftschedule-card.js.map
+!dist/tgshiftschedule-card.js.LICENSE.txt
+# Ignoriere alle HMR (Hot Module Replacement) Dateien vom Dev-Server
+dist/*.hot-update.*
+# Ignoriere Chunk-Dateien (werden dynamisch generiert)
+dist/[0-9]*.tgshiftschedule-card.js*
 build/
 
 # IDE and editor files
@@ -21,3 +27,9 @@ build/
 .env.local
 .env.*.local 
 node_modules
+
+# Development/Helper Scripts (nur lokal, nicht auf GitHub)
+*.sh
+*.py
+!package.json
+!package-lock.json

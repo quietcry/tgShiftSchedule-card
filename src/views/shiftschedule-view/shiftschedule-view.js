@@ -1,5 +1,6 @@
 import { html, css, unsafeCSS } from 'lit';
 import { ViewBase } from '../view-base.js';
+import { SaveDebounceTime } from '../../card-config.js';
 
 export class ShiftScheduleView extends ViewBase {
   static className = 'ShiftScheduleView';
@@ -45,6 +46,13 @@ export class ShiftScheduleView extends ViewBase {
     this._isWriting = false; // Flag, ob gerade geschrieben wird
     this._writeLockTimer = null; // Timer für das 5-Sekunden-Lock nach dem Schreiben
     this._selectedCalendar = null; // Shortcut des ausgewählten Kalenders (wird beim Setzen der Config initialisiert)
+    // Performance-Caches
+    this._holidayCache = {}; // Cache für Feiertage: {"2025-12": {1: true, 25: true, ...}}
+    this._cachedHolidayEntities = null; // Cache für Holiday-Entities (wird bei hass-Update invalidiert)
+    this._editorModeCache = null; // Cache für Editor-Mode-Erkennung
+    this._editorModeCacheTime = 0; // Zeitstempel für Cache-Invalidierung
+    // Debouncing für Speicher-Operationen
+    this._saveDebounceTimer = null; // Timer für Debouncing beim Speichern
   }
 
   // Formatiert eine Zahl auf zwei Ziffern (z.B. 1 -> "01", 25 -> "25")
@@ -52,97 +60,123 @@ export class ShiftScheduleView extends ViewBase {
     return String(num).padStart(2, '0');
   }
 
-  // Prüft, ob die Karte im Editor-Modus angezeigt wird
+  // Prüft, ob die Karte im Editor-Modus angezeigt wird (mit Cache)
   _isInEditorMode() {
+    // Cache: Prüfe ob Cache noch gültig ist (5 Sekunden)
+    const now = Date.now();
+    if (this._editorModeCache !== null && (now - this._editorModeCacheTime) < 5000) {
+      return this._editorModeCache;
+    }
+
+    let result = false;
+
     // Methode 1: Prüfe URL-Parameter ?edit=1
     if (typeof window !== 'undefined' && window.location) {
       const urlParams = new URLSearchParams(window.location.search);
       if (urlParams.get('edit') === '1') {
-        return true;
+        result = true;
       }
     }
 
-    // Methode 2: Prüfe lovelace.editMode
-    if (this.lovelace?.editMode === true) {
-      return true;
-    }
-
-    // Methode 3: Prüfe, ob hui-dialog-edit-card im DOM existiert
-    if (typeof document !== 'undefined') {
-      const editDialog = document.querySelector('hui-dialog-edit-card');
-      if (editDialog) {
-        return true;
+    if (!result) {
+      // Methode 2: Prüfe lovelace.editMode
+      if (this.lovelace?.editMode === true) {
+        result = true;
       }
     }
 
-    // Methode 4: Prüfe, ob die Karte in einem Editor-Container ist
-    let element = this;
-    let depth = 0;
-    const maxDepth = 20; // Erhöht für bessere Erkennung
-
-    while (element && depth < maxDepth) {
-      // Prüfe auf hui-dialog-edit-card im Parent-Baum
-      if (element.tagName?.toLowerCase() === 'hui-dialog-edit-card') {
-        return true;
-      }
-
-      // Prüfe auf Editor-spezifische Klassen oder Attribute
-      if (
-        element.classList?.contains('card-editor') ||
-        element.classList?.contains('hui-card-editor') ||
-        element.classList?.contains('edit-mode') ||
-        element.classList?.contains('hui-card-config-editor') ||
-        element.getAttribute?.('data-card-editor') === 'true' ||
-        element.tagName?.toLowerCase().includes('editor') ||
-        element.tagName?.toLowerCase() === 'hui-card-element-editor'
-      ) {
-        return true;
-      }
-
-      // Prüfe auf Editor-spezifische IDs
-      if (element.id && (element.id.includes('editor') || element.id.includes('config'))) {
-        return true;
-      }
-
-      // Prüfe auf Editor-spezifische Attribute
-      if (element.hasAttribute && (
-        element.hasAttribute('data-card-editor') ||
-        element.hasAttribute('data-editor')
-      )) {
-        return true;
-      }
-
-      element = element.parentElement || element.parentNode;
-      depth++;
-    }
-
-    // Methode 5: Prüfe, ob die Karte in einem Shadow DOM mit Editor-Klassen ist
-    const root = this.getRootNode();
-    if (root && root !== document) {
-      const host = root.host;
-      if (host) {
-        if (
-          host.tagName?.toLowerCase() === 'hui-dialog-edit-card' ||
-          host.classList?.contains('card-editor') ||
-          host.classList?.contains('hui-card-editor') ||
-          host.classList?.contains('edit-mode') ||
-          host.classList?.contains('hui-card-config-editor') ||
-          host.tagName?.toLowerCase() === 'hui-card-element-editor'
-        ) {
-          return true;
+    if (!result) {
+      // Methode 3: Prüfe, ob hui-dialog-edit-card im DOM existiert
+      if (typeof document !== 'undefined') {
+        const editDialog = document.querySelector('hui-dialog-edit-card');
+        if (editDialog) {
+          result = true;
         }
       }
     }
 
-    // Methode 6: Prüfe URL-Pfad (falls im Editor-Modus)
-    if (typeof window !== 'undefined' && window.location) {
-      const url = window.location.href || window.location.pathname;
-      if (url && (url.includes('/config/lovelace/dashboards') || url.includes('/editor'))) {
-        return true;
+    if (!result) {
+      // Methode 4: Prüfe, ob die Karte in einem Editor-Container ist
+      let element = this;
+      let depth = 0;
+      const maxDepth = 20; // Erhöht für bessere Erkennung
+
+      while (element && depth < maxDepth) {
+        // Prüfe auf hui-dialog-edit-card im Parent-Baum
+        if (element.tagName?.toLowerCase() === 'hui-dialog-edit-card') {
+          result = true;
+          break;
+        }
+
+        // Prüfe auf Editor-spezifische Klassen oder Attribute
+        if (
+          element.classList?.contains('card-editor') ||
+          element.classList?.contains('hui-card-editor') ||
+          element.classList?.contains('edit-mode') ||
+          element.classList?.contains('hui-card-config-editor') ||
+          element.getAttribute?.('data-card-editor') === 'true' ||
+          element.tagName?.toLowerCase().includes('editor') ||
+          element.tagName?.toLowerCase() === 'hui-card-element-editor'
+        ) {
+          result = true;
+          break;
+        }
+
+        // Prüfe auf Editor-spezifische IDs
+        if (element.id && (element.id.includes('editor') || element.id.includes('config'))) {
+          result = true;
+          break;
+        }
+
+        // Prüfe auf Editor-spezifische Attribute
+        if (element.hasAttribute && (
+          element.hasAttribute('data-card-editor') ||
+          element.hasAttribute('data-editor')
+        )) {
+          result = true;
+          break;
+        }
+
+        element = element.parentElement || element.parentNode;
+        depth++;
       }
     }
 
-    return false;
+    if (!result) {
+      // Methode 5: Prüfe, ob die Karte in einem Shadow DOM mit Editor-Klassen ist
+      const root = this.getRootNode();
+      if (root && root !== document) {
+        const host = root.host;
+        if (host) {
+          if (
+            host.tagName?.toLowerCase() === 'hui-dialog-edit-card' ||
+            host.classList?.contains('card-editor') ||
+            host.classList?.contains('hui-card-editor') ||
+            host.classList?.contains('edit-mode') ||
+            host.classList?.contains('hui-card-config-editor') ||
+            host.tagName?.toLowerCase() === 'hui-card-element-editor'
+          ) {
+            result = true;
+          }
+        }
+      }
+    }
+
+    if (!result) {
+      // Methode 6: Prüfe URL-Pfad (falls im Editor-Modus)
+      if (typeof window !== 'undefined' && window.location) {
+        const url = window.location.href || window.location.pathname;
+        if (url && (url.includes('/config/lovelace/dashboards') || url.includes('/editor'))) {
+          result = true;
+        }
+      }
+    }
+
+    // Cache speichern
+    this._editorModeCache = result;
+    this._editorModeCacheTime = now;
+
+    return result;
   }
 
   // Berechnet die Kontrastfarbe (schwarz oder weiß) für eine gegebene Hintergrundfarbe
@@ -183,17 +217,37 @@ export class ShiftScheduleView extends ViewBase {
     return new Date(year, month - 1, day);
   }
 
-  // Prüft ob ein Datum ein Feiertag ist
+  // Prüft ob ein Datum ein Feiertag ist (mit Cache)
   // Versucht zuerst Home Assistant Holiday-Sensoren zu verwenden, falls vorhanden
   _isHoliday(year, month, day) {
+    // Cache-Key: "2025-12" für Monat/Jahr
+    const cacheKey = `${year}-${String(month + 1).padStart(2, '0')}`;
+
+    // Prüfe Cache
+    if (this._holidayCache[cacheKey] && this._holidayCache[cacheKey][day] !== undefined) {
+      return this._holidayCache[cacheKey][day];
+    }
+
+    // Initialisiere Cache für diesen Monat
+    if (!this._holidayCache[cacheKey]) {
+      this._holidayCache[cacheKey] = {};
+    }
+
+    let result = false;
+
     // Prüfe ob Home Assistant Holiday-Sensoren verfügbar sind
     if (this._hass && this._hass.states) {
       // Suche nach Holiday-Sensoren (z.B. sensor.germany_holidays, sensor.holidays, etc.)
-      const holidayEntities = Object.keys(this._hass.states).filter(entityId => {
-        return entityId.startsWith('sensor.') &&
-               (entityId.includes('holiday') || entityId.includes('feiertag')) &&
-               this._hass.states[entityId].state === 'on';
-      });
+      // OPTIMIERUNG: Cache Holiday-Entities, nicht bei jedem Aufruf suchen
+      if (!this._cachedHolidayEntities) {
+        this._cachedHolidayEntities = Object.keys(this._hass.states).filter(entityId => {
+          return entityId.startsWith('sensor.') &&
+                 (entityId.includes('holiday') || entityId.includes('feiertag')) &&
+                 this._hass.states[entityId].state === 'on';
+        });
+      }
+
+      const holidayEntities = this._cachedHolidayEntities;
 
       if (holidayEntities.length > 0) {
         // Prüfe ob das Datum in den Holiday-Attributen enthalten ist
@@ -211,11 +265,13 @@ export class ShiftScheduleView extends ViewBase {
                 const attrValue = entity.attributes[attr];
                 if (Array.isArray(attrValue)) {
                   if (attrValue.some(d => d === dateStr || d === dateStrShort || d.includes(dateStr) || d.includes(dateStrShort))) {
-                    return true;
+                    result = true;
+                    break;
                   }
                 } else if (typeof attrValue === 'string') {
                   if (attrValue.includes(dateStr) || attrValue.includes(dateStrShort)) {
-                    return true;
+                    result = true;
+                    break;
                   }
                 }
               }
@@ -246,51 +302,60 @@ export class ShiftScheduleView extends ViewBase {
       { month: 11, day: 26, key: 'weihnachten_2' }, // 2. Weihnachtsfeiertag
     ];
 
-    // Prüfe feste Feiertage
-    for (const holiday of fixedHolidays) {
-      if (month === holiday.month && day === holiday.day && isHolidayEnabled(holiday.key)) {
-        return true;
+    if (!result) {
+      // Prüfe feste Feiertage
+      for (const holiday of fixedHolidays) {
+        if (month === holiday.month && day === holiday.day && isHolidayEnabled(holiday.key)) {
+          result = true;
+          break;
+        }
       }
     }
 
-    // Bewegliche Feiertage (abhängig von Ostern)
-    const easterTime = easter.getTime();
-    const oneDay = 24 * 60 * 60 * 1000;
+    if (!result) {
+      // Bewegliche Feiertage (abhängig von Ostern)
+      const easterTime = easter.getTime();
+      const oneDay = 24 * 60 * 60 * 1000;
 
-    // Buß- und Bettag: Mittwoch vor dem 23. November (oder am 23. November, falls es ein Mittwoch ist)
-    const nov23 = new Date(year, 10, 23); // 23. November (month ist 0-basiert)
-    const dayOfWeekNov23 = nov23.getDay(); // 0 = Sonntag, 1 = Montag, ..., 3 = Mittwoch, ..., 6 = Samstag
-    // Berechne wie viele Tage zurück zum Mittwoch
-    // Wenn Mittwoch (3): 0 Tage zurück
-    // Wenn Donnerstag (4): 1 Tag zurück → 4 - 3 = 1
-    // Wenn Freitag (5): 2 Tage zurück → 5 - 3 = 2
-    // Wenn Samstag (6): 3 Tage zurück → 6 - 3 = 3
-    // Wenn Sonntag (0): 4 Tage zurück → (0 + 7) - 3 = 4
-    // Wenn Montag (1): 5 Tage zurück → (1 + 7) - 3 = 5
-    // Wenn Dienstag (2): 6 Tage zurück → (2 + 7) - 3 = 6
-    const daysToSubtract = dayOfWeekNov23 <= 3 ? (3 - dayOfWeekNov23) : ((dayOfWeekNov23 + 7) - 3);
-    const busstag = new Date(year, 10, 23 - daysToSubtract);
+      // Buß- und Bettag: Mittwoch vor dem 23. November (oder am 23. November, falls es ein Mittwoch ist)
+      const nov23 = new Date(year, 10, 23); // 23. November (month ist 0-basiert)
+      const dayOfWeekNov23 = nov23.getDay(); // 0 = Sonntag, 1 = Montag, ..., 3 = Mittwoch, ..., 6 = Samstag
+      // Berechne wie viele Tage zurück zum Mittwoch
+      // Wenn Mittwoch (3): 0 Tage zurück
+      // Wenn Donnerstag (4): 1 Tag zurück → 4 - 3 = 1
+      // Wenn Freitag (5): 2 Tage zurück → 5 - 3 = 2
+      // Wenn Samstag (6): 3 Tage zurück → 6 - 3 = 3
+      // Wenn Sonntag (0): 4 Tage zurück → (0 + 7) - 3 = 4
+      // Wenn Montag (1): 5 Tage zurück → (1 + 7) - 3 = 5
+      // Wenn Dienstag (2): 6 Tage zurück → (2 + 7) - 3 = 6
+      const daysToSubtract = dayOfWeekNov23 <= 3 ? (3 - dayOfWeekNov23) : ((dayOfWeekNov23 + 7) - 3);
+      const busstag = new Date(year, 10, 23 - daysToSubtract);
 
-    const movableHolidays = [
-      { date: new Date(easterTime - 2 * oneDay), key: 'karfreitag' },  // Karfreitag
-      { date: new Date(easterTime + 1 * oneDay), key: 'ostermontag' },  // Ostermontag
-      { date: new Date(easterTime + 39 * oneDay), key: 'christi_himmelfahrt' }, // Christi Himmelfahrt
-      { date: new Date(easterTime + 50 * oneDay), key: 'pfingstmontag' }, // Pfingstmontag
-      { date: new Date(easterTime + 60 * oneDay), key: 'fronleichnam' }, // Fronleichnam (nur in bestimmten Bundesländern)
-      { date: busstag, key: 'busstag' }, // Buß- und Bettag (nur in Sachsen)
-    ];
+      const movableHolidays = [
+        { date: new Date(easterTime - 2 * oneDay), key: 'karfreitag' },  // Karfreitag
+        { date: new Date(easterTime + 1 * oneDay), key: 'ostermontag' },  // Ostermontag
+        { date: new Date(easterTime + 39 * oneDay), key: 'christi_himmelfahrt' }, // Christi Himmelfahrt
+        { date: new Date(easterTime + 50 * oneDay), key: 'pfingstmontag' }, // Pfingstmontag
+        { date: new Date(easterTime + 60 * oneDay), key: 'fronleichnam' }, // Fronleichnam (nur in bestimmten Bundesländern)
+        { date: busstag, key: 'busstag' }, // Buß- und Bettag (nur in Sachsen)
+      ];
 
-    // Prüfe bewegliche Feiertage
-    for (const holiday of movableHolidays) {
-      if (holiday.date.getFullYear() === year &&
-          holiday.date.getMonth() === month &&
-          holiday.date.getDate() === day &&
-          isHolidayEnabled(holiday.key)) {
-        return true;
+      // Prüfe bewegliche Feiertage
+      for (const holiday of movableHolidays) {
+        if (holiday.date.getFullYear() === year &&
+            holiday.date.getMonth() === month &&
+            holiday.date.getDate() === day &&
+            isHolidayEnabled(holiday.key)) {
+          result = true;
+          break;
+        }
       }
     }
 
-    return false;
+    // Cache speichern
+    this._holidayCache[cacheKey][day] = result;
+
+    return result;
   }
 
   // Prüft ob ein Datum ein Wochenende ist
@@ -327,6 +392,10 @@ export class ShiftScheduleView extends ViewBase {
     }
 
     this._hass = hass;
+
+    // Cache-Invalidierung: Holiday-Entities Cache zurücksetzen bei hass-Update
+    this._cachedHolidayEntities = null;
+
     if (this._config) {
       // Nur laden, wenn sich ein State tatsächlich geändert hat (nicht bei jedem Update)
       if (hasAnyEntityChanged) {
@@ -1422,15 +1491,170 @@ export class ShiftScheduleView extends ViewBase {
         }
       }
 
-    const serializedData = this.serializeWorkingDays();
+    // OPTIMIERUNG: Direkte DOM-Manipulation statt komplettes Re-Rendering
+    this._updateDayButtonDirectly(monthNum, dayNum, yearNum, key, elements);
 
-    // Verteile die Daten auf mehrere Entities, falls nötig
-    await this.distributeDataToEntities(serializedData);
+    // OPTIMIERUNG: Debounced Speichern - warte nach dem letzten Klick, bevor gespeichert wird
+    this._scheduleDebouncedSave();
+  }
 
-    // Prüfe Speicherverbrauch nach dem Toggle
-    // Verwende die Länge der serialisierten Daten, da die States noch nicht aktualisiert sind
-    this.checkStorageUsage(serializedData.length);
-    this.requestUpdate();
+  // Plant ein debounced Speichern der Daten
+  _scheduleDebouncedSave() {
+    // Lese Debounce-Zeit aus der Config (Standard: 300ms)
+    const debounceTime = this._getSaveDebounceTime();
+
+    // Wenn Debounce-Zeit 0 ist, speichere sofort
+    if (debounceTime === 0) {
+      this._saveToHA();
+      return;
+    }
+
+    // Lösche vorhandenen Timer
+    if (this._saveDebounceTimer) {
+      clearTimeout(this._saveDebounceTimer);
+      this._saveDebounceTimer = null;
+    }
+
+    // Setze neuen Timer
+    this._saveDebounceTimer = setTimeout(() => {
+      this._saveDebounceTimer = null;
+      this._saveToHA();
+    }, debounceTime);
+  }
+
+  // Speichert die Daten asynchron in Home Assistant
+  async _saveToHA() {
+    try {
+      const serializedData = this.serializeWorkingDays();
+
+      // Verteile die Daten auf mehrere Entities, falls nötig
+      await this.distributeDataToEntities(serializedData);
+
+      // Prüfe Speicherverbrauch nach dem Toggle
+      // Verwende die Länge der serialisierten Daten, da die States noch nicht aktualisiert sind
+      this.checkStorageUsage(serializedData.length);
+    } catch (error) {
+      console.error('[TG Schichtplan] Fehler beim Speichern:', error);
+      // Optional: Hier könnte man eine Fehlermeldung anzeigen
+    }
+  }
+
+  // Liest die Debounce-Zeit aus der Config
+  _getSaveDebounceTime() {
+    // Versuche aus Config zu lesen
+    if (this._config && typeof this._config.saveDebounceTime === 'number') {
+      return Math.max(0, this._config.saveDebounceTime); // Mindestens 0
+    }
+
+    // Fallback: Verwende Standard-Wert aus card-config.js
+    return SaveDebounceTime || 300; // Standard: 300ms
+  }
+
+  // Aktualisiert einen einzelnen Button direkt im DOM ohne komplettes Re-Rendering
+  _updateDayButtonDirectly(monthNum, dayNum, yearNum, key, dayElements) {
+    if (!this.shadowRoot) {
+      // Shadow DOM noch nicht bereit, Fallback zu requestUpdate
+      this.requestUpdate();
+      return;
+    }
+
+    // Finde den Button im DOM
+    const button = this.shadowRoot.querySelector(
+      `button[data-month="${monthNum}"][data-day="${dayNum}"][data-year="${yearNum}"]`
+    );
+
+    if (!button) {
+      // Button nicht gefunden, Fallback zu requestUpdate
+      this.requestUpdate();
+      return;
+    }
+
+    // Berechne die neuen Werte für diesen Button
+    const selectedShortcut = this._getSelectedCalendarShortcut();
+    const hasSelectedShift = selectedShortcut && dayElements.includes(selectedShortcut);
+    const selectedCalendar = this._getCalendarByShortcut(selectedShortcut);
+
+    // Finde die erste aktivierte Schicht
+    let firstActiveShift = null;
+    const shiftOrder = ['a', 'b', 'c', 'd', 'e'];
+    for (const shortcut of shiftOrder) {
+      if (dayElements.includes(shortcut)) {
+        const calendar = this._getCalendarByShortcut(shortcut);
+        if (calendar && calendar.enabled) {
+          firstActiveShift = shortcut;
+          break;
+        }
+      }
+    }
+
+    // Bestimme welche Schicht den Tag färben soll
+    let activeShiftForColor = null;
+    if (hasSelectedShift && selectedCalendar && selectedCalendar.enabled) {
+      activeShiftForColor = selectedShortcut;
+    } else if (firstActiveShift) {
+      activeShiftForColor = firstActiveShift;
+    }
+
+    const isWorking = activeShiftForColor !== null;
+
+    // Aktualisiere CSS-Klasse
+    if (isWorking) {
+      button.classList.add('working');
+    } else {
+      button.classList.remove('working');
+    }
+
+    // Aktualisiere Hintergrundfarbe
+    if (activeShiftForColor) {
+      const activeCalendar = this._getCalendarByShortcut(activeShiftForColor);
+      if (activeCalendar && activeCalendar.color) {
+        button.style.backgroundColor = activeCalendar.color;
+      } else {
+        button.style.backgroundColor = '';
+      }
+    } else {
+      button.style.backgroundColor = '';
+    }
+
+    // Aktualisiere Shift-Indikatoren
+    const shiftsContainer = button.querySelector('.shifts-container');
+    const existingIndicators = shiftsContainer ? Array.from(shiftsContainer.querySelectorAll('.shift-indicator')) : [];
+
+    // Entferne alte Indikatoren
+    if (shiftsContainer) {
+      shiftsContainer.innerHTML = '';
+    }
+
+    // Erstelle neue Indikatoren für alle Schichten außer der, die den Tag färbt
+    const shiftIndicators = dayElements
+      .filter(shortcut => shortcut !== activeShiftForColor)
+      .map(shortcut => {
+        const calendar = this._getCalendarByShortcut(shortcut);
+        if (calendar && calendar.enabled && calendar.color) {
+          const indicator = document.createElement('span');
+          indicator.className = 'shift-indicator';
+          indicator.style.backgroundColor = calendar.color;
+          indicator.title = calendar.name || `Schicht ${shortcut.toUpperCase()}`;
+          return indicator;
+        }
+        return null;
+      })
+      .filter(indicator => indicator !== null);
+
+    // Füge Indikatoren hinzu
+    if (shiftIndicators.length > 0) {
+      if (!shiftsContainer) {
+        const container = document.createElement('div');
+        container.className = 'shifts-container';
+        button.appendChild(container);
+        shiftIndicators.forEach(ind => container.appendChild(ind));
+      } else {
+        shiftIndicators.forEach(ind => shiftsContainer.appendChild(ind));
+      }
+    } else if (shiftsContainer) {
+      // Entferne Container wenn keine Indikatoren mehr vorhanden
+      shiftsContainer.remove();
+    }
   }
 
   getDaysInMonth(year, month) {
@@ -1789,6 +2013,7 @@ export class ShiftScheduleView extends ViewBase {
 
   _onCalendarSelectedByIndex(shortcut) {
     if (shortcut !== '' && shortcut !== null && shortcut !== undefined) {
+      const previousCalendar = this._selectedCalendar;
       this._selectedCalendar = shortcut;
 
       // Aktualisiere die Config mit der neuen Auswahl
@@ -1810,8 +2035,111 @@ export class ShiftScheduleView extends ViewBase {
         this.saveConfigToEntity();
       }
 
-      this.requestUpdate();
+      // OPTIMIERUNG: Aktualisiere nur die betroffenen Buttons per DOM-Manipulation
+      if (this.shadowRoot && previousCalendar !== shortcut) {
+        this._updateAllDayButtonsForCalendarChange();
+      } else {
+        // Fallback: Komplettes Re-Rendering wenn Shadow DOM nicht bereit
+        this.requestUpdate();
+      }
     }
+  }
+
+  // Aktualisiert alle Tag-Buttons nach Kalender-Auswahl (nur Farben/Klassen, kein komplettes Re-Rendering)
+  _updateAllDayButtonsForCalendarChange() {
+    if (!this.shadowRoot) return;
+
+    const buttons = this.shadowRoot.querySelectorAll('button.day-button');
+    const selectedShortcut = this._getSelectedCalendarShortcut();
+    const selectedCalendar = this._getCalendarByShortcut(selectedShortcut);
+
+    buttons.forEach(button => {
+      const monthKey = button.getAttribute('data-month');
+      const dayNum = parseInt(button.getAttribute('data-day'));
+      const yearKey = button.getAttribute('data-year');
+
+      if (!monthKey || !dayNum || !yearKey) return;
+
+      const key = `${yearKey}:${monthKey}`;
+      const dayElements = this._getDayElements(key, dayNum);
+      const hasSelectedShift = selectedShortcut && dayElements.includes(selectedShortcut);
+
+      // Finde die erste aktivierte Schicht
+      let firstActiveShift = null;
+      const shiftOrder = ['a', 'b', 'c', 'd', 'e'];
+      for (const shortcut of shiftOrder) {
+        if (dayElements.includes(shortcut)) {
+          const calendar = this._getCalendarByShortcut(shortcut);
+          if (calendar && calendar.enabled) {
+            firstActiveShift = shortcut;
+            break;
+          }
+        }
+      }
+
+      // Bestimme welche Schicht den Tag färben soll
+      let activeShiftForColor = null;
+      if (hasSelectedShift && selectedCalendar && selectedCalendar.enabled) {
+        activeShiftForColor = selectedShortcut;
+      } else if (firstActiveShift) {
+        activeShiftForColor = firstActiveShift;
+      }
+
+      const isWorking = activeShiftForColor !== null;
+
+      // Aktualisiere CSS-Klasse
+      if (isWorking) {
+        button.classList.add('working');
+      } else {
+        button.classList.remove('working');
+      }
+
+      // Aktualisiere Hintergrundfarbe
+      if (activeShiftForColor) {
+        const activeCalendar = this._getCalendarByShortcut(activeShiftForColor);
+        if (activeCalendar && activeCalendar.color) {
+          button.style.backgroundColor = activeCalendar.color;
+        } else {
+          button.style.backgroundColor = '';
+        }
+      } else {
+        button.style.backgroundColor = '';
+      }
+
+      // Aktualisiere Shift-Indikatoren (ähnlich wie in _updateDayButtonDirectly)
+      const shiftsContainer = button.querySelector('.shifts-container');
+      if (shiftsContainer) {
+        shiftsContainer.innerHTML = '';
+      }
+
+      const shiftIndicators = dayElements
+        .filter(shortcut => shortcut !== activeShiftForColor)
+        .map(shortcut => {
+          const calendar = this._getCalendarByShortcut(shortcut);
+          if (calendar && calendar.enabled && calendar.color) {
+            const indicator = document.createElement('span');
+            indicator.className = 'shift-indicator';
+            indicator.style.backgroundColor = calendar.color;
+            indicator.title = calendar.name || `Schicht ${shortcut.toUpperCase()}`;
+            return indicator;
+          }
+          return null;
+        })
+        .filter(indicator => indicator !== null);
+
+      if (shiftIndicators.length > 0) {
+        if (!shiftsContainer) {
+          const container = document.createElement('div');
+          container.className = 'shifts-container';
+          button.appendChild(container);
+          shiftIndicators.forEach(ind => container.appendChild(ind));
+        } else {
+          shiftIndicators.forEach(ind => shiftsContainer.appendChild(ind));
+        }
+      } else if (shiftsContainer) {
+        shiftsContainer.remove();
+      }
+    });
   }
 
   _getDayElements(monthKey, day) {
@@ -1826,6 +2154,13 @@ export class ShiftScheduleView extends ViewBase {
     }
 
     return this._workingDays[monthKey][day] || [];
+  }
+
+  // Optimierung: Verhindere unnötige Re-Renderings
+  shouldUpdate(changedProperties) {
+    // Prüfe ob sich relevante Properties geändert haben
+    const relevantProps = ['hass', 'config', '_workingDays', '_displayedMonths', '_startMonthOffset', '_selectedCalendar', '_storageWarning', '_configWarning', '_statusWarning'];
+    return relevantProps.some(prop => changedProperties.has(prop));
   }
 
   render() {
@@ -2227,8 +2562,10 @@ export class ShiftScheduleView extends ViewBase {
         background-color: var(--accent-color, var(--tgshiftschedule-default-selected-day-color));
       }
 
+      /* Basis: Heute-Markierung mit Outline (wird außerhalb des Borders gerendert) */
       .day-button.today {
-        border: 4px solid var(--primary-color, #03a9f4);
+        outline: 3px solid var(--primary-color, #03a9f4);
+        outline-offset: 2px;
       }
 
       .day-button.weekend {
@@ -2245,17 +2582,25 @@ export class ShiftScheduleView extends ViewBase {
         border: 5px solid var(--error-color, #f44336);
       }
 
-      /* Heute-Markierung hat Vorrang, aber kombiniert mit anderen Markierungen */
+      /* Heute + Wochenende: Border für Wochenende, Outline für heute */
       .day-button.today.weekend {
-        border: 5px solid var(--secondary-color, #757575);
+        border: 4px solid var(--secondary-color, #757575);
+        outline: 3px solid var(--primary-color, #03a9f4);
+        outline-offset: 2px;
       }
 
+      /* Heute + Feiertag: Border für Feiertag, Outline für heute */
       .day-button.today.holiday {
-        border: 5px solid var(--error-color, #f44336);
+        border: 4px solid var(--error-color, #f44336);
+        outline: 3px solid var(--primary-color, #03a9f4);
+        outline-offset: 2px;
       }
 
+      /* Heute + Wochenende + Feiertag: Border für Feiertag (stärker), Outline für heute */
       .day-button.today.weekend.holiday {
-        border: 6px solid var(--error-color, #f44336);
+        border: 5px solid var(--error-color, #f44336);
+        outline: 3px solid var(--primary-color, #03a9f4);
+        outline-offset: 2px;
       }
 
       .day-button.readonly,

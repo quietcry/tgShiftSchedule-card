@@ -44,6 +44,10 @@ if ! git diff-index --quiet HEAD --; then
     fi
 fi
 
+# Aktualisiere README-Version
+echo -e "${GREEN}Aktualisiere README-Version...${NC}"
+./update-readme-version.sh
+
 # Build durchführen
 echo -e "${GREEN}Führe Build durch...${NC}"
 npm run build
