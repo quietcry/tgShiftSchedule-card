@@ -2576,6 +2576,20 @@ export class ShiftScheduleView extends ViewBase {
         filter: brightness(0.9);
       }
 
+      /* Verhindere visuelle Markierung nach Klick auf mobilen Geräten */
+      .day-button:active,
+      .day-button:focus {
+        outline: none !important;
+        box-shadow: none !important;
+      }
+
+      /* Touch-spezifische Behandlung: Verhindere aktiven State nach Touch */
+      .day-button {
+        -webkit-tap-highlight-color: transparent;
+        -webkit-touch-callout: none;
+        touch-action: manipulation;
+      }
+
       .day-button.working {
         /* background-color wird jetzt dynamisch per style gesetzt, wenn eine Schicht ausgewählt ist */
         color: var(--text-primary-color, #ffffff);
