@@ -1776,7 +1776,26 @@ export class ShiftScheduleView extends ViewBase {
             if (!isPreviousMonth) {
               this.toggleDay(monthKey, currentDay, yearKey);
               // Entferne Fokus nach Klick (wichtig für mobile Geräte)
-              e.target.blur();
+              // Setze Fokus explizit auf die Karte selbst
+              setTimeout(() => {
+                e.target.blur();
+                // Setze Fokus auf das Hauptcontainer-Element der Karte
+                if (this.shadowRoot) {
+                  const wrapper = this.shadowRoot.querySelector('.calendar-wrapper');
+                  if (wrapper) {
+                    // Stelle sicher, dass das Element fokussierbar ist
+                    if (!wrapper.hasAttribute('tabindex')) {
+                      wrapper.setAttribute('tabindex', '-1');
+                    }
+                    wrapper.focus();
+                  } else {
+                    // Fallback: Setze Fokus auf die Komponente selbst
+                    if (this.focus) {
+                      this.focus();
+                    }
+                  }
+                }
+              }, 0);
             }
           }}
           ?disabled=${isPreviousMonth}
