@@ -1,6 +1,6 @@
 # TG Schichtplan Card
 
-**Version:** 2025.12-0026 (HACS Tag: v2025.12.0026)
+**Version:** 2025.12-0027 (HACS Tag: v2025.12.0027)
 
 Eine Schichtplan-Karte für Home Assistant zur Verwaltung von Arbeitszeiten und Schichten.
 

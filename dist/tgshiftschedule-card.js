@@ -62,7 +62,7 @@
         <button
           class="day-button ${w?"working":""} ${f?"today":""} ${s?"readonly":""} ${$?"weekend":""} ${x?"holiday":""}"
           style="${y}"
-          @click=${()=>!s&&this.toggleDay(e,t,i)}
+          @click=${n=>{s||(this.toggleDay(e,t,i),n.target.blur())}}
           ?disabled=${s}
           data-month="${e}"
           data-day="${t}"

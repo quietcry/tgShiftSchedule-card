@@ -1772,7 +1772,13 @@ export class ShiftScheduleView extends ViewBase {
         <button
           class="day-button ${isWorking ? 'working' : ''} ${isToday ? 'today' : ''} ${isPreviousMonth ? 'readonly' : ''} ${isWeekend ? 'weekend' : ''} ${isHoliday ? 'holiday' : ''}"
           style="${buttonStyle}"
-          @click=${() => !isPreviousMonth && this.toggleDay(monthKey, currentDay, yearKey)}
+          @click=${(e) => {
+            if (!isPreviousMonth) {
+              this.toggleDay(monthKey, currentDay, yearKey);
+              // Entferne Fokus nach Klick (wichtig für mobile Geräte)
+              e.target.blur();
+            }
+          }}
           ?disabled=${isPreviousMonth}
           data-month="${monthKey}"
           data-day="${currentDay}"
