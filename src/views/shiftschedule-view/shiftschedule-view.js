@@ -46,6 +46,8 @@ export class ShiftScheduleView extends ViewBase {
     this._isWriting = false; // Flag, ob gerade geschrieben wird
     this._writeLockTimer = null; // Timer für das 5-Sekunden-Lock nach dem Schreiben
     this._selectedCalendar = null; // Shortcut des ausgewählten Kalenders (wird beim Setzen der Config initialisiert)
+    this._isInitialLoad = true; // Flag, ob gerade der initiale Load läuft (verhindert Config-Schreiben beim Laden)
+    this._directDOMUpdateInProgress = new Set(); // Set von Button-Keys, die gerade per direkter DOM-Manipulation aktualisiert werden
     // Performance-Caches
     this._holidayCache = {}; // Cache für Feiertage: {"2025-12": {1: true, 25: true, ...}}
     this._cachedHolidayEntities = null; // Cache für Holiday-Entities (wird bei hass-Update invalidiert)
@@ -64,7 +66,7 @@ export class ShiftScheduleView extends ViewBase {
   _isInEditorMode() {
     // Cache: Prüfe ob Cache noch gültig ist (5 Sekunden)
     const now = Date.now();
-    if (this._editorModeCache !== null && (now - this._editorModeCacheTime) < 5000) {
+    if (this._editorModeCache !== null && now - this._editorModeCacheTime < 5000) {
       return this._editorModeCache;
     }
 
@@ -129,10 +131,10 @@ export class ShiftScheduleView extends ViewBase {
         }
 
         // Prüfe auf Editor-spezifische Attribute
-        if (element.hasAttribute && (
-          element.hasAttribute('data-card-editor') ||
-          element.hasAttribute('data-editor')
-        )) {
+        if (
+          element.hasAttribute &&
+          (element.hasAttribute('data-card-editor') || element.hasAttribute('data-editor'))
+        ) {
           result = true;
           break;
         }
@@ -241,9 +243,11 @@ export class ShiftScheduleView extends ViewBase {
       // OPTIMIERUNG: Cache Holiday-Entities, nicht bei jedem Aufruf suchen
       if (!this._cachedHolidayEntities) {
         this._cachedHolidayEntities = Object.keys(this._hass.states).filter(entityId => {
-          return entityId.startsWith('sensor.') &&
-                 (entityId.includes('holiday') || entityId.includes('feiertag')) &&
-                 this._hass.states[entityId].state === 'on';
+          return (
+            entityId.startsWith('sensor.') &&
+            (entityId.includes('holiday') || entityId.includes('feiertag')) &&
+            this._hass.states[entityId].state === 'on'
+          );
         });
       }
 
@@ -259,12 +263,27 @@ export class ShiftScheduleView extends ViewBase {
             const dateStrShort = `${String(day).padStart(2, '0')}.${String(month + 1).padStart(2, '0')}.${year}`;
 
             // Prüfe verschiedene Attribute-Namen
-            const possibleAttrs = ['dates', 'holidays', 'feiertage', 'date', 'next_date', 'upcoming'];
+            const possibleAttrs = [
+              'dates',
+              'holidays',
+              'feiertage',
+              'date',
+              'next_date',
+              'upcoming',
+            ];
             for (const attr of possibleAttrs) {
               if (entity.attributes[attr]) {
                 const attrValue = entity.attributes[attr];
                 if (Array.isArray(attrValue)) {
-                  if (attrValue.some(d => d === dateStr || d === dateStrShort || d.includes(dateStr) || d.includes(dateStrShort))) {
+                  if (
+                    attrValue.some(
+                      d =>
+                        d === dateStr ||
+                        d === dateStrShort ||
+                        d.includes(dateStr) ||
+                        d.includes(dateStrShort)
+                    )
+                  ) {
                     result = true;
                     break;
                   }
@@ -283,21 +302,21 @@ export class ShiftScheduleView extends ViewBase {
 
     // Hole Feiertags-Konfiguration aus der Config (Standard: alle aktiviert)
     const holidaysConfig = this.config?.holidays || {};
-    const isHolidayEnabled = (key) => holidaysConfig[key] !== false; // Default: true wenn nicht gesetzt
+    const isHolidayEnabled = key => holidaysConfig[key] !== false; // Default: true wenn nicht gesetzt
 
     // Fallback: Berechne deutsche Feiertage selbst
     const easter = this._getEasterDate(year);
 
     // Feste Feiertage mit Konfigurationsprüfung
     const fixedHolidays = [
-      { month: 0, day: 1, key: 'neujahr' },   // Neujahr
-      { month: 0, day: 6, key: 'heilige_drei_koenige' },   // Heilige Drei Könige
-      { month: 4, day: 1, key: 'tag_der_arbeit' },   // Tag der Arbeit
-      { month: 7, day: 8, key: 'friedensfest' },   // Friedensfest (nur in Augsburg)
-      { month: 7, day: 15, key: 'mariae_himmelfahrt' },  // Mariä Himmelfahrt
-      { month: 9, day: 3, key: 'tag_der_deutschen_einheit' },   // Tag der Deutschen Einheit
-      { month: 9, day: 31, key: 'reformationstag' },  // Reformationstag
-      { month: 10, day: 1, key: 'allerheiligen' },  // Allerheiligen
+      { month: 0, day: 1, key: 'neujahr' }, // Neujahr
+      { month: 0, day: 6, key: 'heilige_drei_koenige' }, // Heilige Drei Könige
+      { month: 4, day: 1, key: 'tag_der_arbeit' }, // Tag der Arbeit
+      { month: 7, day: 8, key: 'friedensfest' }, // Friedensfest (nur in Augsburg)
+      { month: 7, day: 15, key: 'mariae_himmelfahrt' }, // Mariä Himmelfahrt
+      { month: 9, day: 3, key: 'tag_der_deutschen_einheit' }, // Tag der Deutschen Einheit
+      { month: 9, day: 31, key: 'reformationstag' }, // Reformationstag
+      { month: 10, day: 1, key: 'allerheiligen' }, // Allerheiligen
       { month: 11, day: 25, key: 'weihnachten_1' }, // 1. Weihnachtsfeiertag
       { month: 11, day: 26, key: 'weihnachten_2' }, // 2. Weihnachtsfeiertag
     ];
@@ -328,12 +347,12 @@ export class ShiftScheduleView extends ViewBase {
       // Wenn Sonntag (0): 4 Tage zurück → (0 + 7) - 3 = 4
       // Wenn Montag (1): 5 Tage zurück → (1 + 7) - 3 = 5
       // Wenn Dienstag (2): 6 Tage zurück → (2 + 7) - 3 = 6
-      const daysToSubtract = dayOfWeekNov23 <= 3 ? (3 - dayOfWeekNov23) : ((dayOfWeekNov23 + 7) - 3);
+      const daysToSubtract = dayOfWeekNov23 <= 3 ? 3 - dayOfWeekNov23 : dayOfWeekNov23 + 7 - 3;
       const busstag = new Date(year, 10, 23 - daysToSubtract);
 
       const movableHolidays = [
-        { date: new Date(easterTime - 2 * oneDay), key: 'karfreitag' },  // Karfreitag
-        { date: new Date(easterTime + 1 * oneDay), key: 'ostermontag' },  // Ostermontag
+        { date: new Date(easterTime - 2 * oneDay), key: 'karfreitag' }, // Karfreitag
+        { date: new Date(easterTime + 1 * oneDay), key: 'ostermontag' }, // Ostermontag
         { date: new Date(easterTime + 39 * oneDay), key: 'christi_himmelfahrt' }, // Christi Himmelfahrt
         { date: new Date(easterTime + 50 * oneDay), key: 'pfingstmontag' }, // Pfingstmontag
         { date: new Date(easterTime + 60 * oneDay), key: 'fronleichnam' }, // Fronleichnam (nur in bestimmten Bundesländern)
@@ -342,10 +361,12 @@ export class ShiftScheduleView extends ViewBase {
 
       // Prüfe bewegliche Feiertage
       for (const holiday of movableHolidays) {
-        if (holiday.date.getFullYear() === year &&
-            holiday.date.getMonth() === month &&
-            holiday.date.getDate() === day &&
-            isHolidayEnabled(holiday.key)) {
+        if (
+          holiday.date.getFullYear() === year &&
+          holiday.date.getMonth() === month &&
+          holiday.date.getDate() === day &&
+          isHolidayEnabled(holiday.key)
+        ) {
           result = true;
           break;
         }
@@ -363,6 +384,10 @@ export class ShiftScheduleView extends ViewBase {
     const date = new Date(year, month, day);
     const dayOfWeek = date.getDay();
     return dayOfWeek === 0 || dayOfWeek === 6; // Sonntag = 0, Samstag = 6
+  }
+
+  get hass() {
+    return this._hass;
   }
 
   set hass(hass) {
@@ -401,14 +426,22 @@ export class ShiftScheduleView extends ViewBase {
       if (hasAnyEntityChanged) {
         this.loadWorkingDays();
       }
-      // Prüfe Config-Entity und Status-Entity bei jedem hass-Update (kann sich ändern)
-      this.checkConfigEntity();
-      this.checkStatusEntity();
+      // Prüfe Config-Entity und Status-Entity nur bei text_entity Modus
+      // (bei Saver werden diese nicht benötigt)
+      if (this._config.store_mode !== 'saver') {
+        this.checkConfigEntity();
+        this.checkStatusEntity();
+      }
     }
     this.requestUpdate();
   }
 
+  get config() {
+    return this._config;
+  }
+
   set config(config) {
+    const wasInitialLoad = this._isInitialLoad;
     this._config = config;
 
     // Initialisiere _displayedMonths aus der Config
@@ -442,20 +475,8 @@ export class ShiftScheduleView extends ViewBase {
           this._selectedCalendar = allCalendars[0].shortcut;
           if (config) {
             config.selectedCalendar = this._selectedCalendar;
-            this.dispatchEvent(
-              new CustomEvent('config-changed', {
-                detail: { config: config },
-                bubbles: true,
-                composed: true,
-              })
-            );
-          }
-        } else {
-          // Ausgewählter Kalender ist nicht aktiviert, verwende den ersten aktivierten
-          if (allCalendars.length > 0) {
-            this._selectedCalendar = allCalendars[0].shortcut;
-            if (config) {
-              config.selectedCalendar = this._selectedCalendar;
+            // Nur config-changed Event auslösen, wenn nicht initialer Load
+            if (!wasInitialLoad) {
               this.dispatchEvent(
                 new CustomEvent('config-changed', {
                   detail: { config: config },
@@ -463,6 +484,24 @@ export class ShiftScheduleView extends ViewBase {
                   composed: true,
                 })
               );
+            }
+          }
+        } else {
+          // Ausgewählter Kalender ist nicht aktiviert, verwende den ersten aktivierten
+          if (allCalendars.length > 0) {
+            this._selectedCalendar = allCalendars[0].shortcut;
+            if (config) {
+              config.selectedCalendar = this._selectedCalendar;
+              // Nur config-changed Event auslösen, wenn nicht initialer Load
+              if (!wasInitialLoad) {
+                this.dispatchEvent(
+                  new CustomEvent('config-changed', {
+                    detail: { config: config },
+                    bubbles: true,
+                    composed: true,
+                  })
+                );
+              }
             }
           } else {
             // Kein Kalender aktiviert - keine automatische Aktivierung
@@ -479,13 +518,16 @@ export class ShiftScheduleView extends ViewBase {
         this._selectedCalendar = allCalendars[0].shortcut;
         if (config) {
           config.selectedCalendar = this._selectedCalendar;
-          this.dispatchEvent(
-            new CustomEvent('config-changed', {
-              detail: { config: config },
-              bubbles: true,
-              composed: true,
-            })
-          );
+          // Nur config-changed Event auslösen, wenn nicht initialer Load
+          if (!wasInitialLoad) {
+            this.dispatchEvent(
+              new CustomEvent('config-changed', {
+                detail: { config: config },
+                bubbles: true,
+                composed: true,
+              })
+            );
+          }
         }
       } else {
         // Kein Kalender aktiviert - keine automatische Aktivierung
@@ -498,53 +540,244 @@ export class ShiftScheduleView extends ViewBase {
 
     if (this._hass) {
       this.loadWorkingDays();
-      this.checkConfigEntity();
-      this.checkStatusEntity();
-      this.saveConfigToEntity();
+      // Prüfe Config-Entity und Status-Entity nur bei text_entity Modus
+      // (bei Saver werden diese nicht benötigt)
+      if (this._config && this._config.store_mode !== 'saver') {
+        this.checkConfigEntity();
+        this.checkStatusEntity();
+      }
+      // saveConfigToEntity() wird nur durch config-changed Events aufgerufen,
+      // nicht beim initialen Laden im config Setter
     }
+
+    // Markiere initialen Load als abgeschlossen NACH dem ersten Rendering
+    // (nicht hier, sondern in firstUpdated oder nach dem ersten config-changed Event)
+
     this.requestUpdate();
   }
 
-  async loadWorkingDays() {
-    if (!this._hass || !this._config || !this._config.entity) return;
+  // Wird aufgerufen, wenn ein config-changed Event empfangen wird
+  // (nur dann wird die Config gespeichert, nicht beim initialen Laden)
+  _handleConfigChanged() {
+    // Verhindere Speichern beim initialen Load
+    if (this._isInitialLoad) {
+      this._debug('[Config] _handleConfigChanged: Initialer Load, überspringe Config-Speichern');
+      // Markiere initialen Load als abgeschlossen NACH dem ersten Event
+      this._isInitialLoad = false;
+      return;
+    }
+    if (this._hass && this._config) {
+      this.saveConfigToEntity();
+    }
+  }
 
-    // Ermittle die maximale Länge für alle Entities
-    const maxLengths = this.getAllEntityMaxLengths();
+  // Liest eine Saver-Variable (z.B. "Schichtplan" aus saver.saver.attributes.variables)
+  _readSaverVariable(key) {
+    if (!this._hass || !this._hass.states || !key) {
+      this._debug('[Saver] _readSaverVariable: Kein hass oder key vorhanden');
+      return null;
+    }
 
-    // Sammle alle Daten-Strings aus der Haupt-Entity und zusätzlichen Entities
-    const dataStrings = [];
+    // Saver-Variablen sind in saver.saver.attributes.variables gespeichert
+    const saverEntity = this._hass.states['saver.saver'];
+    if (saverEntity && saverEntity.attributes && saverEntity.attributes.variables) {
+      const variables = saverEntity.attributes.variables;
+      const variableValue = variables[key];
 
-    // Prüfe auf zusätzliche Entities (z.B. input_text.arbeitszeiten_001, _002, etc.)
-    const baseEntityId = this._config.entity;
-    const additionalEntities = this.findAdditionalEntities(baseEntityId);
-
-    // Speichere die Liste der bekannten Entities für späteres Schreiben
-    // Diese Liste enthält: Haupt-Entity + alle zusätzlichen Entities
-    this._knownEntityIds = [baseEntityId, ...additionalEntities];
-
-    // Lade Daten aus allen Entities (Haupt-Entity + zusätzliche)
-    for (const entityId of this._knownEntityIds) {
-      const entity = this._hass.states[entityId];
-      if (entity && entity.state && entity.state.trim() !== '') {
-        dataStrings.push(entity.state);
-        const currentLength = entity.state.length;
-        const maxLength = maxLengths[entityId];
-        if (maxLength !== undefined) {
+      if (variableValue !== undefined && variableValue !== null) {
+        // Konvertiere zu String und trimme
+        const value = String(variableValue).trim();
+        if (value !== '') {
+          this._debug(
+            `[Saver] _readSaverVariable: Variable "${key}" gefunden in saver.saver.attributes.variables, Länge: ${value.length} Zeichen`
+          );
+          // Zeige ersten 100 Zeichen der Daten für Debug
+          if (value.length > 0) {
+            const preview = value.substring(0, 100);
+            this._debug(
+              `[Saver] _readSaverVariable: Daten-Vorschau: "${preview}${value.length > 100 ? '...' : ''}"`
+            );
+          }
+          return value;
         }
+      }
+
+      // Debug: Zeige verfügbare Variablen
+      const availableKeys = Object.keys(variables);
+      this._debug(
+        `[Saver] _readSaverVariable: Variable "${key}" nicht gefunden. Verfügbare Variablen: ${availableKeys.length > 0 ? availableKeys.join(', ') : 'keine'}`
+      );
+    } else {
+      this._debug(
+        `[Saver] _readSaverVariable: saver.saver Entity nicht gefunden oder hat keine variables-Attribute`
+      );
+    }
+
+    this._debug(`[Saver] _readSaverVariable: Variable "${key}" nicht gefunden oder leer`);
+    return null;
+  }
+
+  // Prüft ob Saver verfügbar ist (mindestens eine Saver-Entity existiert)
+  _isSaverAvailable() {
+    if (!this._hass || !this._hass.states) {
+      return false;
+    }
+    // Prüfe ob irgendeine saver.* Entity existiert
+    return Object.keys(this._hass.states).some(entityId => entityId.startsWith('saver.'));
+  }
+
+  // Liest Daten vom Saver (wenn store_mode == 'saver' und Saver verfügbar)
+  _loadDataFromSaver() {
+    if (!this._config || this._config.store_mode !== 'saver') {
+      this._debug('[Saver] _loadDataFromSaver: store_mode ist nicht "saver"');
+      return null;
+    }
+
+    const saverKey = this._config.saver_key || 'Schichtplan';
+    this._debug(
+      `[Saver] _loadDataFromSaver: Versuche Daten von Saver-Variable "${saverKey}" zu laden`
+    );
+    const data = this._readSaverVariable(saverKey);
+
+    // Wenn Daten vorhanden, gib sie zurück
+    if (data && data.trim() !== '') {
+      this._debug(
+        `[Saver] _loadDataFromSaver: Daten erfolgreich geladen, Länge: ${data.length} Zeichen`
+      );
+      return data;
+    }
+
+    this._debug('[Saver] _loadDataFromSaver: Keine Daten gefunden');
+    return null;
+  }
+
+  // Liest Config vom Saver (wenn store_mode == 'saver' und Saver verfügbar)
+  _loadConfigFromSaver() {
+    if (!this._config || this._config.store_mode !== 'saver') {
+      this._debug('[Saver] _loadConfigFromSaver: store_mode ist nicht "saver"');
+      return null;
+    }
+
+    const saverKey = this._config.saver_key || 'Schichtplan';
+    const configKey = `${saverKey}_config`;
+    this._debug(
+      `[Saver] _loadConfigFromSaver: Versuche Config von Saver-Variable "${configKey}" zu laden`
+    );
+    const config = this._readSaverVariable(configKey);
+
+    // Wenn Config vorhanden, gib sie zurück
+    if (config && config.trim() !== '') {
+      this._debug(
+        `[Saver] _loadConfigFromSaver: Config erfolgreich geladen, Länge: ${config.length} Zeichen`
+      );
+      return config;
+    }
+
+    this._debug('[Saver] _loadConfigFromSaver: Keine Config gefunden');
+    return null;
+  }
+
+  async loadWorkingDays() {
+    if (!this._hass || !this._config || !this._config.entity) {
+      this._debug('[Laden] loadWorkingDays: Kein hass, config oder entity vorhanden');
+      return;
+    }
+
+    this._debug(
+      `[Laden] loadWorkingDays: Start, store_mode: "${this._config.store_mode}", entity: "${this._config.entity}"`
+    );
+
+    let dataString = null;
+    let dataSource = 'none';
+
+    // Versuche zuerst Saver (wenn store_mode == 'saver')
+    if (this._config.store_mode === 'saver') {
+      this._debug('[Laden] loadWorkingDays: Versuche Daten vom Saver zu laden');
+      const saverData = this._loadDataFromSaver();
+      if (saverData) {
+        dataString = saverData;
+        dataSource = 'saver';
+        this._debug(
+          `[Laden] loadWorkingDays: Daten vom Saver geladen, Länge: ${dataString.length} Zeichen`
+        );
+      } else {
+        this._debug('[Laden] loadWorkingDays: Keine Daten vom Saver, Fallback zu Entities');
+      }
+    } else {
+      this._debug(
+        '[Laden] loadWorkingDays: store_mode ist nicht "saver", lade direkt von Entities'
+      );
+    }
+
+    // Fallback: Lade von Entities (wenn Saver-Daten fehlen oder store_mode != 'saver')
+    if (!dataString || dataString.trim() === '') {
+      this._debug('[Laden] loadWorkingDays: Lade Daten von Entities');
+      // Ermittle die maximale Länge für alle Entities
+      const maxLengths = this.getAllEntityMaxLengths();
+
+      // Sammle alle Daten-Strings aus der Haupt-Entity und zusätzlichen Entities
+      const dataStrings = [];
+
+      // Prüfe auf zusätzliche Entities (z.B. input_text.arbeitszeiten_001, _002, etc.)
+      const baseEntityId = this._config.entity;
+      const additionalEntities = this.findAdditionalEntities(baseEntityId);
+      this._debug(
+        `[Laden] loadWorkingDays: Gefundene Entities: Haupt: "${baseEntityId}", Zusätzliche: ${additionalEntities.length}`
+      );
+
+      // Speichere die Liste der bekannten Entities für späteres Schreiben
+      // Diese Liste enthält: Haupt-Entity + alle zusätzlichen Entities
+      this._knownEntityIds = [baseEntityId, ...additionalEntities];
+
+      // Lade Daten aus allen Entities (Haupt-Entity + zusätzliche)
+      for (const entityId of this._knownEntityIds) {
+        const entity = this._hass.states[entityId];
+        if (entity && entity.state && entity.state.trim() !== '') {
+          const entityData = entity.state;
+          dataStrings.push(entityData);
+          this._debug(
+            `[Laden] loadWorkingDays: Entity "${entityId}" hat Daten, Länge: ${entityData.length} Zeichen`
+          );
+        } else {
+          this._debug(
+            `[Laden] loadWorkingDays: Entity "${entityId}" ist leer oder nicht vorhanden`
+          );
+        }
+      }
+
+      // Füge alle Strings zusammen (mit ";" als Trennzeichen)
+      if (dataStrings.length > 0) {
+        dataString = dataStrings.join(';');
+        dataSource = 'entities';
+        this._debug(
+          `[Laden] loadWorkingDays: Daten von Entities kombiniert, Gesamtlänge: ${dataString.length} Zeichen`
+        );
+      } else {
+        this._debug('[Laden] loadWorkingDays: Keine Daten in Entities gefunden');
       }
     }
 
-    // Füge alle Strings zusammen (mit ";" als Trennzeichen) und parse dann einmal
-    const additionalEntityIds = this._knownEntityIds ? this._knownEntityIds.slice(1) : [];
-    if (dataStrings.length > 0) {
-      const combinedString = dataStrings.join(';');
-      this.parseWorkingDays(combinedString);
+    // Parse die Daten (egal ob von Saver oder Entities)
+    if (dataString && dataString.trim() !== '') {
+      this._debug(`[Laden] loadWorkingDays: Parse Daten von Quelle: "${dataSource}"`);
+      this.parseWorkingDays(dataString);
+      const workingDaysCount = Object.keys(this._workingDays).length;
+      this._debug(`[Laden] loadWorkingDays: Daten geparst, ${workingDaysCount} Monate gefunden`);
     } else {
+      this._debug(
+        '[Laden] loadWorkingDays: Keine Daten zum Parsen vorhanden, setze _workingDays auf {}'
+      );
       this._workingDays = {};
     }
 
     // Prüfe Speicherverbrauch und zeige Warnung bei 90%+
-    this.checkStorageUsage();
+    // Nur bei text_entity Modus (Saver hat keine Längenbegrenzung)
+    if (this._config.store_mode !== 'saver') {
+      this.checkStorageUsage();
+    } else {
+      // Bei Saver-Modus keine Speicherwarnung nötig
+      this._storageWarning = null;
+    }
 
     // Bereinige alte Monate: entferne alle Monate, die nicht angezeigt werden
     // Die Karte zeigt numberOfMonths Monate an (ab aktueller Monat)
@@ -593,9 +826,7 @@ export class ShiftScheduleView extends ViewBase {
           const keyMonth = parseInt(keyParts[1]);
 
           // Prüfe ob dieser Key in der Liste der zu behaltenden Monate ist
-          const shouldKeep = monthsToKeep.some(
-            m => m.year === keyYear && m.month === keyMonth
-          );
+          const shouldKeep = monthsToKeep.some(m => m.year === keyYear && m.month === keyMonth);
 
           //   key,
           //   keyYear,
@@ -623,8 +854,7 @@ export class ShiftScheduleView extends ViewBase {
             entity_id: this._config.entity,
             value: cleanedValue,
           });
-        } catch (error) {
-        }
+        } catch (error) {}
       }
     }
 
@@ -702,7 +932,9 @@ export class ShiftScheduleView extends ViewBase {
       if (match) {
         const dayNum = parseInt(match[1]);
         const elementsStr = match[2] || '';
-        const elements = elementsStr.split('').filter(e => e.trim() !== '');
+        // WICHTIG: Filtere nur leere Strings heraus, nicht einzelne Buchstaben
+        // split('') teilt jeden Buchstaben in ein separates Array-Element
+        const elements = elementsStr.split('').filter(e => e && e.trim() !== '');
 
         if (!isNaN(dayNum) && dayNum >= 1 && dayNum <= 31) {
           // Wenn der Tag bereits existiert, füge Elemente hinzu (keine Duplikate)
@@ -712,6 +944,11 @@ export class ShiftScheduleView extends ViewBase {
           } else {
             result[dayNum] = elements;
           }
+        }
+      } else {
+        // Debug-Log wenn kein Match gefunden wurde
+        if (trimmed.includes('03')) {
+          this._debug(`[Parsing] Kein Match für "${trimmed}"`);
         }
       }
     }
@@ -803,9 +1040,16 @@ export class ShiftScheduleView extends ViewBase {
   }
 
   checkStorageUsage(serializedDataLength = null) {
+    // Warnungen nur bei text_entity Modus (Saver hat keine Längenbegrenzung)
+    if (this._config && this._config.store_mode === 'saver') {
+      this._storageWarning = null;
+      this._updateStorageWarningDirectly();
+      return;
+    }
+
     if (!this._hass || !this._config || !this._config.entity) {
       this._storageWarning = null;
-      this.requestUpdate();
+      this._updateStorageWarningDirectly();
       return;
     }
 
@@ -821,7 +1065,7 @@ export class ShiftScheduleView extends ViewBase {
     const maxLengths = this.getAllEntityMaxLengths();
     if (Object.keys(maxLengths).length === 0) {
       this._storageWarning = null;
-      this.requestUpdate();
+      this._updateStorageWarningDirectly();
       return;
     }
 
@@ -853,7 +1097,7 @@ export class ShiftScheduleView extends ViewBase {
 
     if (totalMaxLength === 0) {
       this._storageWarning = null;
-      this.requestUpdate();
+      this._updateStorageWarningDirectly();
       return;
     }
 
@@ -871,8 +1115,8 @@ export class ShiftScheduleView extends ViewBase {
       this._storageWarning = null;
     }
 
-    // Wichtig: requestUpdate() aufrufen, damit die Warnung angezeigt wird
-    this.requestUpdate();
+    // Aktualisiere Warnung direkt im DOM ohne Re-Rendering
+    this._updateStorageWarningDirectly();
   }
 
   getConfigEntityId() {
@@ -896,17 +1140,24 @@ export class ShiftScheduleView extends ViewBase {
   }
 
   checkConfigEntity() {
+    // Warnungen nur bei text_entity Modus (bei Saver wird Config anders gespeichert)
+    if (this._config && this._config.store_mode === 'saver') {
+      this._configWarning = null;
+      this._updateConfigWarningDirectly();
+      return;
+    }
+
     // Prüfe ob die Config-Entity existiert
     if (!this._config || !this._config.entity) {
       this._configWarning = null;
-      this.requestUpdate();
+      this._updateConfigWarningDirectly();
       return;
     }
 
     const configEntityId = this.getConfigEntityId();
     if (!configEntityId) {
       this._configWarning = null;
-      this.requestUpdate();
+      this._updateConfigWarningDirectly();
       return;
     }
 
@@ -921,7 +1172,7 @@ export class ShiftScheduleView extends ViewBase {
       } else {
         this._configWarning = null;
       }
-      this.requestUpdate();
+      this._updateConfigWarningDirectly();
       return;
     }
 
@@ -941,7 +1192,7 @@ export class ShiftScheduleView extends ViewBase {
       }
     }
 
-    this.requestUpdate();
+    this._updateConfigWarningDirectly();
   }
 
   // Rendert eine Warnung für eine fehlende Entity
@@ -970,17 +1221,24 @@ export class ShiftScheduleView extends ViewBase {
   }
 
   checkStatusEntity() {
+    // Warnungen nur bei text_entity Modus (bei Saver wird Status anders gespeichert)
+    if (this._config && this._config.store_mode === 'saver') {
+      this._statusWarning = null;
+      this._updateStatusWarningDirectly();
+      return;
+    }
+
     // Prüfe ob die Status-Entity existiert
     if (!this._config || !this._config.entity) {
       this._statusWarning = null;
-      this.requestUpdate();
+      this._updateStatusWarningDirectly();
       return;
     }
 
     const statusEntityId = this.getStatusEntityId();
     if (!statusEntityId) {
       this._statusWarning = null;
-      this.requestUpdate();
+      this._updateStatusWarningDirectly();
       return;
     }
 
@@ -995,7 +1253,7 @@ export class ShiftScheduleView extends ViewBase {
       } else {
         this._statusWarning = null;
       }
-      this.requestUpdate();
+      this._updateStatusWarningDirectly();
       return;
     }
 
@@ -1010,25 +1268,63 @@ export class ShiftScheduleView extends ViewBase {
       this._statusWarning = null;
     }
 
-    this.requestUpdate();
+    this._updateStatusWarningDirectly();
+  }
+
+  // Erstellt die Config-Daten im komprimierten Format (für text_input Entities)
+  _createCompressedConfig(activeShifts) {
+    // Speichere als JSON (direktes Array, kein Objekt-Wrapper)
+    let configJson = JSON.stringify(activeShifts);
+
+    // Entferne die äußere Klammer (erstes [ und letztes ])
+    if (configJson.startsWith('[') && configJson.endsWith(']')) {
+      configJson = configJson.slice(1, -1);
+    }
+
+    // Entferne "null" aus dem String (behalte Kommas)
+    // Wiederhole die Ersetzung, bis keine null mehr vorhanden sind (für mehrere null hintereinander)
+    let previousLength;
+    do {
+      previousLength = configJson.length;
+      // Ersetze ,null, durch ,, (mehrfach, bis keine null mehr vorhanden sind)
+      configJson = configJson.replace(/,null,/g, ',,');
+      // Ersetze ,null] durch ,] (falls am Ende eines Arrays)
+      configJson = configJson.replace(/,null\]/g, ',]');
+      // Ersetze [null, durch [, (falls am Anfang eines Arrays)
+      configJson = configJson.replace(/\[null,/g, '[,');
+      // Ersetze ,null, am Ende des Strings (falls letztes Element null ist)
+      configJson = configJson.replace(/,null$/g, ',');
+    } while (configJson.length !== previousLength);
+
+    // Entferne Anführungszeichen um Strings
+    // Ersetze "," durch , (Anführungszeichen um Kommas)
+    configJson = configJson.replace(/","/g, ',');
+    // Ersetze [" durch [ (Anführungszeichen am Anfang eines Arrays)
+    configJson = configJson.replace(/\["/g, '[');
+    // Ersetze "] durch ] (Anführungszeichen am Ende eines Arrays)
+    configJson = configJson.replace(/"\]/g, ']');
+    // Ersetze ," durch , (Anführungszeichen nach Komma)
+    configJson = configJson.replace(/,"/g, ',');
+    // Ersetze ", durch , (Anführungszeichen vor Komma)
+    configJson = configJson.replace(/",/g, ',');
+
+    return configJson;
+  }
+
+  // Erstellt die Config-Daten im vollständigen JSON-Format (für Saver)
+  _createFullJsonConfig(activeShifts) {
+    // Vollständiges JSON-Format: Array mit Anführungszeichen und null-Werten
+    return JSON.stringify(activeShifts);
   }
 
   async saveConfigToEntity() {
-    // Speichere die Konfiguration in der Config-Entity
+    // Speichere die Konfiguration in der Config-Entity oder im Saver
+    // Verhindere Speichern beim initialen Load
+    if (this._isInitialLoad) {
+      this._debug('[Config] saveConfigToEntity: Initialer Load, überspringe Config-Speichern');
+      return;
+    }
     if (!this._hass || !this._config || !this._config.entity) {
-      return;
-    }
-
-    const configEntityId = this.getConfigEntityId();
-    if (!configEntityId) {
-      return;
-    }
-
-    // Prüfe ob die Entity existiert
-    const configEntity = this._hass.states[configEntityId];
-    if (!configEntity) {
-      // Entity existiert nicht, zeige Warnung
-      this.checkConfigEntity();
       return;
     }
 
@@ -1038,7 +1334,11 @@ export class ShiftScheduleView extends ViewBase {
     const activeShifts = [];
     if (this._config.calendars) {
       for (const calendar of this._config.calendars) {
-        if (calendar && calendar.shortcut && (calendar.enabled === true || calendar.enabled === 'true' || calendar.enabled === 1)) {
+        if (
+          calendar &&
+          calendar.shortcut &&
+          (calendar.enabled === true || calendar.enabled === 'true' || calendar.enabled === 1)
+        ) {
           const shiftData = [
             calendar.shortcut,
             calendar.name || `Schicht ${calendar.shortcut.toUpperCase()}`,
@@ -1090,42 +1390,95 @@ export class ShiftScheduleView extends ViewBase {
       }
     }
 
-    // Speichere als JSON (direktes Array, kein Objekt-Wrapper)
-    let configJson = JSON.stringify(activeShifts);
+    this._debug(`[Config] saveConfigToEntity: ${activeShifts.length} aktive Schichten gefunden`);
 
-    // Entferne die äußere Klammer (erstes [ und letztes ])
-    if (configJson.startsWith('[') && configJson.endsWith(']')) {
-      configJson = configJson.slice(1, -1);
+    // Unterschiedliche Formate je nach store_mode
+    if (this._config.store_mode === 'saver') {
+      // Saver: Vollständiges JSON-Format
+      const saverKey = this._config.saver_key || 'Schichtplan';
+      const configKey = `${saverKey}_config`;
+      const configJson = this._createFullJsonConfig(activeShifts);
+      this._debug(
+        `[Config] saveConfigToEntity: Speichere Config in Saver "${configKey}", Länge: ${configJson.length} Zeichen (vollständiges JSON)`
+      );
+
+      try {
+        // Prüfe ob die Saver-Variable existiert und ob sich der Wert geändert hat
+        // Suche in saver.saver.attributes.variables (nicht als direkte Entity)
+        const saverEntity = this._hass.states['saver.saver'];
+        let oldValue = '';
+
+        if (saverEntity && saverEntity.attributes && saverEntity.attributes.variables) {
+          const existingValue = saverEntity.attributes.variables[configKey];
+          if (existingValue !== undefined && existingValue !== null) {
+            oldValue = String(existingValue).trim();
+          }
+        }
+
+        this._debug(
+          `[Config] saveConfigToEntity: Saver-Variable "${configKey}" existiert: ${oldValue !== ''}, alte Länge: ${oldValue.length} Zeichen`
+        );
+
+        // Nur schreiben wenn Variable nicht existiert oder Wert sich geändert hat
+        if (oldValue === '' || oldValue !== configJson) {
+          this._debug(
+            `[Config] saveConfigToEntity: Schreibe Config in Saver (Variable existiert nicht oder Wert hat sich geändert)`
+          );
+          await this._hass.callService('saver', 'set_variable', {
+            name: configKey,
+            value: configJson,
+          });
+          this._debug(`[Config] saveConfigToEntity: Erfolgreich in Saver geschrieben`);
+        } else {
+          this._debug(
+            `[Config] saveConfigToEntity: Kein Schreiben nötig, Wert hat sich nicht geändert`
+          );
+        }
+        // Warnung entfernen, da Saver erfolgreich beschrieben wurde
+        this._configWarning = null;
+        this._updateConfigWarningDirectly();
+      } catch (error) {
+        // Fehler beim Schreiben - könnte bedeuten, dass Saver nicht verfügbar ist
+        // Fallback: Versuche Entity
+        this._debug(
+          `[Config] saveConfigToEntity: Fehler beim Schreiben in Saver, Fallback zu Entity: ${error.message}`,
+          error
+        );
+        this._saveConfigToEntityFallback(activeShifts);
+      }
+    } else {
+      // text_entity: Komprimiertes Format
+      this._debug(`[Config] saveConfigToEntity: Speichere Config in Entity (komprimiertes Format)`);
+      this._saveConfigToEntityFallback(activeShifts);
+    }
+  }
+
+  async _saveConfigToEntityFallback(activeShifts) {
+    const configEntityId = this.getConfigEntityId();
+    if (!configEntityId) {
+      this._debug('[Config] _saveConfigToEntityFallback: Keine configEntityId');
+      return;
     }
 
-    // Entferne "null" aus dem String (behalte Kommas)
-    // Wiederhole die Ersetzung, bis keine null mehr vorhanden sind (für mehrere null hintereinander)
-    let previousLength;
-    do {
-      previousLength = configJson.length;
-      // Ersetze ,null, durch ,, (mehrfach, bis keine null mehr vorhanden sind)
-      configJson = configJson.replace(/,null,/g, ',,');
-      // Ersetze ,null] durch ,] (falls am Ende eines Arrays)
-      configJson = configJson.replace(/,null\]/g, ',]');
-      // Ersetze [null, durch [, (falls am Anfang eines Arrays)
-      configJson = configJson.replace(/\[null,/g, '[,');
-      // Ersetze ,null, am Ende des Strings (falls letztes Element null ist)
-      configJson = configJson.replace(/,null$/g, ',');
-    } while (configJson.length !== previousLength);
+    this._debug(`[Config] _saveConfigToEntityFallback: Start, configEntityId: "${configEntityId}"`);
 
-    // Entferne Anführungszeichen um Strings
-    // Ersetze "," durch , (Anführungszeichen um Kommas)
-    configJson = configJson.replace(/","/g, ',');
-    // Ersetze [" durch [ (Anführungszeichen am Anfang eines Arrays)
-    configJson = configJson.replace(/\["/g, '[');
-    // Ersetze "] durch ] (Anführungszeichen am Ende eines Arrays)
-    configJson = configJson.replace(/"\]/g, ']');
-    // Ersetze ," durch , (Anführungszeichen nach Komma)
-    configJson = configJson.replace(/,"/g, ',');
-    // Ersetze ", durch , (Anführungszeichen vor Komma)
-    configJson = configJson.replace(/",/g, ',');
+    // Prüfe ob die Entity existiert
+    const configEntity = this._hass.states[configEntityId];
+    if (!configEntity) {
+      // Entity existiert nicht, zeige Warnung
+      this._debug(
+        `[Config] _saveConfigToEntityFallback: Entity "${configEntityId}" existiert nicht`
+      );
+      this.checkConfigEntity();
+      return;
+    }
 
+    // Komprimiertes Format für text_input Entities
+    const configJson = this._createCompressedConfig(activeShifts);
     const configJsonLength = configJson.length;
+    this._debug(
+      `[Config] _saveConfigToEntityFallback: Config erstellt (komprimiert), Länge: ${configJsonLength} Zeichen`
+    );
 
     // Prüfe ob der JSON-Text in das Entity passt
     const maxLength = this.getEntityMaxLength(configEntityId);
@@ -1140,20 +1493,28 @@ export class ShiftScheduleView extends ViewBase {
         maxLength: maxLength,
         percentage: Math.round(percentage * 10) / 10,
       };
-      this.requestUpdate();
+      this._updateConfigWarningDirectly();
       return;
     }
 
     try {
+      this._debug(
+        `[Config] _saveConfigToEntityFallback: Schreibe Config in Entity "${configEntityId}"`
+      );
       await this._hass.callService('input_text', 'set_value', {
         entity_id: configEntityId,
         value: configJson,
       });
+      this._debug(`[Config] _saveConfigToEntityFallback: Erfolgreich in Entity geschrieben`);
       // Warnung entfernen, da Entity existiert und erfolgreich beschrieben wurde
       this._configWarning = null;
-      this.requestUpdate();
+      this._updateConfigWarningDirectly();
     } catch (error) {
       // Fehler beim Schreiben - könnte bedeuten, dass Entity nicht existiert
+      this._debug(
+        `[Config] _saveConfigToEntityFallback: Fehler beim Schreiben in Entity: ${error.message}`,
+        error
+      );
       this.checkConfigEntity();
     }
   }
@@ -1181,19 +1542,21 @@ export class ShiftScheduleView extends ViewBase {
       if (dayEntries.length > 0) {
         // Format: <jahr>:<monat>:<tag><elementen>,<tag><elementen>
         // Beispiel: "25:11:01a,02ab,03b"
-        const formattedDays = dayEntries.map(dayNum => {
-          const elements = days[dayNum];
-          const dayStr = this.formatTwoDigits(dayNum);
-          if (Array.isArray(elements) && elements.length > 0) {
-            // Sortiere die Kalender-Shortcuts alphabetisch (a, b, c, d, e) für konsistente Reihenfolge
-            const sortedElements = [...elements].sort();
-            // Tag mit Elementen: "01a", "02ab", etc.
-            return dayStr + sortedElements.join('');
-          } else {
-            // Tag ohne Elemente
-            return dayStr;
-          }
-        }).join(',');
+        const formattedDays = dayEntries
+          .map(dayNum => {
+            const elements = days[dayNum];
+            const dayStr = this.formatTwoDigits(dayNum);
+            if (Array.isArray(elements) && elements.length > 0) {
+              // Sortiere die Kalender-Shortcuts alphabetisch (a, b, c, d, e) für konsistente Reihenfolge
+              const sortedElements = [...elements].sort();
+              // Tag mit Elementen: "01a", "02ab", etc.
+              return dayStr + sortedElements.join('');
+            } else {
+              // Tag ohne Elemente
+              return dayStr;
+            }
+          })
+          .join(',');
         parts.push(`${key}:${formattedDays}`);
       }
     }
@@ -1202,11 +1565,17 @@ export class ShiftScheduleView extends ViewBase {
 
   async distributeDataToEntities(serializedData) {
     if (!this._hass || !this._config || !this._config.entity) {
+      this._debug('[Speichern] distributeDataToEntities: Kein hass, config oder entity vorhanden');
       return;
     }
 
+    this._debug(
+      `[Speichern] distributeDataToEntities: Start, Datenlänge: ${serializedData ? serializedData.length : 0} Zeichen`
+    );
+
     // Setze Schreib-Lock
     this._isWriting = true;
+    this._debug('[Speichern] distributeDataToEntities: Schreib-Lock gesetzt');
 
     // Lösche vorhandenen Timer, falls vorhanden
     if (this._writeLockTimer) {
@@ -1216,195 +1585,254 @@ export class ShiftScheduleView extends ViewBase {
 
     try {
       // Verwende die gecachte Liste der Entities, falls verfügbar
-    // Prüfe aber auch, ob neue Entities hinzugekommen sind
-    let allEntityIds;
-    if (this._knownEntityIds && this._knownEntityIds.length > 0) {
-      // Verwende gecachte Liste
-      allEntityIds = [...this._knownEntityIds];
+      // Prüfe aber auch, ob neue Entities hinzugekommen sind
+      let allEntityIds;
+      if (this._knownEntityIds && this._knownEntityIds.length > 0) {
+        // Verwende gecachte Liste
+        allEntityIds = [...this._knownEntityIds];
 
-      // Prüfe ob neue Entities hinzugekommen sind
-      const currentAdditionalEntities = this.findAdditionalEntities(this._config.entity);
-      const knownAdditionalCount = this._knownEntityIds.length - 1; // -1 für Haupt-Entity
-      if (currentAdditionalEntities.length > knownAdditionalCount) {
-        // Neue Entities gefunden, aktualisiere die Liste
-        const newEntities = currentAdditionalEntities.slice(knownAdditionalCount);
-        allEntityIds.push(...newEntities);
+        // Prüfe ob neue Entities hinzugekommen sind
+        const currentAdditionalEntities = this.findAdditionalEntities(this._config.entity);
+        const knownAdditionalCount = this._knownEntityIds.length - 1; // -1 für Haupt-Entity
+        if (currentAdditionalEntities.length > knownAdditionalCount) {
+          // Neue Entities gefunden, aktualisiere die Liste
+          const newEntities = currentAdditionalEntities.slice(knownAdditionalCount);
+          allEntityIds.push(...newEntities);
+          this._knownEntityIds = [...allEntityIds];
+        }
+      } else {
+        // Keine gecachte Liste vorhanden, sammle Entities neu
+        allEntityIds = [this._config.entity];
+        const additionalEntities = this.findAdditionalEntities(this._config.entity);
+        allEntityIds.push(...additionalEntities);
         this._knownEntityIds = [...allEntityIds];
       }
-    } else {
-      // Keine gecachte Liste vorhanden, sammle Entities neu
-      allEntityIds = [this._config.entity];
-      const additionalEntities = this.findAdditionalEntities(this._config.entity);
-      allEntityIds.push(...additionalEntities);
-      this._knownEntityIds = [...allEntityIds];
-    }
 
-    // Ermittle die maximale Länge für jede Entity
-    const maxLengths = {};
-    let totalMaxLength = 0;
-    for (const entityId of allEntityIds) {
-      const maxLength = this.getEntityMaxLength(entityId);
-      if (maxLength !== null) {
-        maxLengths[entityId] = maxLength;
-        totalMaxLength += maxLength;
-      } else {
-        // Wenn keine max-Länge bekannt ist, verwende einen Standardwert (z.B. 255)
-        maxLengths[entityId] = 255;
-        totalMaxLength += 255;
-      }
-    }
+      this._debug(
+        `[Speichern] distributeDataToEntities: Verwende ${allEntityIds.length} Entities: ${allEntityIds.join(', ')}`
+      );
 
-    // Debug: Zeige wie viele Zeichen wir schreiben wollen vs. können
-    const dataLength = serializedData ? serializedData.length : 0;
-
-    // Wenn keine Daten vorhanden sind, setze alle Entities auf leer
-    if (!serializedData || serializedData.trim() === '') {
+      // Ermittle die maximale Länge für jede Entity
+      const maxLengths = {};
+      let totalMaxLength = 0;
       for (const entityId of allEntityIds) {
-        try {
-          await this._hass.callService('input_text', 'set_value', {
-            entity_id: entityId,
-            value: '',
-          });
-        } catch (error) {
+        const maxLength = this.getEntityMaxLength(entityId);
+        if (maxLength !== null) {
+          maxLengths[entityId] = maxLength;
+          totalMaxLength += maxLength;
+        } else {
+          // Wenn keine max-Länge bekannt ist, verwende einen Standardwert (z.B. 255)
+          maxLengths[entityId] = 255;
+          totalMaxLength += 255;
         }
       }
-      // Setze Timer auch wenn keine Daten vorhanden waren
-      this._writeLockTimer = setTimeout(() => {
-        this._isWriting = false;
-        this._writeLockTimer = null;
-      }, 5000);
-      return;
-    }
 
-    // Verteile die Daten zeichenweise auf die Entities (umgekehrt zum Einlesen)
-    // Wir haben einen Datenstring über alles und schreiben nur so viele Zeichen wie aufgenommen werden können
-    const entityValues = {};
-    let currentEntityIndex = 0;
-    let remainingData = serializedData;
+      // Debug: Zeige wie viele Zeichen wir schreiben wollen vs. können
+      const dataLength = serializedData ? serializedData.length : 0;
+      this._debug(
+        `[Speichern] distributeDataToEntities: Datenlänge: ${dataLength} Zeichen, verfügbarer Speicher: ${totalMaxLength} Zeichen`
+      );
 
-    // Verteile die Daten auf die verfügbaren Entities
-    while (remainingData.length > 0 && currentEntityIndex < allEntityIds.length) {
-      const currentEntityId = allEntityIds[currentEntityIndex];
-      const maxLength = maxLengths[currentEntityId];
+      // Wenn keine Daten vorhanden sind, setze alle Entities auf leer
+      if (!serializedData || serializedData.trim() === '') {
+        this._debug(
+          '[Speichern] distributeDataToEntities: Keine Daten vorhanden, setze alle Entities auf leer'
+        );
+        for (const entityId of allEntityIds) {
+          try {
+            await this._hass.callService('input_text', 'set_value', {
+              entity_id: entityId,
+              value: '',
+            });
+            this._debug(
+              `[Speichern] distributeDataToEntities: Entity "${entityId}" auf leer gesetzt`
+            );
+          } catch (error) {
+            this._debug(
+              `[Speichern] distributeDataToEntities: Fehler beim Leeren von "${entityId}": ${error.message}`
+            );
+          }
+        }
+        // Setze Timer auch wenn keine Daten vorhanden waren
+        this._writeLockTimer = setTimeout(() => {
+          this._isWriting = false;
+          this._writeLockTimer = null;
+          this._debug(
+            '[Speichern] distributeDataToEntities: Schreib-Lock nach 5 Sekunden entfernt (keine Daten)'
+          );
+        }, 5000);
+        return;
+      }
 
-      // Nimm so viele Zeichen wie möglich aus remainingData
-      const charsToTake = Math.min(remainingData.length, maxLength);
-      const valueToWrite = remainingData.substring(0, charsToTake);
+      // Verteile die Daten zeichenweise auf die Entities (umgekehrt zum Einlesen)
+      // Wir haben einen Datenstring über alles und schreiben nur so viele Zeichen wie aufgenommen werden können
+      const entityValues = {};
+      let currentEntityIndex = 0;
+      let remainingData = serializedData;
 
-      entityValues[currentEntityId] = valueToWrite;
-      remainingData = remainingData.substring(charsToTake);
+      // Verteile die Daten auf die verfügbaren Entities
+      while (remainingData.length > 0 && currentEntityIndex < allEntityIds.length) {
+        const currentEntityId = allEntityIds[currentEntityIndex];
+        const maxLength = maxLengths[currentEntityId];
 
+        // Nimm so viele Zeichen wie möglich aus remainingData
+        const charsToTake = Math.min(remainingData.length, maxLength);
+        const valueToWrite = remainingData.substring(0, charsToTake);
 
-      // Wenn noch Daten übrig sind, wechsle zur nächsten Entity
+        entityValues[currentEntityId] = valueToWrite;
+        remainingData = remainingData.substring(charsToTake);
+
+        // Wenn noch Daten übrig sind, wechsle zur nächsten Entity
+        if (remainingData.length > 0) {
+          currentEntityIndex++;
+        }
+      }
+
+      // Wenn am Ende noch Text über ist, prüfe ob zwischenzeitlich eine zusätzliche Entität angelegt wurde
       if (remainingData.length > 0) {
-        currentEntityIndex++;
+        // Prüfe ob neue Entities hinzugekommen sind
+        const currentAdditionalEntities = this.findAdditionalEntities(this._config.entity);
+        const knownAdditionalCount = this._knownEntityIds ? this._knownEntityIds.length - 1 : 0; // -1 für Haupt-Entity
+
+        if (currentAdditionalEntities.length > knownAdditionalCount) {
+          // Neue Entities gefunden
+          const newEntities = currentAdditionalEntities.slice(knownAdditionalCount);
+
+          // Aktualisiere die Liste
+          allEntityIds.push(...newEntities);
+          this._knownEntityIds = [...allEntityIds];
+
+          // Ermittle max-Längen für neue Entities
+          for (const newEntityId of newEntities) {
+            const maxLength = this.getEntityMaxLength(newEntityId);
+            if (maxLength !== null) {
+              maxLengths[newEntityId] = maxLength;
+            } else {
+              maxLengths[newEntityId] = 255;
+            }
+          }
+
+          // Verteile die verbleibenden Daten auf die neuen Entities
+          currentEntityIndex = allEntityIds.length - newEntities.length;
+          while (remainingData.length > 0 && currentEntityIndex < allEntityIds.length) {
+            const currentEntityId = allEntityIds[currentEntityIndex];
+            const maxLength = maxLengths[currentEntityId];
+
+            const charsToTake = Math.min(remainingData.length, maxLength);
+            const valueToWrite = remainingData.substring(0, charsToTake);
+
+            entityValues[currentEntityId] = valueToWrite;
+            remainingData = remainingData.substring(charsToTake);
+
+            if (remainingData.length > 0) {
+              currentEntityIndex++;
+            }
+          }
+        } else {
+        }
       }
-    }
 
-    // Wenn am Ende noch Text über ist, prüfe ob zwischenzeitlich eine zusätzliche Entität angelegt wurde
-    if (remainingData.length > 0) {
+      // Schreibe die Werte in die Entities (sequenziell, um sicherzustellen, dass alle Calls abgeschlossen sind)
+      this._debug(
+        `[Speichern] distributeDataToEntities: Schreibe in ${allEntityIds.length} Entities`
+      );
+      for (const entityId of allEntityIds) {
+        const value = entityValues[entityId] || '';
+        const maxLength = maxLengths[entityId];
 
-      // Prüfe ob neue Entities hinzugekommen sind
-      const currentAdditionalEntities = this.findAdditionalEntities(this._config.entity);
-      const knownAdditionalCount = this._knownEntityIds ? this._knownEntityIds.length - 1 : 0; // -1 für Haupt-Entity
-
-      if (currentAdditionalEntities.length > knownAdditionalCount) {
-        // Neue Entities gefunden
-        const newEntities = currentAdditionalEntities.slice(knownAdditionalCount);
-
-        // Aktualisiere die Liste
-        allEntityIds.push(...newEntities);
-        this._knownEntityIds = [...allEntityIds];
-
-        // Ermittle max-Längen für neue Entities
-        for (const newEntityId of newEntities) {
-          const maxLength = this.getEntityMaxLength(newEntityId);
-          if (maxLength !== null) {
-            maxLengths[newEntityId] = maxLength;
-          } else {
-            maxLengths[newEntityId] = 255;
+        // Der Wert sollte nie die maximale Länge überschreiten, da wir zeichenweise verteilen
+        if (value.length > maxLength) {
+          // Kürze den Wert auf die maximale Länge (als Notfall-Lösung)
+          const truncatedValue = value.substring(0, maxLength);
+          this._debug(
+            `[Speichern] distributeDataToEntities: Schreibe in "${entityId}" (gekürzt von ${value.length} auf ${truncatedValue.length} Zeichen)`
+          );
+          try {
+            await this._hass.callService('input_text', 'set_value', {
+              entity_id: entityId,
+              value: truncatedValue,
+            });
+            this._debug(
+              `[Speichern] distributeDataToEntities: Erfolgreich in "${entityId}" geschrieben`
+            );
+          } catch (error) {
+            this._debug(
+              `[Speichern] distributeDataToEntities: Fehler beim Schreiben in "${entityId}": ${error.message}`
+            );
+          }
+        } else {
+          this._debug(
+            `[Speichern] distributeDataToEntities: Schreibe in "${entityId}" (${value.length} Zeichen)`
+          );
+          try {
+            await this._hass.callService('input_text', 'set_value', {
+              entity_id: entityId,
+              value: value,
+            });
+            this._debug(
+              `[Speichern] distributeDataToEntities: Erfolgreich in "${entityId}" geschrieben`
+            );
+          } catch (error) {
+            this._debug(
+              `[Speichern] distributeDataToEntities: Fehler beim Schreiben in "${entityId}": ${error.message}`
+            );
           }
         }
+      }
 
-        // Verteile die verbleibenden Daten auf die neuen Entities
-        currentEntityIndex = allEntityIds.length - newEntities.length;
-        while (remainingData.length > 0 && currentEntityIndex < allEntityIds.length) {
-          const currentEntityId = allEntityIds[currentEntityIndex];
-          const maxLength = maxLengths[currentEntityId];
-
-          const charsToTake = Math.min(remainingData.length, maxLength);
-          const valueToWrite = remainingData.substring(0, charsToTake);
-
-          entityValues[currentEntityId] = valueToWrite;
-          remainingData = remainingData.substring(charsToTake);
-
-
-          if (remainingData.length > 0) {
-            currentEntityIndex++;
+      // Leere alle zusätzlichen Entities, die nicht verwendet wurden (um alte Daten zu entfernen)
+      // Wir müssen alle bekannten zusätzlichen Entities prüfen, nicht nur die in allEntityIds
+      const allAdditionalEntities = this.findAdditionalEntities(this._config.entity);
+      this._debug(
+        `[Speichern] distributeDataToEntities: Prüfe ${allAdditionalEntities.length} zusätzliche Entities zum Leeren`
+      );
+      for (const additionalEntityId of allAdditionalEntities) {
+        // Wenn diese Entity nicht in entityValues ist, bedeutet das, dass sie nicht verwendet wurde
+        if (!(additionalEntityId in entityValues)) {
+          this._debug(
+            `[Speichern] distributeDataToEntities: Leere nicht verwendete Entity "${additionalEntityId}"`
+          );
+          try {
+            await this._hass.callService('input_text', 'set_value', {
+              entity_id: additionalEntityId,
+              value: '',
+            });
+            this._debug(
+              `[Speichern] distributeDataToEntities: Entity "${additionalEntityId}" erfolgreich geleert`
+            );
+          } catch (error) {
+            this._debug(
+              `[Speichern] distributeDataToEntities: Fehler beim Leeren von "${additionalEntityId}": ${error.message}`
+            );
           }
         }
-      } else {
       }
-    }
-
-    // Schreibe die Werte in die Entities (sequenziell, um sicherzustellen, dass alle Calls abgeschlossen sind)
-    for (const entityId of allEntityIds) {
-      const value = entityValues[entityId] || '';
-      const maxLength = maxLengths[entityId];
-
-      // Der Wert sollte nie die maximale Länge überschreiten, da wir zeichenweise verteilen
-      if (value.length > maxLength) {
-        // Kürze den Wert auf die maximale Länge (als Notfall-Lösung)
-        const truncatedValue = value.substring(0, maxLength);
-        try {
-          await this._hass.callService('input_text', 'set_value', {
-            entity_id: entityId,
-            value: truncatedValue,
-          });
-        } catch (error) {
-        }
-      } else {
-        try {
-          await this._hass.callService('input_text', 'set_value', {
-            entity_id: entityId,
-            value: value,
-          });
-        } catch (error) {
-        }
-      }
-    }
-
-    // Leere alle zusätzlichen Entities, die nicht verwendet wurden (um alte Daten zu entfernen)
-    // Wir müssen alle bekannten zusätzlichen Entities prüfen, nicht nur die in allEntityIds
-    const allAdditionalEntities = this.findAdditionalEntities(this._config.entity);
-    for (const additionalEntityId of allAdditionalEntities) {
-      // Wenn diese Entity nicht in entityValues ist, bedeutet das, dass sie nicht verwendet wurde
-      if (!(additionalEntityId in entityValues)) {
-        try {
-          await this._hass.callService('input_text', 'set_value', {
-            entity_id: additionalEntityId,
-            value: '',
-          });
-        } catch (error) {
-        }
-      }
-    }
 
       // Wenn noch Daten übrig sind, die nicht gespeichert werden konnten
       if (remainingData.length > 0) {
+        this._debug(
+          `[Speichern] distributeDataToEntities: WARNUNG - ${remainingData.length} Zeichen konnten nicht gespeichert werden!`
+        );
       }
     } catch (error) {
+      this._debug(
+        `[Speichern] distributeDataToEntities: Fehler beim Verteilen der Daten: ${error.message}`,
+        error
+      );
     } finally {
       // Schreib-Lock für weitere 5 Sekunden aufrechterhalten (um sicherzustellen, dass alle Updates verarbeitet wurden)
       this._writeLockTimer = setTimeout(() => {
         this._isWriting = false;
         this._writeLockTimer = null;
+        this._debug('[Speichern] distributeDataToEntities: Schreib-Lock nach 5 Sekunden entfernt');
       }, 5000);
+      this._debug(
+        '[Speichern] distributeDataToEntities: Abgeschlossen, Schreib-Lock wird in 5 Sekunden entfernt'
+      );
     }
   }
 
   async toggleDay(month, day, year = null) {
-
     // Stelle sicher, dass month und day Zahlen sind
     const monthNum = parseInt(month);
     const dayNum = parseInt(day);
@@ -1428,10 +1856,10 @@ export class ShiftScheduleView extends ViewBase {
     let isPreviousMonth = false;
     if (currentMonth === 1) {
       // Aktuell ist Januar, Vormonat ist Dezember des Vorjahres
-      isPreviousMonth = (monthNum === 12 && yearNum === (currentYearFull - 1) % 100);
+      isPreviousMonth = monthNum === 12 && yearNum === (currentYearFull - 1) % 100;
     } else {
       // Vormonat ist aktueller Monat - 1 im gleichen Jahr
-      isPreviousMonth = (monthNum === currentMonth - 1 && yearNum === currentYear);
+      isPreviousMonth = monthNum === currentMonth - 1 && yearNum === currentYear;
     }
 
     if (isPreviousMonth) {
@@ -1459,40 +1887,55 @@ export class ShiftScheduleView extends ViewBase {
     }
 
     // Tag mit Kalender
-      if (!this._workingDays[key][dayNum]) {
-        this._workingDays[key][dayNum] = [];
-      }
+    if (!this._workingDays[key][dayNum]) {
+      this._workingDays[key][dayNum] = [];
+    }
 
-      // WICHTIG: Erstelle eine Kopie des Arrays, um sicherzustellen, dass wir mit dem richtigen Array arbeiten
-      const elements = [...(this._workingDays[key][dayNum] || [])];
+    // WICHTIG: Erstelle eine Kopie des Arrays, um sicherzustellen, dass wir mit dem richtigen Array arbeiten
+    const elements = [...(this._workingDays[key][dayNum] || [])];
 
-      const elementIndex = elements.indexOf(selectedCalendarShortcut);
+    const elementIndex = elements.indexOf(selectedCalendarShortcut);
 
-      if (elementIndex > -1) {
-        // Kalender entfernen
-        elements.splice(elementIndex, 1);
-        // Wenn keine Kalender mehr vorhanden sind, entferne den Tag
-        if (elements.length === 0) {
-          delete this._workingDays[key][dayNum];
-          // Wenn keine Tage mehr vorhanden sind, entferne den Monat
-          if (Object.keys(this._workingDays[key]).length === 0) {
-            delete this._workingDays[key];
-          }
-        } else {
-          // Aktualisiere das Array im _workingDays
-          this._workingDays[key][dayNum] = elements;
+    // MARKIERE BUTTON ALS "WIRD DIREKT AKTUALISIERT" BEVOR _workingDays GEÄNDERT WIRD
+    // Dies verhindert, dass Lit ein Update auslöst, während wir direkt manipulieren
+    const buttonKey = `${yearNum}:${monthNum}:${dayNum}`;
+    this._directDOMUpdateInProgress.add(buttonKey);
+
+    let finalElements = [];
+
+    if (elementIndex > -1) {
+      // Kalender entfernen
+      elements.splice(elementIndex, 1);
+      // Speichere die finalen Elemente BEVOR wir möglicherweise den Monat löschen
+      finalElements = elements;
+      // Wenn keine Kalender mehr vorhanden sind, entferne den Tag
+      if (elements.length === 0) {
+        delete this._workingDays[key][dayNum];
+        // Wenn keine Tage mehr vorhanden sind, entferne den Monat
+        if (Object.keys(this._workingDays[key]).length === 0) {
+          delete this._workingDays[key];
         }
       } else {
-        // Kalender hinzufügen (nur wenn noch nicht vorhanden)
-        if (!elements.includes(selectedCalendarShortcut)) {
-          elements.push(selectedCalendarShortcut);
-          // Aktualisiere das Array im _workingDays
-          this._workingDays[key][dayNum] = elements;
-        }
+        // Aktualisiere das Array im _workingDays
+        this._workingDays[key][dayNum] = elements;
       }
+    } else {
+      // Kalender hinzufügen (nur wenn noch nicht vorhanden)
+      if (!elements.includes(selectedCalendarShortcut)) {
+        elements.push(selectedCalendarShortcut);
+        // Aktualisiere das Array im _workingDays
+        this._workingDays[key][dayNum] = elements;
+      }
+      // Speichere die finalen Elemente
+      finalElements =
+        this._workingDays[key] && this._workingDays[key][dayNum]
+          ? this._workingDays[key][dayNum]
+          : elements;
+    }
 
     // OPTIMIERUNG: Direkte DOM-Manipulation statt komplettes Re-Rendering
-    this._updateDayButtonDirectly(monthNum, dayNum, yearNum, key, elements);
+    // Verwende die finalen elements (bereits vor dem möglichen Löschen gespeichert)
+    this._updateDayButtonDirectly(monthNum, dayNum, yearNum, key, finalElements);
 
     // OPTIMIERUNG: Debounced Speichern - warte nach dem letzten Klick, bevor gespeichert wird
     this._scheduleDebouncedSave();
@@ -1525,17 +1968,88 @@ export class ShiftScheduleView extends ViewBase {
   // Speichert die Daten asynchron in Home Assistant
   async _saveToHA() {
     try {
+      this._debug('[Speichern] _saveToHA: Start');
       const serializedData = this.serializeWorkingDays();
+      this._debug(
+        `[Speichern] _saveToHA: Daten serialisiert, Länge: ${serializedData.length} Zeichen, store_mode: "${this._config.store_mode}"`
+      );
 
-      // Verteile die Daten auf mehrere Entities, falls nötig
-      await this.distributeDataToEntities(serializedData);
+      // Unterschiedliche Speicherung je nach store_mode
+      if (this._config.store_mode === 'saver') {
+        // Saver-Modus: Schreibe direkt in Saver-Variable
+        this._debug('[Speichern] _saveToHA: Speichere in Saver');
+        await this._saveDataToSaver(serializedData);
+      } else {
+        // text_entity-Modus: Verteile die Daten auf mehrere Entities, falls nötig
+        this._debug('[Speichern] _saveToHA: Speichere in Entities');
+        await this.distributeDataToEntities(serializedData);
+      }
 
-      // Prüfe Speicherverbrauch nach dem Toggle
+      // Prüfe Speicherverbrauch nach dem Toggle (nur bei text_entity)
       // Verwende die Länge der serialisierten Daten, da die States noch nicht aktualisiert sind
-      this.checkStorageUsage(serializedData.length);
+      if (this._config.store_mode !== 'saver') {
+        this.checkStorageUsage(serializedData.length);
+      }
+      this._debug('[Speichern] _saveToHA: Erfolgreich abgeschlossen');
     } catch (error) {
+      this._debug(`[Speichern] _saveToHA: Fehler beim Speichern: ${error.message}`, error);
       console.error('[TG Schichtplan] Fehler beim Speichern:', error);
       // Optional: Hier könnte man eine Fehlermeldung anzeigen
+    }
+  }
+
+  // Speichert Daten in den Saver
+  async _saveDataToSaver(serializedData) {
+    if (!this._hass || !this._config || !this._config.saver_key) {
+      this._debug('[Speichern] _saveDataToSaver: Kein hass, config oder saver_key vorhanden');
+      return;
+    }
+
+    const saverKey = this._config.saver_key || 'Schichtplan';
+    this._debug(
+      `[Speichern] _saveDataToSaver: Start, saver_key: "${saverKey}", Datenlänge: ${serializedData.length} Zeichen`
+    );
+
+    try {
+      // Prüfe ob die Saver-Variable existiert und ob sich der Wert geändert hat
+      // Saver-Variablen sind in saver.saver.attributes.variables gespeichert
+      const saverEntity = this._hass.states['saver.saver'];
+      let oldValue = '';
+
+      if (saverEntity && saverEntity.attributes && saverEntity.attributes.variables) {
+        const existingValue = saverEntity.attributes.variables[saverKey];
+        if (existingValue !== undefined && existingValue !== null) {
+          oldValue = String(existingValue).trim();
+        }
+      }
+
+      this._debug(
+        `[Speichern] _saveDataToSaver: Saver-Variable "${saverKey}" existiert: ${oldValue !== ''}, alte Länge: ${oldValue.length} Zeichen`
+      );
+
+      // Nur schreiben wenn Variable nicht existiert oder Wert sich geändert hat
+      if (oldValue === '' || oldValue !== serializedData) {
+        this._debug(
+          `[Speichern] _saveDataToSaver: Schreibe in Saver (Variable existiert nicht oder Wert hat sich geändert)`
+        );
+        await this._hass.callService('saver', 'set_variable', {
+          name: saverKey,
+          value: serializedData || '',
+        });
+        this._debug(`[Speichern] _saveDataToSaver: Erfolgreich in Saver geschrieben`);
+      } else {
+        this._debug(
+          `[Speichern] _saveDataToSaver: Kein Schreiben nötig, Wert hat sich nicht geändert`
+        );
+      }
+    } catch (error) {
+      // Fehler beim Schreiben in Saver - Fallback zu Entities
+      this._debug(
+        `[Speichern] _saveDataToSaver: Fehler beim Schreiben in Saver, Fallback zu Entities: ${error.message}`,
+        error
+      );
+      console.warn('[TG Schichtplan] Fehler beim Schreiben in Saver, Fallback zu Entities:', error);
+      await this.distributeDataToEntities(serializedData);
     }
   }
 
@@ -1558,6 +2072,13 @@ export class ShiftScheduleView extends ViewBase {
       return;
     }
 
+    // Button sollte bereits in _directDOMUpdateInProgress sein (wurde in toggleDay gesetzt)
+    // Falls nicht, füge ihn hinzu (Fallback für direkte Aufrufe)
+    const buttonKey = `${yearNum}:${monthNum}:${dayNum}`;
+    if (!this._directDOMUpdateInProgress.has(buttonKey)) {
+      this._directDOMUpdateInProgress.add(buttonKey);
+    }
+
     // Finde den Button im DOM
     const button = this.shadowRoot.querySelector(
       `button[data-month="${monthNum}"][data-day="${dayNum}"][data-year="${yearNum}"]`
@@ -1565,6 +2086,7 @@ export class ShiftScheduleView extends ViewBase {
 
     if (!button) {
       // Button nicht gefunden, Fallback zu requestUpdate
+      this._directDOMUpdateInProgress.delete(buttonKey);
       this.requestUpdate();
       return;
     }
@@ -1617,12 +2139,10 @@ export class ShiftScheduleView extends ViewBase {
     }
 
     // Aktualisiere Shift-Indikatoren
-    const shiftsContainer = button.querySelector('.shifts-container');
-    const existingIndicators = shiftsContainer ? Array.from(shiftsContainer.querySelectorAll('.shift-indicator')) : [];
-
-    // Entferne alte Indikatoren
-    if (shiftsContainer) {
-      shiftsContainer.innerHTML = '';
+    // Entferne zuerst alle vorhandenen Container und Indikatoren
+    const existingContainer = button.querySelector('.shifts-container');
+    if (existingContainer) {
+      existingContainer.remove();
     }
 
     // Erstelle neue Indikatoren für alle Schichten außer der, die den Tag färbt
@@ -1641,20 +2161,21 @@ export class ShiftScheduleView extends ViewBase {
       })
       .filter(indicator => indicator !== null);
 
-    // Füge Indikatoren hinzu
+    // Füge Indikatoren nur hinzu, wenn welche vorhanden sind
     if (shiftIndicators.length > 0) {
-      if (!shiftsContainer) {
-        const container = document.createElement('div');
-        container.className = 'shifts-container';
-        button.appendChild(container);
-        shiftIndicators.forEach(ind => container.appendChild(ind));
-      } else {
-        shiftIndicators.forEach(ind => shiftsContainer.appendChild(ind));
-      }
-    } else if (shiftsContainer) {
-      // Entferne Container wenn keine Indikatoren mehr vorhanden
-      shiftsContainer.remove();
+      const container = document.createElement('div');
+      container.className = 'shifts-container';
+      // Markiere Container als manuell erstellt, damit das Template sie nicht überschreibt
+      container.setAttribute('data-manual-update', 'true');
+      shiftIndicators.forEach(ind => container.appendChild(ind));
+      button.appendChild(container);
     }
+
+    // Entferne Markierung nach Abschluss der direkten DOM-Manipulation
+    // Verzögert, damit Lit-Updates, die durch _workingDays-Änderung ausgelöst werden, übersprungen werden können
+    setTimeout(() => {
+      this._directDOMUpdateInProgress.delete(buttonKey);
+    }, 100); // Länger warten, damit Lit-Updates abgeschlossen sind
   }
 
   getDaysInMonth(year, month) {
@@ -1670,13 +2191,23 @@ export class ShiftScheduleView extends ViewBase {
     const dayNum = d.getUTCDay() || 7;
     d.setUTCDate(d.getUTCDate() + 4 - dayNum);
     const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-    return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+    return Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
   }
 
   getMonthName(month) {
     const months = [
-      'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni',
-      'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'
+      'Januar',
+      'Februar',
+      'März',
+      'April',
+      'Mai',
+      'Juni',
+      'Juli',
+      'August',
+      'September',
+      'Oktober',
+      'November',
+      'Dezember',
     ];
     return months[month];
   }
@@ -1700,7 +2231,7 @@ export class ShiftScheduleView extends ViewBase {
     const currentYear = now.getFullYear();
 
     const dayElements = this._getDayElements(key, currentDay);
-    const isToday = (year === currentYear && month === currentMonth && currentDay === today);
+    const isToday = year === currentYear && month === currentMonth && currentDay === today;
 
     // Prüfe ob der ausgewählte Kalender an diesem Tag aktiv ist
     const selectedShortcut = this._getSelectedCalendarShortcut();
@@ -1747,32 +2278,37 @@ export class ShiftScheduleView extends ViewBase {
     const isWeekend = this._isWeekend(year, month, currentDay);
     const isHoliday = this._isHoliday(year, month, currentDay);
 
-        // Erstelle visuelle Darstellung der Kalender (alle außer der Schicht, die den Tag färbt)
-        // Nur aktivierte Kalender werden angezeigt
-        const shiftIndicators = dayElements
-          .filter(shortcut => shortcut !== activeShiftForColor) // Filtere die Schicht heraus, die den Tag färbt
-          .map(shortcut => {
-            const calendar = this._getCalendarByShortcut(shortcut);
-            // Nur anzeigen, wenn der Kalender aktiviert ist
-            if (calendar && calendar.enabled && calendar.color) {
-              return html`
-                <span
-                  class="shift-indicator"
-                  style="background-color: ${calendar.color};"
-                  title="${calendar.name || `Schicht ${shortcut.toUpperCase()}`}">
-                </span>
-              `;
-            }
-            return null; // Nicht anzeigen, wenn Kalender deaktiviert ist
-          })
-          .filter(indicator => indicator !== null); // Entferne null-Werte
+    // Erstelle visuelle Darstellung der Kalender (alle außer der Schicht, die den Tag färbt)
+    // Nur aktivierte Kalender werden angezeigt
+    const shiftIndicators = dayElements
+      .filter(shortcut => shortcut !== activeShiftForColor) // Filtere die Schicht heraus, die den Tag färbt
+      .map(shortcut => {
+        const calendar = this._getCalendarByShortcut(shortcut);
+        // Nur anzeigen, wenn der Kalender aktiviert ist
+        if (calendar && calendar.enabled && calendar.color) {
+          return html`
+            <span
+              class="shift-indicator"
+              style="background-color: ${calendar.color};"
+              title="${calendar.name || `Schicht ${shortcut.toUpperCase()}`}"
+            >
+            </span>
+          `;
+        }
+        return null; // Nicht anzeigen, wenn Kalender deaktiviert ist
+      })
+      .filter(indicator => indicator !== null); // Entferne null-Werte
 
     return html`
       <td>
         <button
-          class="day-button ${isWorking ? 'working' : ''} ${isToday ? 'today' : ''} ${isPreviousMonth ? 'readonly' : ''} ${isWeekend ? 'weekend' : ''} ${isHoliday ? 'holiday' : ''}"
+          class="day-button ${isWorking ? 'working' : ''} ${isToday
+            ? 'today'
+            : ''} ${isPreviousMonth ? 'readonly' : ''} ${isWeekend ? 'weekend' : ''} ${isHoliday
+            ? 'holiday'
+            : ''}"
           style="${buttonStyle}"
-          @click=${(e) => {
+          @click=${e => {
             if (!isPreviousMonth) {
               this.toggleDay(monthKey, currentDay, yearKey);
               // Entferne Fokus nach Klick (wichtig für mobile Geräte)
@@ -1801,9 +2337,32 @@ export class ShiftScheduleView extends ViewBase {
           ?disabled=${isPreviousMonth}
           data-month="${monthKey}"
           data-day="${currentDay}"
-          data-year="${yearKey}">
+          data-year="${yearKey}"
+        >
           <span class="day-number">${currentDay}</span>
-          ${shiftIndicators.length > 0 ? html`<div class="shifts-container">${shiftIndicators}</div>` : ''}
+          ${(() => {
+            // Prüfe ob dieser Button bereits manuell aktualisiert wurde
+            // Wenn ja, rendere keine Indikatoren (werden per direkter DOM-Manipulation verwaltet)
+            const buttonKey = `${yearKey}:${monthKey}:${currentDay}`;
+            if (this._directDOMUpdateInProgress && this._directDOMUpdateInProgress.has(buttonKey)) {
+              return '';
+            }
+            // Prüfe auch, ob im DOM bereits ein manuell erstellter Container existiert
+            if (this.shadowRoot) {
+              const existingButton = this.shadowRoot.querySelector(
+                `button[data-month="${monthKey}"][data-day="${currentDay}"][data-year="${yearKey}"]`
+              );
+              if (
+                existingButton &&
+                existingButton.querySelector('.shifts-container[data-manual-update="true"]')
+              ) {
+                return '';
+              }
+            }
+            return shiftIndicators.length > 0
+              ? html`<div class="shifts-container">${shiftIndicators}</div>`
+              : '';
+          })()}
         </button>
       </td>
     `;
@@ -1841,10 +2400,10 @@ export class ShiftScheduleView extends ViewBase {
     let isPreviousMonth = false;
     if (currentMonth === 0) {
       // Aktuell ist Januar, Vormonat ist Dezember des Vorjahres
-      isPreviousMonth = (month === 11 && year === currentYear - 1);
+      isPreviousMonth = month === 11 && year === currentYear - 1;
     } else {
       // Vormonat ist aktueller Monat - 1 im gleichen Jahr
-      isPreviousMonth = (month === currentMonth - 1 && year === currentYear);
+      isPreviousMonth = month === currentMonth - 1 && year === currentYear;
     }
 
     const rows = [];
@@ -1859,11 +2418,17 @@ export class ShiftScheduleView extends ViewBase {
       firstRowCells.push(html`<td></td>`);
     }
 
-      for (let i = firstDayMonday; i < 7 && day <= daysInMonth; i++) {
-        firstRowCells.push(this.renderDay(day, monthKey, yearKey, key, workingDays, isPreviousMonth, year, month));
-        day++;
-      }
-    rows.push(html`<tr>${firstRowCells}</tr>`);
+    for (let i = firstDayMonday; i < 7 && day <= daysInMonth; i++) {
+      firstRowCells.push(
+        this.renderDay(day, monthKey, yearKey, key, workingDays, isPreviousMonth, year, month)
+      );
+      day++;
+    }
+    rows.push(
+      html`<tr>
+        ${firstRowCells}
+      </tr>`
+    );
 
     // Weitere Wochen
     while (day <= daysInMonth) {
@@ -1874,14 +2439,20 @@ export class ShiftScheduleView extends ViewBase {
       // Rendere immer 7 Zellen pro Woche (Tage oder leere Zellen)
       for (let i = 0; i < 7; i++) {
         if (day <= daysInMonth) {
-          rowCells.push(this.renderDay(day, monthKey, yearKey, key, workingDays, isPreviousMonth, year, month));
+          rowCells.push(
+            this.renderDay(day, monthKey, yearKey, key, workingDays, isPreviousMonth, year, month)
+          );
           day++;
         } else {
           // Leere Zelle am Ende der letzten Woche
           rowCells.push(html`<td></td>`);
         }
       }
-      rows.push(html`<tr>${rowCells}</tr>`);
+      rows.push(
+        html`<tr>
+          ${rowCells}
+        </tr>`
+      );
     }
 
     return html`
@@ -1946,7 +2517,7 @@ export class ShiftScheduleView extends ViewBase {
 
     return {
       canGoBack: currentOffset > minOffset,
-      canGoForward: currentOffset < maxOffset
+      canGoForward: currentOffset < maxOffset,
     };
   }
 
@@ -1954,7 +2525,11 @@ export class ShiftScheduleView extends ViewBase {
     // Gibt den Shortcut des ausgewählten Kalenders zurück
 
     // Prüfe zuerst _selectedCalendar
-    if (this._selectedCalendar !== null && this._selectedCalendar !== undefined && this._selectedCalendar !== '') {
+    if (
+      this._selectedCalendar !== null &&
+      this._selectedCalendar !== undefined &&
+      this._selectedCalendar !== ''
+    ) {
       return this._selectedCalendar;
     }
 
@@ -1990,7 +2565,12 @@ export class ShiftScheduleView extends ViewBase {
 
     // Filtere nur aktivierte Kalender und sortiere nach Shortcut (a, b, c, d, e)
     return this._config.calendars
-      .filter(cal => cal && cal.shortcut && (cal.enabled === true || cal.enabled === 'true' || cal.enabled === 1))
+      .filter(
+        cal =>
+          cal &&
+          cal.shortcut &&
+          (cal.enabled === true || cal.enabled === 'true' || cal.enabled === 1)
+      )
       .sort((a, b) => a.shortcut.localeCompare(b.shortcut));
   }
 
@@ -2038,7 +2618,6 @@ export class ShiftScheduleView extends ViewBase {
 
   _onCalendarSelectedByIndex(shortcut) {
     if (shortcut !== '' && shortcut !== null && shortcut !== undefined) {
-      const previousCalendar = this._selectedCalendar;
       this._selectedCalendar = shortcut;
 
       // Aktualisiere die Config mit der neuen Auswahl
@@ -2049,23 +2628,35 @@ export class ShiftScheduleView extends ViewBase {
         };
 
         // Dispatch config-changed Event, damit die Card die Config aktualisiert
-        this.dispatchEvent(
-          new CustomEvent('config-changed', {
-            detail: { config: this._config },
-            bubbles: true,
-            composed: true,
-          })
-        );
-        // Speichere die Config in die Entity
-        this.saveConfigToEntity();
+        // (nur wenn nicht initialer Load)
+        if (!this._isInitialLoad) {
+          this.dispatchEvent(
+            new CustomEvent('config-changed', {
+              detail: { config: this._config },
+              bubbles: true,
+              composed: true,
+            })
+          );
+          // Speichere die Config in die Entity (nur bei Benutzeraktionen)
+          this.saveConfigToEntity();
+        }
       }
 
-      // OPTIMIERUNG: Aktualisiere nur die betroffenen Buttons per DOM-Manipulation
-      if (this.shadowRoot && previousCalendar !== shortcut) {
-        this._updateAllDayButtonsForCalendarChange();
-      } else {
-        // Fallback: Komplettes Re-Rendering wenn Shadow DOM nicht bereit
-        this.requestUpdate();
+      // Aktualisiere alle Buttons, die die neue aktive Schicht haben
+      // Dies ist notwendig, um die Hintergrundfarben und Indikatoren korrekt zu aktualisieren
+      // (z.B. wenn Tag 2 die Schicht "a" hat und wir zu "a" wechseln, sollte Tag 2 orange werden)
+      // ABER: Nur wenn es sich nicht um den initialen Load handelt UND die Daten bereits geladen sind
+      // Beim initialen Load werden die Buttons bereits korrekt durch Lit gerendert
+      if (
+        !this._isInitialLoad &&
+        this.shadowRoot &&
+        this._workingDays &&
+        Object.keys(this._workingDays).length > 0
+      ) {
+        // Verwende setTimeout, um sicherzustellen, dass _selectedCalendar bereits aktualisiert wurde
+        setTimeout(() => {
+          this._updateAllDayButtonsForCalendarChange();
+        }, 0);
       }
     }
   }
@@ -2132,9 +2723,10 @@ export class ShiftScheduleView extends ViewBase {
       }
 
       // Aktualisiere Shift-Indikatoren (ähnlich wie in _updateDayButtonDirectly)
-      const shiftsContainer = button.querySelector('.shifts-container');
-      if (shiftsContainer) {
-        shiftsContainer.innerHTML = '';
+      // Entferne zuerst alle vorhandenen Container und Indikatoren
+      const existingContainer = button.querySelector('.shifts-container');
+      if (existingContainer) {
+        existingContainer.remove();
       }
 
       const shiftIndicators = dayElements
@@ -2152,19 +2744,243 @@ export class ShiftScheduleView extends ViewBase {
         })
         .filter(indicator => indicator !== null);
 
+      // Füge Indikatoren nur hinzu, wenn welche vorhanden sind
       if (shiftIndicators.length > 0) {
-        if (!shiftsContainer) {
-          const container = document.createElement('div');
-          container.className = 'shifts-container';
-          button.appendChild(container);
-          shiftIndicators.forEach(ind => container.appendChild(ind));
-        } else {
-          shiftIndicators.forEach(ind => shiftsContainer.appendChild(ind));
-        }
-      } else if (shiftsContainer) {
-        shiftsContainer.remove();
+        const container = document.createElement('div');
+        container.className = 'shifts-container';
+        // Markiere Container als manuell erstellt, damit das Template sie nicht überschreibt
+        container.setAttribute('data-manual-update', 'true');
+        shiftIndicators.forEach(ind => container.appendChild(ind));
+        button.appendChild(container);
       }
+      // Wenn keine Indikatoren vorhanden sind, wurde der Container bereits oben entfernt
     });
+  }
+
+  // Aktualisiert die Storage-Warnung direkt im DOM ohne Re-Rendering
+  _updateStorageWarningDirectly() {
+    if (!this.shadowRoot) {
+      // Shadow DOM noch nicht bereit, Fallback zu requestUpdate
+      this.requestUpdate();
+      return;
+    }
+
+    const wrapper = this.shadowRoot.querySelector('.calendar-wrapper');
+    if (!wrapper) {
+      // Wrapper nicht gefunden, Fallback zu requestUpdate
+      this.requestUpdate();
+      return;
+    }
+
+    const isEditorMode = this._isInEditorMode();
+    const hasStorageWarning = this._storageWarning && this._storageWarning.show;
+
+    // Aktualisiere CSS-Klasse
+    if (hasStorageWarning) {
+      wrapper.classList.add('storage-warning-active');
+    } else {
+      wrapper.classList.remove('storage-warning-active');
+    }
+
+    // Finde oder erstelle Storage-Warnung
+    let storageWarningEl = wrapper.querySelector('.storage-warning[data-warning-type="storage"]');
+
+    if (hasStorageWarning) {
+      if (!storageWarningEl) {
+        // Erstelle neue Warnung
+        storageWarningEl = document.createElement('div');
+        storageWarningEl.className = 'storage-warning';
+        storageWarningEl.setAttribute('data-warning-type', 'storage');
+        wrapper.insertBefore(storageWarningEl, wrapper.firstChild);
+      }
+
+      // Aktualisiere Inhalt
+      const additionalEntities = this.findAdditionalEntities(this._config.entity);
+      const nextEntitySuffix = String(additionalEntities.length + 1).padStart(3, '0');
+      storageWarningEl.innerHTML = `
+        <div class="warning-icon">⚠️</div>
+        <div class="warning-content">
+          <div class="warning-title">Speicherplatz fast voll!</div>
+          <div class="warning-message">
+            ${this._storageWarning.percentage}% der verfügbaren Speicherkapazität verwendet
+            (${this._storageWarning.currentLength} / ${this._storageWarning.maxLength} Zeichen).
+          </div>
+          <div class="warning-action">
+            Bitte legen Sie ein zusätzliches Input-Text-Feld an (z.B. ${this._config.entity}_${nextEntitySuffix}).
+          </div>
+        </div>
+      `;
+    } else if (storageWarningEl) {
+      // Entferne Warnung wenn nicht mehr nötig
+      storageWarningEl.remove();
+    }
+  }
+
+  // Aktualisiert die Config-Warnung direkt im DOM ohne Re-Rendering
+  _updateConfigWarningDirectly() {
+    if (!this.shadowRoot) {
+      // Shadow DOM noch nicht bereit, Fallback zu requestUpdate
+      this.requestUpdate();
+      return;
+    }
+
+    const wrapper = this.shadowRoot.querySelector('.calendar-wrapper');
+    if (!wrapper) {
+      // Wrapper nicht gefunden, Fallback zu requestUpdate
+      this.requestUpdate();
+      return;
+    }
+
+    const isEditorMode = this._isInEditorMode();
+    const hasConfigWarning =
+      this._configWarning &&
+      this._configWarning.show &&
+      (this._configWarning.type === 'size' ||
+        (this._configWarning.type === 'missing' && isEditorMode));
+
+    // Finde alle Config-Warnungen (size und missing)
+    const configWarningSize = wrapper.querySelector(
+      '.storage-warning[data-warning-type="config-size"]'
+    );
+    const configWarningMissing = wrapper.querySelector(
+      '.storage-warning[data-warning-type="config-missing"]'
+    );
+
+    if (hasConfigWarning && this._configWarning.type === 'size') {
+      // Size-Warnung anzeigen/aktualisieren
+      let warningEl = configWarningSize;
+      if (!warningEl) {
+        warningEl = document.createElement('div');
+        warningEl.className = 'storage-warning';
+        warningEl.setAttribute('data-warning-type', 'config-size');
+        // Füge nach Storage-Warnung ein, falls vorhanden
+        const storageWarning = wrapper.querySelector(
+          '.storage-warning[data-warning-type="storage"]'
+        );
+        if (storageWarning) {
+          storageWarning.insertAdjacentElement('afterend', warningEl);
+        } else {
+          wrapper.insertBefore(warningEl, wrapper.firstChild);
+        }
+      }
+      warningEl.innerHTML = `
+        <div class="warning-icon">⚠️</div>
+        <div class="warning-content">
+          <div class="warning-title">Konfigurations-Entity zu klein!</div>
+          <div class="warning-message">
+            Die Konfiguration passt nicht in die Entity <code>${this._configWarning.configEntityId}</code>.
+            ${this._configWarning.percentage}% der verfügbaren Speicherkapazität benötigt
+            (${this._configWarning.currentLength} / ${this._configWarning.maxLength} Zeichen).
+          </div>
+          <div class="warning-action">
+            Bitte erhöhen Sie die maximale Länge der Entity über die UI:
+            <ul>
+              <li>Einstellungen → Automatisierungen &amp; Szenen → Hilfsmittel</li>
+              <li>Entity <code>${this._configWarning.configEntityId.replace('input_text.', '')}</code> bearbeiten</li>
+              <li>Maximale Länge auf mindestens <code>${Math.ceil(this._configWarning.currentLength * 1.2)}</code> Zeichen erhöhen</li>
+            </ul>
+          </div>
+        </div>
+      `;
+    } else if (configWarningSize) {
+      configWarningSize.remove();
+    }
+
+    if (hasConfigWarning && this._configWarning.type === 'missing' && isEditorMode) {
+      // Missing-Warnung anzeigen/aktualisieren
+      let warningEl = configWarningMissing;
+      if (!warningEl) {
+        warningEl = document.createElement('div');
+        warningEl.className = 'storage-warning';
+        warningEl.setAttribute('data-warning-type', 'config-missing');
+        // Füge nach anderen Warnungen ein
+        const lastWarning = wrapper.querySelector('.storage-warning:last-of-type');
+        if (lastWarning) {
+          lastWarning.insertAdjacentElement('afterend', warningEl);
+        } else {
+          wrapper.insertBefore(warningEl, wrapper.firstChild);
+        }
+      }
+      // Erstelle HTML-String für missing entity warning
+      const entityNameShort = this._configWarning.configEntityId.replace('input_text.', '');
+      warningEl.innerHTML = `
+        <div class="warning-icon">⚠️</div>
+        <div class="warning-content">
+          <div class="warning-title">Konfigurations-Entity fehlt!</div>
+          <div class="warning-message">
+            Die Entity <code>${this._configWarning.configEntityId}</code> wurde nicht gefunden.
+          </div>
+          <div class="warning-action">
+            Bitte legen Sie diese Entity über die UI an:
+            <ul>
+              <li>Einstellungen → Automatisierungen &amp; Szenen → Hilfsmittel</li>
+              <li>Hilfsmittel hinzufügen → Text</li>
+              <li>Entity-ID: <code>${this._configWarning.configEntityId}</code></li>
+              <li>Maximale Länge: <code>255</code> Zeichen (oder mehr)</li>
+            </ul>
+          </div>
+        </div>
+      `;
+    } else if (configWarningMissing) {
+      configWarningMissing.remove();
+    }
+  }
+
+  // Aktualisiert die Status-Warnung direkt im DOM ohne Re-Rendering
+  _updateStatusWarningDirectly() {
+    if (!this.shadowRoot) {
+      // Shadow DOM noch nicht bereit, Fallback zu requestUpdate
+      this.requestUpdate();
+      return;
+    }
+
+    const wrapper = this.shadowRoot.querySelector('.calendar-wrapper');
+    if (!wrapper) {
+      // Wrapper nicht gefunden, Fallback zu requestUpdate
+      this.requestUpdate();
+      return;
+    }
+
+    const isEditorMode = this._isInEditorMode();
+    const hasStatusWarning = this._statusWarning && this._statusWarning.show && isEditorMode;
+
+    const statusWarningEl = wrapper.querySelector('.storage-warning[data-warning-type="status"]');
+
+    if (hasStatusWarning) {
+      let warningEl = statusWarningEl;
+      if (!warningEl) {
+        warningEl = document.createElement('div');
+        warningEl.className = 'storage-warning';
+        warningEl.setAttribute('data-warning-type', 'status');
+        // Füge nach anderen Warnungen ein
+        const lastWarning = wrapper.querySelector('.storage-warning:last-of-type');
+        if (lastWarning) {
+          lastWarning.insertAdjacentElement('afterend', warningEl);
+        } else {
+          wrapper.insertBefore(warningEl, wrapper.firstChild);
+        }
+      }
+      warningEl.innerHTML = `
+        <div class="warning-icon">⚠️</div>
+        <div class="warning-content">
+          <div class="warning-title">Status-Entity fehlt!</div>
+          <div class="warning-message">
+            Die Entity <code>${this._statusWarning.statusEntityId}</code> wurde nicht gefunden.
+          </div>
+          <div class="warning-action">
+            Bitte legen Sie diese Entity über die UI an:
+            <ul>
+              <li>Einstellungen → Automatisierungen &amp; Szenen → Hilfsmittel</li>
+              <li>Hilfsmittel hinzufügen → Text</li>
+              <li>Entity-ID: <code>${this._statusWarning.statusEntityId}</code></li>
+              <li>Maximale Länge: <code>255</code> Zeichen (oder mehr)</li>
+            </ul>
+          </div>
+        </div>
+      `;
+    } else if (statusWarningEl) {
+      statusWarningEl.remove();
+    }
   }
 
   _getDayElements(monthKey, day) {
@@ -2178,13 +2994,37 @@ export class ShiftScheduleView extends ViewBase {
       return [];
     }
 
-    return this._workingDays[monthKey][day] || [];
+    const elements = this._workingDays[monthKey][day] || [];
+
+    return elements;
   }
 
   // Optimierung: Verhindere unnötige Re-Renderings
   shouldUpdate(changedProperties) {
     // Prüfe ob sich relevante Properties geändert haben
-    const relevantProps = ['hass', 'config', '_workingDays', '_displayedMonths', '_startMonthOffset', '_selectedCalendar', '_storageWarning', '_configWarning', '_statusWarning'];
+    const relevantProps = [
+      'hass',
+      'config',
+      '_workingDays',
+      '_displayedMonths',
+      '_startMonthOffset',
+      '_selectedCalendar',
+      '_storageWarning',
+      '_configWarning',
+      '_statusWarning',
+    ];
+
+    // Wenn nur _workingDays geändert wurde und direkte DOM-Updates im Gange sind,
+    // überspringe das Update, um Verdopplungen zu vermeiden
+    if (
+      changedProperties.has('_workingDays') &&
+      changedProperties.size === 1 &&
+      this._directDOMUpdateInProgress.size > 0
+    ) {
+      // Überspringe Update, da direkte DOM-Manipulation verwendet wird
+      return false;
+    }
+
     return relevantProps.some(prop => changedProperties.has(prop));
   }
 
@@ -2210,10 +3050,11 @@ export class ShiftScheduleView extends ViewBase {
     // Speicherwarnung wird immer angezeigt (auch im normalen Modus)
     const hasStorageWarning = this._storageWarning && this._storageWarning.show;
     // Config-Warnung: "missing" nur im Editor, "size" immer (auch im normalen Modus)
-    const hasConfigWarning = this._configWarning && this._configWarning.show && (
-      this._configWarning.type === 'size' || // Speicherplatz-Warnung immer anzeigen
-      (this._configWarning.type === 'missing' && isEditorMode) // Fehlende Entity nur im Editor
-    );
+    const hasConfigWarning =
+      this._configWarning &&
+      this._configWarning.show &&
+      (this._configWarning.type === 'size' || // Speicherplatz-Warnung immer anzeigen
+        (this._configWarning.type === 'missing' && isEditorMode)); // Fehlende Entity nur im Editor
     // Status-Warnung wird nur im Editor-Modus angezeigt
     const hasStatusWarning = this._statusWarning && this._statusWarning.show && isEditorMode;
     const navBounds = this.getNavigationBounds();
@@ -2222,16 +3063,20 @@ export class ShiftScheduleView extends ViewBase {
       <div class="calendar-wrapper ${hasStorageWarning ? 'storage-warning-active' : ''}">
         ${hasStorageWarning
           ? html`
-              <div class="storage-warning">
+              <div class="storage-warning" data-warning-type="storage">
                 <div class="warning-icon">⚠️</div>
                 <div class="warning-content">
                   <div class="warning-title">Speicherplatz fast voll!</div>
                   <div class="warning-message">
                     ${this._storageWarning.percentage}% der verfügbaren Speicherkapazität verwendet
-                    (${this._storageWarning.currentLength} / ${this._storageWarning.maxLength} Zeichen).
+                    (${this._storageWarning.currentLength} / ${this._storageWarning.maxLength}
+                    Zeichen).
                   </div>
                   <div class="warning-action">
-                    Bitte legen Sie ein zusätzliches Input-Text-Feld an (z.B. ${this._config.entity}_${String(this.findAdditionalEntities(this._config.entity).length + 1).padStart(3, '0')}).
+                    Bitte legen Sie ein zusätzliches Input-Text-Feld an (z.B.
+                    ${this._config.entity}_${String(
+                      this.findAdditionalEntities(this._config.entity).length + 1
+                    ).padStart(3, '0')}).
                   </div>
                 </div>
               </div>
@@ -2239,21 +3084,33 @@ export class ShiftScheduleView extends ViewBase {
           : ''}
         ${hasConfigWarning && this._configWarning.type === 'size'
           ? html`
-              <div class="storage-warning">
+              <div class="storage-warning" data-warning-type="config-size">
                 <div class="warning-icon">⚠️</div>
                 <div class="warning-content">
                   <div class="warning-title">Konfigurations-Entity zu klein!</div>
                   <div class="warning-message">
-                    Die Konfiguration passt nicht in die Entity <code>${this._configWarning.configEntityId}</code>.
+                    Die Konfiguration passt nicht in die Entity
+                    <code>${this._configWarning.configEntityId}</code>.
                     ${this._configWarning.percentage}% der verfügbaren Speicherkapazität benötigt
-                    (${this._configWarning.currentLength} / ${this._configWarning.maxLength} Zeichen).
+                    (${this._configWarning.currentLength} / ${this._configWarning.maxLength}
+                    Zeichen).
                   </div>
                   <div class="warning-action">
                     Bitte erhöhen Sie die maximale Länge der Entity über die UI:
                     <ul>
                       <li>Einstellungen → Automatisierungen &amp; Szenen → Hilfsmittel</li>
-                      <li>Entity <code>${this._configWarning.configEntityId.replace('input_text.', '')}</code> bearbeiten</li>
-                      <li>Maximale Länge auf mindestens <code>${Math.ceil(this._configWarning.currentLength * 1.2)}</code> Zeichen erhöhen</li>
+                      <li>
+                        Entity
+                        <code
+                          >${this._configWarning.configEntityId.replace('input_text.', '')}</code
+                        >
+                        bearbeiten
+                      </li>
+                      <li>
+                        Maximale Länge auf mindestens
+                        <code>${Math.ceil(this._configWarning.currentLength * 1.2)}</code> Zeichen
+                        erhöhen
+                      </li>
                     </ul>
                   </div>
                 </div>
@@ -2261,34 +3118,44 @@ export class ShiftScheduleView extends ViewBase {
             `
           : ''}
         ${hasConfigWarning && this._configWarning.type === 'missing'
-          ? this._renderMissingEntityWarning(
-              this._configWarning.configEntityId,
-              'Konfigurations-Entity',
-              255,
-              true
-            )
+          ? html`
+              <div class="storage-warning" data-warning-type="config-missing">
+                ${this._renderMissingEntityWarning(
+                  this._configWarning.configEntityId,
+                  'Konfigurations-Entity',
+                  255,
+                  true
+                )}
+              </div>
+            `
           : ''}
         ${hasStatusWarning
-          ? this._renderMissingEntityWarning(
-              this._statusWarning.statusEntityId,
-              'Status-Entity',
-              255,
-              false
-            )
+          ? html`
+              <div class="storage-warning" data-warning-type="status">
+                ${this._renderMissingEntityWarning(
+                  this._statusWarning.statusEntityId,
+                  'Status-Entity',
+                  255,
+                  false
+                )}
+              </div>
+            `
           : ''}
         <div class="menu-bar">
           <button
             class="menu-button navigation-button"
             @click=${() => this.changeStartMonth(-1)}
             ?disabled=${!navBounds.canGoBack}
-            title="Vorheriger Monat">
+            title="Vorheriger Monat"
+          >
             ←
           </button>
           <button
             class="menu-button decrease-button"
             @click=${() => this.changeDisplayedMonths(-1)}
             ?disabled=${displayedMonths <= 1}
-            title="Weniger Monate anzeigen">
+            title="Weniger Monate anzeigen"
+          >
             −
           </button>
           <div class="menu-number">${displayedMonths}</div>
@@ -2296,72 +3163,83 @@ export class ShiftScheduleView extends ViewBase {
             class="menu-button increase-button"
             @click=${() => this.changeDisplayedMonths(1)}
             ?disabled=${displayedMonths >= maxMonths}
-            title="Mehr Monate anzeigen">
+            title="Mehr Monate anzeigen"
+          >
             +
           </button>
           <button
             class="menu-button navigation-button"
             @click=${() => this.changeStartMonth(1)}
             ?disabled=${!navBounds.canGoForward}
-            title="Nächster Monat">
+            title="Nächster Monat"
+          >
             →
           </button>
           ${(() => {
-              const allCalendars = this._getAllCalendars();
-              const selectedValue = this._getSelectedCalendarValue();
-              return html`
-                <div class="calendar-selector">
-                  <ha-select
-                    .value=${selectedValue || 'a'}
-                    @selected=${(e) => {
-                      try {
-                        // Verhindere Event-Propagation zu Home Assistant's Card-Picker
-                        if (e) {
-                          if (typeof e.stopPropagation === 'function') {
-                            e.stopPropagation();
-                          }
-                          if (typeof e.stopImmediatePropagation === 'function') {
-                            e.stopImmediatePropagation();
-                          }
+            const allCalendars = this._getAllCalendars();
+            const selectedValue = this._getSelectedCalendarValue();
+            return html`
+              <div class="calendar-selector">
+                <ha-select
+                  .value=${selectedValue || 'a'}
+                  @selected=${e => {
+                    try {
+                      // Verhindere Event-Propagation zu Home Assistant's Card-Picker
+                      if (e) {
+                        if (typeof e.stopPropagation === 'function') {
+                          e.stopPropagation();
                         }
-
-                        if (!e || !e.detail) {
-                          return;
+                        if (typeof e.stopImmediatePropagation === 'function') {
+                          e.stopImmediatePropagation();
                         }
-
-                        const index = e.detail.index;
-                        if (index !== undefined && index !== null && index >= 0 && allCalendars && allCalendars[index]) {
-                          const selectedCalendar = allCalendars[index];
-                          if (selectedCalendar && selectedCalendar.shortcut) {
-                            if (typeof this._onCalendarSelectedByIndex === 'function') {
-                              this._onCalendarSelectedByIndex(selectedCalendar.shortcut);
-                            }
-                          }
-                        }
-                      } catch (error) {
-                        console.error('Error in calendar selection handler:', error);
                       }
-                    }}
-                    naturalMenuWidth
-                    fixedMenuPosition
-                  >
-                    ${allCalendars.map(calendar => {
-                      const bgColor = calendar.color || '';
-                      const textColor = calendar.color ? this._getContrastColor(calendar.color) : '';
-                      return html`
-                        <mwc-list-item
-                          value="${calendar.shortcut}"
-                          data-calendar-color="${bgColor}"
-                          data-calendar-text-color="${textColor}"
-                          style="${bgColor ? `--calendar-bg-color: ${bgColor}; --calendar-text-color: ${textColor};` : ''}">
-                          ${calendar.name || `Schicht ${calendar.shortcut.toUpperCase()}`}
-                        </mwc-list-item>
-                      `;
-                    })}
-                  </ha-select>
-                </div>
-              `;
-            })()}
+
+                      if (!e || !e.detail) {
+                        return;
+                      }
+
+                      const index = e.detail.index;
+                      if (
+                        index !== undefined &&
+                        index !== null &&
+                        index >= 0 &&
+                        allCalendars &&
+                        allCalendars[index]
+                      ) {
+                        const selectedCalendar = allCalendars[index];
+                        if (selectedCalendar && selectedCalendar.shortcut) {
+                          if (typeof this._onCalendarSelectedByIndex === 'function') {
+                            this._onCalendarSelectedByIndex(selectedCalendar.shortcut);
+                          }
+                        }
+                      }
+                    } catch (error) {
+                      console.error('Error in calendar selection handler:', error);
+                    }
+                  }}
+                  naturalMenuWidth
+                  fixedMenuPosition
+                >
+                  ${allCalendars.map(calendar => {
+                    const bgColor = calendar.color || '';
+                    const textColor = calendar.color ? this._getContrastColor(calendar.color) : '';
+                    return html`
+                      <mwc-list-item
+                        value="${calendar.shortcut}"
+                        data-calendar-color="${bgColor}"
+                        data-calendar-text-color="${textColor}"
+                        style="${bgColor
+                          ? `--calendar-bg-color: ${bgColor}; --calendar-text-color: ${textColor};`
+                          : ''}"
+                      >
+                        ${calendar.name || `Schicht ${calendar.shortcut.toUpperCase()}`}
+                      </mwc-list-item>
+                    `;
+                  })}
+                </ha-select>
+              </div>
+            `;
+          })()}
         </div>
         <div class="calendar-container">
           ${months.map(({ year, month }) => this.renderMonth(year, month))}
@@ -2375,7 +3253,9 @@ export class ShiftScheduleView extends ViewBase {
     css`
       :host {
         display: block;
-        --tgshiftschedule-default-selected-day-color: ${unsafeCSS(ShiftScheduleView.DEFAULT_SELECTED_DAY_COLOR)};
+        --tgshiftschedule-default-selected-day-color: ${unsafeCSS(
+          ShiftScheduleView.DEFAULT_SELECTED_DAY_COLOR
+        )};
       }
 
       .calendar-wrapper {
@@ -2416,7 +3296,9 @@ export class ShiftScheduleView extends ViewBase {
         display: flex;
         align-items: center;
         justify-content: center;
-        transition: background-color 0.2s ease, opacity 0.2s ease;
+        transition:
+          background-color 0.2s ease,
+          opacity 0.2s ease;
       }
 
       .menu-button.navigation-button {
@@ -2606,7 +3488,7 @@ export class ShiftScheduleView extends ViewBase {
       }
 
       /* Fallback: Wenn keine Schicht ausgewählt ist, verwende die Standardfarbe */
-      .day-button.working:not([style*="background-color"]) {
+      .day-button.working:not([style*='background-color']) {
         background-color: var(--accent-color, var(--tgshiftschedule-default-selected-day-color));
       }
 
@@ -2774,4 +3656,3 @@ export class ShiftScheduleView extends ViewBase {
 if (!customElements.get('shiftschedule-view')) {
   customElements.define('shiftschedule-view', ShiftScheduleView);
 }
-

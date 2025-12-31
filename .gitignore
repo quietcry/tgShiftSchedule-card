@@ -20,16 +20,37 @@ build/
 .vscode/
 *.swp
 *.swo
-.DS_Store
+*.sublime-project
+*.sublime-workspace
+*.code-workspace
+Thumbs.db
 
 # Environment variables
 .env
 .env.local
-.env.*.local 
-node_modules
+.env.*.local
 
 # Development/Helper Scripts (nur lokal, nicht auf GitHub)
 *.sh
 *.py
-!package.json
-!package-lock.json
+scripts/
+
+# Backup files
+*~
+~/
+*.bak
+*.backup
+*.tmp
+
+# Logs
+*.log
+logs/
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Desktop.ini

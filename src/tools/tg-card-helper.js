@@ -21,7 +21,8 @@ export class TgCardHelper {
     // this._debug('tgCardHelper initialisiert');
   }
   _debug(...args) {
-    if (!this.debugMode) return;
+    // Prüfe ob Debug aktiviert ist (kann String 'true' oder Boolean true sein)
+    if (!this.debugMode || this.debugMode === 'false' || this.debugMode === false) return;
 
     // Versuche verschiedene Methoden, um den echten Klassennamen zu bekommen
     let classNameDefault = 'unknownClass';
@@ -35,11 +36,17 @@ export class TgCardHelper {
     // Prüfe ob das erste Argument ein Kontext-Objekt ist (this aus SuperBase)
     // Kontext-Objekt erkennt man daran, dass es eine constructor-Eigenschaft hat UND
     // spezifische Eigenschaften unserer Klassen hat (cardName ist einzigartig für unsere Klassen)
-    if (Array.isArray(args[0]) && args[0].length === 1 && args[0][0] && typeof args[0][0] === 'object' && args[0][0].constructor && (args[0][0].cardName || args[0][0].constructor.className)) {
+    if (
+      Array.isArray(args[0]) &&
+      args[0].length === 1 &&
+      args[0][0] &&
+      typeof args[0][0] === 'object' &&
+      args[0][0].constructor &&
+      (args[0][0].cardName || args[0][0].constructor.className)
+    ) {
       contextObject = args[0][0];
       args = args.slice(1);
-    }
-    else {
+    } else {
       contextObject = this;
     }
 
@@ -110,5 +117,11 @@ export class TgCardHelper {
     while (path.length < 50) {
       path = path + ' ';
     }
+
+    // Erstelle die vollständige Debug-Ausgabe mit Formatierung
+    const debugArgs = [path, ...args];
+
+    // Verwende console.log mit dem formatierten Pfad
+    console.log(...this.getCardInfoString, ...debugArgs);
   }
 }

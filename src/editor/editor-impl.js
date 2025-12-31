@@ -13,12 +13,38 @@ export class EditorImpl extends EditorBase {
       numberOfMonths: 14,
       initialDisplayedMonths: 2,
       selectedCalendar: 'a',
+      store_mode: 'text_entity',
+      saver_key: 'Schichtplan',
       calendars: [
         { shortcut: 'a', name: 'Schicht A', color: '#ff9800', enabled: true, statusRelevant: true },
-        { shortcut: 'b', name: 'Schicht B', color: '#ff0000', enabled: false, statusRelevant: true },
-        { shortcut: 'c', name: 'Schicht C', color: '#00ff00', enabled: false, statusRelevant: true },
-        { shortcut: 'd', name: 'Schicht D', color: '#0000ff', enabled: false, statusRelevant: true },
-        { shortcut: 'e', name: 'Schicht E', color: '#ffff00', enabled: false, statusRelevant: true },
+        {
+          shortcut: 'b',
+          name: 'Schicht B',
+          color: '#ff0000',
+          enabled: false,
+          statusRelevant: true,
+        },
+        {
+          shortcut: 'c',
+          name: 'Schicht C',
+          color: '#00ff00',
+          enabled: false,
+          statusRelevant: true,
+        },
+        {
+          shortcut: 'd',
+          name: 'Schicht D',
+          color: '#0000ff',
+          enabled: false,
+          statusRelevant: true,
+        },
+        {
+          shortcut: 'e',
+          name: 'Schicht E',
+          color: '#ffff00',
+          enabled: false,
+          statusRelevant: true,
+        },
       ],
       holidays: {
         neujahr: true,
@@ -61,11 +87,41 @@ export class EditorImpl extends EditorBase {
     // Stelle sicher, dass calendars Array vorhanden ist und alle 5 Kalender enthält
     if (!this.config.calendars || !Array.isArray(this.config.calendars)) {
       this.config.calendars = [
-        { shortcut: 'a', name: 'Schicht A', color: '#ff9800', enabled: false, statusRelevant: true },
-        { shortcut: 'b', name: 'Schicht B', color: '#ff0000', enabled: false, statusRelevant: true },
-        { shortcut: 'c', name: 'Schicht C', color: '#00ff00', enabled: false, statusRelevant: true },
-        { shortcut: 'd', name: 'Schicht D', color: '#0000ff', enabled: false, statusRelevant: true },
-        { shortcut: 'e', name: 'Schicht E', color: '#ffff00', enabled: false, statusRelevant: true },
+        {
+          shortcut: 'a',
+          name: 'Schicht A',
+          color: '#ff9800',
+          enabled: false,
+          statusRelevant: true,
+        },
+        {
+          shortcut: 'b',
+          name: 'Schicht B',
+          color: '#ff0000',
+          enabled: false,
+          statusRelevant: true,
+        },
+        {
+          shortcut: 'c',
+          name: 'Schicht C',
+          color: '#00ff00',
+          enabled: false,
+          statusRelevant: true,
+        },
+        {
+          shortcut: 'd',
+          name: 'Schicht D',
+          color: '#0000ff',
+          enabled: false,
+          statusRelevant: true,
+        },
+        {
+          shortcut: 'e',
+          name: 'Schicht E',
+          color: '#ffff00',
+          enabled: false,
+          statusRelevant: true,
+        },
       ];
     }
 
@@ -92,11 +148,19 @@ export class EditorImpl extends EditorBase {
           ...defaultCal,
           ...existing,
           shortcut: defaultCal.shortcut,
-          statusRelevant: existing.statusRelevant !== undefined ? existing.statusRelevant : true
+          statusRelevant: existing.statusRelevant !== undefined ? existing.statusRelevant : true,
         };
       }
       return defaultCal;
     });
+
+    // Stelle sicher, dass store_mode und saver_key gesetzt sind
+    if (!this.config.store_mode) {
+      this.config.store_mode = 'text_entity';
+    }
+    if (!this.config.saver_key) {
+      this.config.saver_key = 'Schichtplan';
+    }
 
     return html`
       <div class="card-config">
@@ -109,13 +173,10 @@ export class EditorImpl extends EditorBase {
         ></ha-form>
         <div class="elements-section">
           <div class="calendars-list">
-            ${this.config.calendars
-              .map((calendar, index) => this._renderCalendar(index, calendar))}
+            ${this.config.calendars.map((calendar, index) => this._renderCalendar(index, calendar))}
           </div>
         </div>
-        <div class="elements-section">
-          ${this._renderHolidays()}
-        </div>
+        <div class="elements-section">${this._renderHolidays()}</div>
       </div>
     `;
   }
@@ -184,10 +245,16 @@ export class EditorImpl extends EditorBase {
       const startValid = this._validateTime(start);
       const endValid = this._validateTime(end);
       if (!startValid) {
-        return { isValid: false, message: 'Ungültiges Format für Startzeit. Bitte HH:MM verwenden (z.B. 08:30)' };
+        return {
+          isValid: false,
+          message: 'Ungültiges Format für Startzeit. Bitte HH:MM verwenden (z.B. 08:30)',
+        };
       }
       if (!endValid) {
-        return { isValid: false, message: 'Ungültiges Format für Endzeit. Bitte HH:MM verwenden (z.B. 17:00)' };
+        return {
+          isValid: false,
+          message: 'Ungültiges Format für Endzeit. Bitte HH:MM verwenden (z.B. 17:00)',
+        };
       }
       return { isValid: true, message: '' };
     }
@@ -206,7 +273,10 @@ export class EditorImpl extends EditorBase {
   _renderCalendar(index, calendar) {
     const colorOptions = this._getColorOptions();
     const currentColor = calendar.color || '#ff0000';
-    const timeRanges = calendar.timeRanges || [[null, null], [null, null]];
+    const timeRanges = calendar.timeRanges || [
+      [null, null],
+      [null, null],
+    ];
 
     const shiftName = calendar.name || `Schicht ${calendar.shortcut.toUpperCase()}`;
     const isEnabled = calendar.enabled || false;
@@ -216,10 +286,14 @@ export class EditorImpl extends EditorBase {
     const range2Validation = this._validateTimeRange(timeRanges[1]);
 
     // Prüfe einzelne Zeiten für Format-Validierung
-    const isValidTimeRange1Start = !timeRanges[0] || !timeRanges[0][0] || this._validateTime(timeRanges[0][0]);
-    const isValidTimeRange1End = !timeRanges[0] || !timeRanges[0][1] || this._validateTime(timeRanges[0][1]);
-    const isValidTimeRange2Start = !timeRanges[1] || !timeRanges[1][0] || this._validateTime(timeRanges[1][0]);
-    const isValidTimeRange2End = !timeRanges[1] || !timeRanges[1][1] || this._validateTime(timeRanges[1][1]);
+    const isValidTimeRange1Start =
+      !timeRanges[0] || !timeRanges[0][0] || this._validateTime(timeRanges[0][0]);
+    const isValidTimeRange1End =
+      !timeRanges[0] || !timeRanges[0][1] || this._validateTime(timeRanges[0][1]);
+    const isValidTimeRange2Start =
+      !timeRanges[1] || !timeRanges[1][0] || this._validateTime(timeRanges[1][0]);
+    const isValidTimeRange2End =
+      !timeRanges[1] || !timeRanges[1][1] || this._validateTime(timeRanges[1][1]);
 
     // Kombiniere Format- und Vollständigkeits-Validierung
     const range1StartError = !isValidTimeRange1Start || !range1Validation.isValid;
@@ -230,12 +304,13 @@ export class EditorImpl extends EditorBase {
     return html`
       <details class="calendar-item">
         <summary class="calendar-summary">
-          <span class="calendar-summary-title">Schicht ${calendar.shortcut.toUpperCase()}: ${shiftName}</span>
+          <span class="calendar-summary-title"
+            >Schicht ${calendar.shortcut.toUpperCase()}: ${shiftName}</span
+          >
           <span class="calendar-summary-status">
             ${isEnabled
               ? html`<span class="status-badge status-enabled">Aktiviert</span>`
-              : html`<span class="status-badge status-disabled">Deaktiviert</span>`
-            }
+              : html`<span class="status-badge status-disabled">Deaktiviert</span>`}
           </span>
         </summary>
         <div class="calendar-fields">
@@ -243,20 +318,21 @@ export class EditorImpl extends EditorBase {
             label="Name"
             .value=${calendar.name || ''}
             maxlength="30"
-            @input=${(e) => this._updateCalendar(calendar.shortcut, 'name', e.target.value)}
+            @input=${e => this._updateCalendar(calendar.shortcut, 'name', e.target.value)}
           ></ha-textfield>
           <div class="switch-item">
             <label class="switch-label">Aktiviert</label>
             <ha-switch
               .checked=${calendar.enabled || false}
-              @change=${(e) => this._updateCalendar(calendar.shortcut, 'enabled', e.target.checked)}
+              @change=${e => this._updateCalendar(calendar.shortcut, 'enabled', e.target.checked)}
             ></ha-switch>
           </div>
           <div class="switch-item">
             <label class="switch-label">Status relevant</label>
             <ha-switch
               .checked=${calendar.statusRelevant !== false}
-              @change=${(e) => this._updateCalendar(calendar.shortcut, 'statusRelevant', e.target.checked)}
+              @change=${e =>
+                this._updateCalendar(calendar.shortcut, 'statusRelevant', e.target.checked)}
             ></ha-switch>
           </div>
           <div class="color-selector">
@@ -266,9 +342,9 @@ export class EditorImpl extends EditorBase {
               .value=${currentColor}
               .items=${colorOptions.map(color => ({
                 value: color.value,
-                label: `${color.name} (${color.value})`
+                label: `${color.name} (${color.value})`,
               }))}
-              @value-changed=${(e) => {
+              @value-changed=${e => {
                 const value = e.detail?.value;
                 if (value) {
                   this._updateCalendar(calendar.shortcut, 'color', value);
@@ -289,31 +365,44 @@ export class EditorImpl extends EditorBase {
                 placeholder="HH:MM"
                 pattern="^([0-1][0-9]|2[0-3]):[0-5][0-9]$"
                 .error=${range1StartError}
-                .helper=${range1StartError ? (range1Validation.message || 'Ungültiges Format. Bitte HH:MM verwenden (z.B. 08:30)') : ''}
-                @input=${(e) => {
+                .helper=${range1StartError
+                  ? range1Validation.message ||
+                    'Ungültiges Format. Bitte HH:MM verwenden (z.B. 08:30)'
+                  : ''}
+                @input=${e => {
                   const value = e.target.value.trim() || null;
                   const formatValid = !value || this._validateTime(value);
                   this._updateTimeRange(calendar.shortcut, 0, 0, value);
                   // Prüfe Vollständigkeit nach Update
                   setTimeout(() => {
-                    const updatedCal = this.config.calendars?.find(c => c.shortcut === calendar.shortcut);
+                    const updatedCal = this.config.calendars?.find(
+                      c => c.shortcut === calendar.shortcut
+                    );
                     const updatedRange = updatedCal?.timeRanges?.[0] || [null, null];
                     const rangeValidation = this._validateTimeRange(updatedRange);
                     const hasError = !formatValid || !rangeValidation.isValid;
                     e.target.error = hasError;
-                    e.target.helper = hasError ? (rangeValidation.message || 'Ungültiges Format. Bitte HH:MM verwenden (z.B. 08:30)') : '';
+                    e.target.helper = hasError
+                      ? rangeValidation.message ||
+                        'Ungültiges Format. Bitte HH:MM verwenden (z.B. 08:30)'
+                      : '';
                     this.requestUpdate();
                   }, 0);
                 }}
-                @blur=${(e) => {
+                @blur=${e => {
                   const value = e.target.value.trim() || null;
                   const formatValid = !value || this._validateTime(value);
-                  const updatedCal = this.config.calendars?.find(c => c.shortcut === calendar.shortcut);
+                  const updatedCal = this.config.calendars?.find(
+                    c => c.shortcut === calendar.shortcut
+                  );
                   const updatedRange = updatedCal?.timeRanges?.[0] || [null, null];
                   const rangeValidation = this._validateTimeRange(updatedRange);
                   const hasError = !formatValid || !rangeValidation.isValid;
                   e.target.error = hasError;
-                  e.target.helper = hasError ? (rangeValidation.message || 'Ungültiges Format. Bitte HH:MM verwenden (z.B. 08:30)') : '';
+                  e.target.helper = hasError
+                    ? rangeValidation.message ||
+                      'Ungültiges Format. Bitte HH:MM verwenden (z.B. 08:30)'
+                    : '';
                   this.requestUpdate();
                 }}
               ></ha-textfield>
@@ -324,30 +413,43 @@ export class EditorImpl extends EditorBase {
                 placeholder="HH:MM"
                 pattern="^([0-1][0-9]|2[0-3]):[0-5][0-9]$"
                 .error=${range1EndError}
-                .helper=${range1EndError ? (range1Validation.message || 'Ungültiges Format. Bitte HH:MM verwenden (z.B. 17:00)') : ''}
-                @input=${(e) => {
+                .helper=${range1EndError
+                  ? range1Validation.message ||
+                    'Ungültiges Format. Bitte HH:MM verwenden (z.B. 17:00)'
+                  : ''}
+                @input=${e => {
                   const value = e.target.value.trim() || null;
                   const formatValid = !value || this._validateTime(value);
                   this._updateTimeRange(calendar.shortcut, 0, 1, value);
                   setTimeout(() => {
-                    const updatedCal = this.config.calendars?.find(c => c.shortcut === calendar.shortcut);
+                    const updatedCal = this.config.calendars?.find(
+                      c => c.shortcut === calendar.shortcut
+                    );
                     const updatedRange = updatedCal?.timeRanges?.[0] || [null, null];
                     const rangeValidation = this._validateTimeRange(updatedRange);
                     const hasError = !formatValid || !rangeValidation.isValid;
                     e.target.error = hasError;
-                    e.target.helper = hasError ? (rangeValidation.message || 'Ungültiges Format. Bitte HH:MM verwenden (z.B. 17:00)') : '';
+                    e.target.helper = hasError
+                      ? rangeValidation.message ||
+                        'Ungültiges Format. Bitte HH:MM verwenden (z.B. 17:00)'
+                      : '';
                     this.requestUpdate();
                   }, 0);
                 }}
-                @blur=${(e) => {
+                @blur=${e => {
                   const value = e.target.value.trim() || null;
                   const formatValid = !value || this._validateTime(value);
-                  const updatedCal = this.config.calendars?.find(c => c.shortcut === calendar.shortcut);
+                  const updatedCal = this.config.calendars?.find(
+                    c => c.shortcut === calendar.shortcut
+                  );
                   const updatedRange = updatedCal?.timeRanges?.[0] || [null, null];
                   const rangeValidation = this._validateTimeRange(updatedRange);
                   const hasError = !formatValid || !rangeValidation.isValid;
                   e.target.error = hasError;
-                  e.target.helper = hasError ? (rangeValidation.message || 'Ungültiges Format. Bitte HH:MM verwenden (z.B. 17:00)') : '';
+                  e.target.helper = hasError
+                    ? rangeValidation.message ||
+                      'Ungültiges Format. Bitte HH:MM verwenden (z.B. 17:00)'
+                    : '';
                   this.requestUpdate();
                 }}
               ></ha-textfield>
@@ -359,30 +461,43 @@ export class EditorImpl extends EditorBase {
                 placeholder="HH:MM"
                 pattern="^([0-1][0-9]|2[0-3]):[0-5][0-9]$"
                 .error=${range2StartError}
-                .helper=${range2StartError ? (range2Validation.message || 'Ungültiges Format. Bitte HH:MM verwenden (z.B. 08:30)') : ''}
-                @input=${(e) => {
+                .helper=${range2StartError
+                  ? range2Validation.message ||
+                    'Ungültiges Format. Bitte HH:MM verwenden (z.B. 08:30)'
+                  : ''}
+                @input=${e => {
                   const value = e.target.value.trim() || null;
                   const formatValid = !value || this._validateTime(value);
                   this._updateTimeRange(calendar.shortcut, 1, 0, value);
                   setTimeout(() => {
-                    const updatedCal = this.config.calendars?.find(c => c.shortcut === calendar.shortcut);
+                    const updatedCal = this.config.calendars?.find(
+                      c => c.shortcut === calendar.shortcut
+                    );
                     const updatedRange = updatedCal?.timeRanges?.[1] || [null, null];
                     const rangeValidation = this._validateTimeRange(updatedRange);
                     const hasError = !formatValid || !rangeValidation.isValid;
                     e.target.error = hasError;
-                    e.target.helper = hasError ? (rangeValidation.message || 'Ungültiges Format. Bitte HH:MM verwenden (z.B. 08:30)') : '';
+                    e.target.helper = hasError
+                      ? rangeValidation.message ||
+                        'Ungültiges Format. Bitte HH:MM verwenden (z.B. 08:30)'
+                      : '';
                     this.requestUpdate();
                   }, 0);
                 }}
-                @blur=${(e) => {
+                @blur=${e => {
                   const value = e.target.value.trim() || null;
                   const formatValid = !value || this._validateTime(value);
-                  const updatedCal = this.config.calendars?.find(c => c.shortcut === calendar.shortcut);
+                  const updatedCal = this.config.calendars?.find(
+                    c => c.shortcut === calendar.shortcut
+                  );
                   const updatedRange = updatedCal?.timeRanges?.[1] || [null, null];
                   const rangeValidation = this._validateTimeRange(updatedRange);
                   const hasError = !formatValid || !rangeValidation.isValid;
                   e.target.error = hasError;
-                  e.target.helper = hasError ? (rangeValidation.message || 'Ungültiges Format. Bitte HH:MM verwenden (z.B. 08:30)') : '';
+                  e.target.helper = hasError
+                    ? rangeValidation.message ||
+                      'Ungültiges Format. Bitte HH:MM verwenden (z.B. 08:30)'
+                    : '';
                   this.requestUpdate();
                 }}
               ></ha-textfield>
@@ -393,30 +508,43 @@ export class EditorImpl extends EditorBase {
                 placeholder="HH:MM"
                 pattern="^([0-1][0-9]|2[0-3]):[0-5][0-9]$"
                 .error=${range2EndError}
-                .helper=${range2EndError ? (range2Validation.message || 'Ungültiges Format. Bitte HH:MM verwenden (z.B. 17:00)') : ''}
-                @input=${(e) => {
+                .helper=${range2EndError
+                  ? range2Validation.message ||
+                    'Ungültiges Format. Bitte HH:MM verwenden (z.B. 17:00)'
+                  : ''}
+                @input=${e => {
                   const value = e.target.value.trim() || null;
                   const formatValid = !value || this._validateTime(value);
                   this._updateTimeRange(calendar.shortcut, 1, 1, value);
                   setTimeout(() => {
-                    const updatedCal = this.config.calendars?.find(c => c.shortcut === calendar.shortcut);
+                    const updatedCal = this.config.calendars?.find(
+                      c => c.shortcut === calendar.shortcut
+                    );
                     const updatedRange = updatedCal?.timeRanges?.[1] || [null, null];
                     const rangeValidation = this._validateTimeRange(updatedRange);
                     const hasError = !formatValid || !rangeValidation.isValid;
                     e.target.error = hasError;
-                    e.target.helper = hasError ? (rangeValidation.message || 'Ungültiges Format. Bitte HH:MM verwenden (z.B. 17:00)') : '';
+                    e.target.helper = hasError
+                      ? rangeValidation.message ||
+                        'Ungültiges Format. Bitte HH:MM verwenden (z.B. 17:00)'
+                      : '';
                     this.requestUpdate();
                   }, 0);
                 }}
-                @blur=${(e) => {
+                @blur=${e => {
                   const value = e.target.value.trim() || null;
                   const formatValid = !value || this._validateTime(value);
-                  const updatedCal = this.config.calendars?.find(c => c.shortcut === calendar.shortcut);
+                  const updatedCal = this.config.calendars?.find(
+                    c => c.shortcut === calendar.shortcut
+                  );
                   const updatedRange = updatedCal?.timeRanges?.[1] || [null, null];
                   const rangeValidation = this._validateTimeRange(updatedRange);
                   const hasError = !formatValid || !rangeValidation.isValid;
                   e.target.error = hasError;
-                  e.target.helper = hasError ? (rangeValidation.message || 'Ungültiges Format. Bitte HH:MM verwenden (z.B. 17:00)') : '';
+                  e.target.helper = hasError
+                    ? rangeValidation.message ||
+                      'Ungültiges Format. Bitte HH:MM verwenden (z.B. 17:00)'
+                    : '';
                   this.requestUpdate();
                 }}
               ></ha-textfield>
@@ -475,15 +603,17 @@ export class EditorImpl extends EditorBase {
           <span class="holidays-summary-title">Feiertage</span>
         </summary>
         <div class="holidays-fields">
-          ${holidays.map(holiday => html`
-            <div class="holiday-switch-item">
-              <label class="holiday-label">${holiday.label}</label>
-              <ha-switch
-                .checked=${this.config.holidays[holiday.key] !== false}
-                @change=${(e) => this._updateHoliday(holiday.key, e.target.checked)}
-              ></ha-switch>
-            </div>
-          `)}
+          ${holidays.map(
+            holiday => html`
+              <div class="holiday-switch-item">
+                <label class="holiday-label">${holiday.label}</label>
+                <ha-switch
+                  .checked=${this.config.holidays[holiday.key] !== false}
+                  @change=${e => this._updateHoliday(holiday.key, e.target.checked)}
+                ></ha-switch>
+              </div>
+            `
+          )}
         </div>
       </details>
     `;
@@ -538,7 +668,10 @@ export class EditorImpl extends EditorBase {
     const newCalendars = this.config.calendars.map(cal => {
       if (cal.shortcut === shortcut) {
         // Stelle sicher, dass timeRanges Array existiert
-        const timeRanges = cal.timeRanges || [[null, null], [null, null]];
+        const timeRanges = cal.timeRanges || [
+          [null, null],
+          [null, null],
+        ];
         // Erstelle eine Kopie des timeRanges Arrays
         const newTimeRanges = timeRanges.map((range, idx) => {
           if (idx === rangeIndex) {
@@ -629,8 +762,6 @@ export class EditorImpl extends EditorBase {
     }, 0);
   }
 
-
-
   _computeLabel(schema) {
     switch (schema.name) {
       case 'entity':
@@ -639,6 +770,10 @@ export class EditorImpl extends EditorBase {
         return 'Maximale Anzahl Monate';
       case 'initialDisplayedMonths':
         return 'Standardwert sichtbare Monate';
+      case 'store_mode':
+        return 'Speichermodus';
+      case 'saver_key':
+        return 'Saver-Variablenname';
       default:
         return schema.name;
     }
@@ -648,12 +783,19 @@ export class EditorImpl extends EditorBase {
     this._debug('EditorImpl _valueChanged wird aufgerufen mit:', ev.detail);
 
     const newValue = ev.detail.value;
+    const oldStoreMode = this.config.store_mode;
 
     // Stelle sicher, dass initialDisplayedMonths nicht größer als numberOfMonths ist
     if (newValue.initialDisplayedMonths !== undefined && newValue.numberOfMonths !== undefined) {
-      newValue.initialDisplayedMonths = Math.min(newValue.initialDisplayedMonths, newValue.numberOfMonths);
+      newValue.initialDisplayedMonths = Math.min(
+        newValue.initialDisplayedMonths,
+        newValue.numberOfMonths
+      );
     } else if (newValue.initialDisplayedMonths !== undefined && this.config.numberOfMonths) {
-      newValue.initialDisplayedMonths = Math.min(newValue.initialDisplayedMonths, this.config.numberOfMonths);
+      newValue.initialDisplayedMonths = Math.min(
+        newValue.initialDisplayedMonths,
+        this.config.numberOfMonths
+      );
     } else if (newValue.numberOfMonths !== undefined && this.config.initialDisplayedMonths) {
       // Wenn numberOfMonths geändert wird, passe initialDisplayedMonths an, falls nötig
       if (this.config.initialDisplayedMonths > newValue.numberOfMonths) {
@@ -661,11 +803,25 @@ export class EditorImpl extends EditorBase {
       }
     }
 
+    // Stelle sicher, dass store_mode und saver_key gesetzt sind
+    if (newValue.store_mode === undefined) {
+      newValue.store_mode = this.config.store_mode || 'text_entity';
+    }
+    if (newValue.saver_key === undefined) {
+      newValue.saver_key = this.config.saver_key || 'Schichtplan';
+    }
+
     this.config = {
       ...this.config,
       ...newValue,
     };
     this._debug('EditorImpl config nach _valueChanged:', this.config);
+
+    // Wenn store_mode geändert wurde, aktualisiere die Ansicht (für bedingte Anzeige von saver_key)
+    if (newValue.store_mode !== undefined && newValue.store_mode !== oldStoreMode) {
+      this.requestUpdate();
+    }
+
     this.dispatchEvent(
       new CustomEvent('config-changed', {
         detail: { config: this.config },
@@ -674,7 +830,6 @@ export class EditorImpl extends EditorBase {
       })
     );
   }
-
 
   static styles = [
     super.styles,
@@ -1011,6 +1166,8 @@ export class EditorImpl extends EditorBase {
       entity: '',
       numberOfMonths: 14,
       initialDisplayedMonths: 2,
+      store_mode: 'text_entity',
+      saver_key: 'Schichtplan',
       useElements: false,
       selectedElement: null,
       elements: [
@@ -1041,12 +1198,23 @@ export class EditorImpl extends EditorBase {
   }
 
   _getBasicSchema() {
-    return [
+    const schema = [
       {
         name: 'entity',
         selector: {
           entity: {
             domain: 'input_text',
+          },
+        },
+      },
+      {
+        name: 'store_mode',
+        selector: {
+          select: {
+            options: [
+              { value: 'text_entity', label: 'Text-Entity' },
+              { value: 'saver', label: 'Saver' },
+            ],
           },
         },
       },
@@ -1073,5 +1241,17 @@ export class EditorImpl extends EditorBase {
         },
       },
     ];
+
+    // Füge saver_key nur hinzu, wenn store_mode === 'saver'
+    if (this.config?.store_mode === 'saver') {
+      schema.splice(2, 0, {
+        name: 'saver_key',
+        selector: {
+          text: {},
+        },
+      });
+    }
+
+    return schema;
   }
 }

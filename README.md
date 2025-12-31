@@ -1,6 +1,6 @@
 # TG Schichtplan Card
 
-**Version:** 2025.12-0037 (HACS Tag: v2025.12.0037)
+**Version:** 2025.12-0038 (HACS Tag: v2025.12.0038)
 
 Eine Schichtplan-Karte für Home Assistant zur Verwaltung von Arbeitszeiten und Schichten.
 
@@ -12,7 +12,8 @@ Eine Schichtplan-Karte für Home Assistant zur Verwaltung von Arbeitszeiten und 
 - Zeiträume pro Schicht (bis zu 2 Zeitfenster pro Tag)
 - Feiertags-Erkennung mit konfigurierbaren Feiertagen
 - Wochenend-Markierung
-- Speicherung der Daten in einem oder mehreren `input_text` Entities
+- **Saver-Integration (empfohlen)**: Speicherung in Saver-Variablen (HACS) ohne Längenbegrenzung
+- **Fallback**: Speicherung in einem oder mehreren `input_text` Entities (bei Bedarf)
 - Konfiguration über Editor-UI
 - Status relevante Schichten für Blueprint-Integration
 - Format: `<jahr>:<monat>:<tag><schicht>,<tag><schicht>;` (z.B. `25:11:03a,04ab,05a;25:12:01a`)
@@ -40,7 +41,23 @@ Eine Schichtplan-Karte für Home Assistant zur Verwaltung von Arbeitszeiten und 
 
 ## Voraussetzungen
 
-Erstelle ein `input_text` Entity in deiner `configuration.yaml`:
+### Option 1: Saver-Integration (empfohlen) ⭐
+
+**Vorteile:**
+- Keine Längenbegrenzung für Schichtdaten
+- Keine Notwendigkeit für mehrere Entities
+- Bessere Performance bei großen Datenmengen
+- Synchronisation mit Blueprint möglich
+
+**Installation:**
+1. Installiere die [Saver-Integration](https://github.com/saver-integration/saver) über HACS
+2. Die Karte verwendet automatisch Saver, wenn `store_mode: 'saver'` in der Konfiguration gesetzt ist
+
+**Keine zusätzliche Konfiguration nötig** - die Karte erstellt die Saver-Variablen automatisch.
+
+### Option 2: input_text Entities (Fallback)
+
+Falls du keine Saver-Integration verwenden möchtest, erstelle `input_text` Entities:
 
 ```yaml
 input_text:
@@ -58,13 +75,41 @@ input_text:
     max: 500  # Für Schichtkonfigurationen mit Zeiträumen
 ```
 
+**Hinweis**: Bei großen Schichtplänen werden die Daten automatisch auf mehrere Entities verteilt (`arbeitszeiten_001`, `arbeitszeiten_002`, etc.).
+
 ## Verwendung
 
 Füge die Karte zu deinem Dashboard hinzu:
 
+### Mit Saver (empfohlen)
+
+```yaml
+type: custom:tgshiftschedule-card
+entity: input_text.arbeitszeiten  # Wird als Fallback verwendet
+store_mode: saver                 # Saver-Modus aktivieren
+saver_key: Schichtplan            # Name der Saver-Variable
+numberOfMonths: 14
+initialDisplayedMonths: 2
+selectedCalendar: a
+calendars:
+  - shortcut: a
+    name: Normalschicht
+    color: '#ff9800'
+    enabled: true
+    statusRelevant: true
+  - shortcut: b
+    name: Schicht B
+    color: '#ff0000'
+    enabled: false
+    statusRelevant: true
+```
+
+### Mit input_text Entities (Fallback)
+
 ```yaml
 type: custom:tgshiftschedule-card
 entity: input_text.arbeitszeiten
+store_mode: text_entity           # Standard-Modus
 numberOfMonths: 14
 initialDisplayedMonths: 2
 selectedCalendar: a
@@ -87,7 +132,11 @@ calendars:
 
 Die Karte bietet einen integrierten Editor für die Konfiguration:
 
-- **Entity**: Die `input_text` Entity für die Schichtdaten
+- **Entity**: Die `input_text` Entity für die Schichtdaten (wird als Fallback verwendet)
+- **Speichermodus**:
+  - `saver` (empfohlen): Verwendet Saver-Variablen ohne Längenbegrenzung
+  - `text_entity`: Verwendet `input_text` Entities (Standard)
+- **Saver-Variablenname**: Name der Saver-Variable (nur bei `store_mode: saver`)
 - **Anzahl Monate**: Maximale Anzahl der Monate (1-14)
 - **Sichtbare Monate**: Standardanzahl der angezeigten Monate
 - **Schichten**: Konfiguration für jede Schicht (a-e)
@@ -128,6 +177,9 @@ Die Karte kann mit dem `tgshiftschedule.yaml` Blueprint verwendet werden:
 - Der Blueprint prüft, ob heute eine der konfigurierten Schichten aktiv ist
 - Nur Schichten mit `statusRelevant: true` werden für die Statusberechnung verwendet
 - Der Blueprint unterstützt Zeitfenster pro Schicht
+- **Synchronisation**: Card und Blueprint verwenden die gleiche Datenquelle basierend auf `store_mode`
+  - Bei `store_mode: saver`: Beide verwenden die gleiche Saver-Variable
+  - Bei `store_mode: text_entity`: Beide verwenden die gleichen `input_text` Entities
 
 ## Entwicklung
 
