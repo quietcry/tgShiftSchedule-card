@@ -41,6 +41,5 @@ if (window.customCards) {
 if (!customElements.get(CardRegname)) {
   try {
     customElements.define(CardRegname, Card);
-  } catch (error) {
-  }
+  } catch (error) {}
 }

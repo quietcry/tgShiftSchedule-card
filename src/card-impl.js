@@ -25,6 +25,8 @@ export class CardImpl extends CardBase {
       entity: '',
       numberOfMonths: 14,
       initialDisplayedMonths: 2,
+      store_mode: 'text_entity',
+      saver_key: 'Schichtplan',
       useElements: false,
       selectedElement: null,
       elements: [
@@ -43,7 +45,6 @@ export class CardImpl extends CardBase {
     this._debug('CardImpl-Konstruktor: Initialisierung abgeschlossen');
   }
 
-
   getDefaultConfig() {
     this._debug(`CardImpl getDefaultConfig wird aufgerufen`);
     return {
@@ -51,12 +52,44 @@ export class CardImpl extends CardBase {
       numberOfMonths: 14,
       initialDisplayedMonths: 2,
       selectedCalendar: 'a', // Erster aktivierter Kalender
+      store_mode: 'text_entity',
+      saver_key: 'Schichtplan',
       calendars: [
-        { shortcut: 'a', name: 'Kalender A', color: '#ff9800', enabled: true, statusRelevant: true },
-        { shortcut: 'b', name: 'Kalender B', color: '#ff0000', enabled: false, statusRelevant: true },
-        { shortcut: 'c', name: 'Kalender C', color: '#00ff00', enabled: false, statusRelevant: true },
-        { shortcut: 'd', name: 'Kalender D', color: '#0000ff', enabled: false, statusRelevant: true },
-        { shortcut: 'e', name: 'Kalender E', color: '#ffff00', enabled: false, statusRelevant: true },
+        {
+          shortcut: 'a',
+          name: 'Kalender A',
+          color: '#ff9800',
+          enabled: true,
+          statusRelevant: true,
+        },
+        {
+          shortcut: 'b',
+          name: 'Kalender B',
+          color: '#ff0000',
+          enabled: false,
+          statusRelevant: true,
+        },
+        {
+          shortcut: 'c',
+          name: 'Kalender C',
+          color: '#00ff00',
+          enabled: false,
+          statusRelevant: true,
+        },
+        {
+          shortcut: 'd',
+          name: 'Kalender D',
+          color: '#0000ff',
+          enabled: false,
+          statusRelevant: true,
+        },
+        {
+          shortcut: 'e',
+          name: 'Kalender E',
+          color: '#ffff00',
+          enabled: false,
+          statusRelevant: true,
+        },
       ],
     };
   }
@@ -73,7 +106,10 @@ export class CardImpl extends CardBase {
       ...defaultConfig,
       ...config,
       // Stelle sicher, dass selectedCalendar aus der übergebenen Config beibehalten wird
-      selectedCalendar: config?.selectedCalendar !== undefined ? config.selectedCalendar : (this.config?.selectedCalendar || defaultConfig.selectedCalendar),
+      selectedCalendar:
+        config?.selectedCalendar !== undefined
+          ? config.selectedCalendar
+          : this.config?.selectedCalendar || defaultConfig.selectedCalendar,
     };
 
     this._debug('config nach setConfig:', this.config);
@@ -88,10 +124,14 @@ export class CardImpl extends CardBase {
         this._view = document.createElement('shiftschedule-view');
 
         // Event-Listener für Config-Änderungen von der View
-        this._view.addEventListener('config-changed', (ev) => {
+        this._view.addEventListener('config-changed', ev => {
           this._debug('config-changed Event von ShiftSchedule-View empfangen:', ev.detail);
           if (ev.detail && ev.detail.config) {
             this.config = ev.detail.config;
+            // Speichere die Config (nur wenn durch Benutzeraktion geändert)
+            if (this._view._handleConfigChanged) {
+              this._view._handleConfigChanged();
+            }
             // Dispatch das Event weiter, damit Home Assistant die Config aktualisiert
             this.dispatchEvent(
               new CustomEvent('config-changed', {
