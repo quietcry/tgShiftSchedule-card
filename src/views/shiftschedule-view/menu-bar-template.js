@@ -20,4 +20,3 @@ export function renderMenuBar({ left = '', center = '', right = '', fullWidth = 
     ${fullWidth ? html`<div class="menu-bar-full-width">${fullWidth}</div>` : ''}
   `;
 }
-

@@ -7,6 +7,7 @@
 import { html, css, LitElement } from 'lit';
 import { sharedMenuStyles } from './shared-menu-styles.js';
 import { renderMenuBar } from './menu-bar-template.js';
+import { Version } from '../../card-config.js';
 
 export class ShiftConfigPanel extends LitElement {
   static properties = {
@@ -46,6 +47,8 @@ export class ShiftConfigPanel extends LitElement {
       display: flex;
       flex-direction: column;
       padding: 12px;
+      position: relative;
+      min-height: 200px;
     }
 
 
@@ -209,6 +212,15 @@ export class ShiftConfigPanel extends LitElement {
     .action-buttons {
       display: flex;
       gap: 8px;
+      align-items: center;
+    }
+
+    .version-info {
+      position: absolute;
+      bottom: 8px;
+      right: 12px;
+      font-size: 11px;
+      color: var(--secondary-text-color, #757575);
     }
 
     .switch-item {
@@ -687,6 +699,7 @@ export class ShiftConfigPanel extends LitElement {
               </div>
               `
             : ''}
+        <span class="version-info">v${Version}</span>
       </div>
     `;
   }
