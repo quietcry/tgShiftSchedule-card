@@ -387,7 +387,8 @@ export class ShiftScheduleView extends ViewBase {
       }
       
       // Wenn sich die saver_config geändert hat, lade die Konfiguration neu
-      if (hasSaverConfigChanged && this._storage) {
+      // ABER: Nicht wenn das Konfigurationspanel offen ist, um ungespeicherte Änderungen nicht zu überschreiben
+      if (hasSaverConfigChanged && this._storage && !this._showConfigPanel) {
         this._debug('[Config] set hass: Lade Konfiguration aus Storage neu');
         // Lade die Konfiguration aus dem Storage und aktualisiere this._config
         this._storage.loadConfig().then(storageConfig => {

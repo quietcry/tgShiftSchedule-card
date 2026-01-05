@@ -285,6 +285,9 @@ export class ShiftConfigPanel extends LitElement {
       font-size: 14px;
       color: var(--primary-text-color, #212121);
       border-right: 1px solid var(--divider-color, #e0e0e0);
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
 
     .time-range-header-cell:last-child {
@@ -302,9 +305,10 @@ export class ShiftConfigPanel extends LitElement {
     }
 
     .time-range-cell {
-      padding: 8px 12px;
+      padding: 8px 6px;
       display: flex;
       align-items: center;
+      justify-content: center;
       border-right: 1px solid var(--divider-color, #e0e0e0);
     }
 
@@ -323,6 +327,8 @@ export class ShiftConfigPanel extends LitElement {
 
     .time-range-cell ha-textfield {
       width: 100%;
+      max-width: 120px;
+      margin: 0 auto;
     }
 
     .time-range-delete-button {
