@@ -1,6 +1,6 @@
 # TG Schichtplan Card
 
-**Version:** 2025.12-0038 (HACS Tag: v2025.12.0038)
+**Version:** 2025.12-0045 (HACS Tag: v2025.12.0045)
 
 Eine Schichtplan-Karte für Home Assistant zur Verwaltung von Arbeitszeiten und Schichten.
 
@@ -9,13 +9,15 @@ Eine Schichtplan-Karte für Home Assistant zur Verwaltung von Arbeitszeiten und 
 - Schichtplanansicht für mehrere Monate (konfigurierbar, max. 14 Monate)
 - Toggle-Buttons für jeden Tag zum Ein- und Ausschalten der Arbeitszeiten/Schichten
 - Unterstützung für 5 Schichten (a, b, c, d, e) mit individuellen Farben
-- Zeiträume pro Schicht (bis zu 2 Zeitfenster pro Tag)
+- **Zeiträume pro Schicht**: Bis zu 9 Zeitfenster pro Schicht mit individuellen IDs (1-9)
+- **Validierung**: Automatische Validierung von Schicht-IDs (a-z) und Zeitraum-IDs (1-9)
 - Feiertags-Erkennung mit konfigurierbaren Feiertagen
 - Wochenend-Markierung
 - **Saver-Integration (empfohlen)**: Speicherung in Saver-Variablen (HACS) ohne Längenbegrenzung
 - **Fallback**: Speicherung in einem oder mehreren `input_text` Entities (bei Bedarf)
-- Konfiguration über Editor-UI
+- Konfiguration über Editor-UI mit visueller Fehleranzeige
 - Status relevante Schichten für Blueprint-Integration
+- **Robuste Fehlerbehandlung**: Verbesserte Stabilität beim Neustart von Home Assistant
 - Format: `<jahr>:<monat>:<tag><schicht>,<tag><schicht>;` (z.B. `25:11:03a,04ab,05a;25:12:01a`)
 
 ## Installation
@@ -140,9 +142,12 @@ Die Karte bietet einen integrierten Editor für die Konfiguration:
 - **Anzahl Monate**: Maximale Anzahl der Monate (1-14)
 - **Sichtbare Monate**: Standardanzahl der angezeigten Monate
 - **Schichten**: Konfiguration für jede Schicht (a-e)
-  - Name, Farbe, Aktiviert
+  - Name, Farbe, ID (einzelner Kleinbuchstabe a-z), Aktiviert
   - Status relevant: Ob die Schicht für Blueprint-Statusberechnung verwendet wird
-  - Zeiträume: Optional bis zu 2 Zeitfenster pro Tag
+  - Zeiträume: Optional bis zu 9 Zeitfenster pro Schicht
+    - Jeder Zeitraum hat eine eindeutige ID (1-9)
+    - Start- und Endzeit im Format HH:MM
+    - Automatische Zuweisung der ersten freien ID bei neuen Zeiträumen
 - **Feiertage**: Ein-/Ausschalten einzelner Feiertage
 
 ### Feiertage
@@ -152,6 +157,8 @@ Folgende Feiertage werden unterstützt:
 - Bewegliche Feiertage: Karfreitag, Ostermontag, Christi Himmelfahrt, Pfingstmontag, Fronleichnam, Buß- und Bettag
 
 ## Datenformat
+
+### Schichtdaten
 
 Die Arbeitszeiten/Schichten werden im folgenden Format gespeichert:
 
@@ -170,6 +177,44 @@ Beispiel:
 
 **Wichtig**: Es werden nur die Tage gespeichert, an denen Sie arbeiten müssen.
 
+### Konfigurationsdaten (Saver)
+
+Die Schichtkonfiguration wird im neuen Format gespeichert:
+
+```json
+{
+  "calendars": [
+    {
+      "shortcut": "a",
+      "name": "Normalschicht",
+      "color": "#ff9800",
+      "enabled": true,
+      "statusRelevant": true,
+      "timeRanges": [
+        {
+          "id": "1",
+          "times": ["08:00", "16:00"]
+        },
+        {
+          "id": "2",
+          "times": ["18:00", "22:00"]
+        }
+      ]
+    }
+  ],
+  "setup": {
+    "timer_entity": "timer.schichtplan",
+    "store_mode": "saver"
+  },
+  "lastchange": 1767601660
+}
+```
+
+**Hinweise:**
+- Alle Schichten werden gespeichert (auch deaktivierte)
+- Zeiträume können IDs von 1-9 haben
+- Jeder Zeitraum hat ein `times`-Array mit Start- und Endzeit
+
 ## Blueprint-Integration
 
 Die Karte kann mit dem `tgshiftschedule.yaml` Blueprint verwendet werden:
@@ -181,6 +226,20 @@ Die Karte kann mit dem `tgshiftschedule.yaml` Blueprint verwendet werden:
   - Bei `store_mode: saver`: Beide verwenden die gleiche Saver-Variable
   - Bei `store_mode: text_entity`: Beide verwenden die gleichen `input_text` Entities
 
+## Validierung
+
+Die Karte validiert automatisch alle Eingaben:
+
+- **Schicht-IDs**: Nur einzelne Kleinbuchstaben (a-z) sind erlaubt
+- **Zeitraum-IDs**: Nur einzelne Ziffern (1-9) sind erlaubt
+- **Zeitformate**: Start- und Endzeiten müssen im Format HH:MM sein
+- **Eindeutigkeit**: Zeitraum-IDs müssen innerhalb einer Schicht eindeutig sein
+
+Bei Validierungsfehlern:
+- Fehlerhafte Felder werden mit rotem Rahmen markiert
+- Bestätigungs- und "Neue Schicht"-Buttons werden deaktiviert
+- Wechsel zu anderen Schichten über die Farbleiste wird verhindert
+
 ## Entwicklung
 
 ```bash
@@ -189,3 +248,18 @@ npm run build
 ```
 
 Die kompilierte Datei wird in `dist/tgshiftschedule-card.js` erstellt.
+
+### Entwicklungsserver
+
+```bash
+npm run dev
+```
+
+Startet einen Entwicklungsserver mit Hot Module Replacement (HMR).
+
+### Code-Formatierung
+
+```bash
+npm run format        # Code formatieren
+npm run format:check  # Formatierung prüfen
+```

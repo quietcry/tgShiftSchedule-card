@@ -61,11 +61,10 @@ export class CardBase extends SuperBase {
   getDefaultConfig() {
     this._debug('getDefaultConfig wird aufgerufen');
     return {
-      entity: '',
       numberOfMonths: 14,
       initialDisplayedMonths: 2,
       selectedCalendar: 'a', // Erster aktivierter Kalender
-      store_mode: 'text_entity',
+      store_mode: 'saver',
       saver_key: 'Schichtplan',
       calendars: [
         {

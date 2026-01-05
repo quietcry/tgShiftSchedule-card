@@ -1,9 +1,9 @@
-const Version = '2025.12-0044';
+const Version = '2026.01-0004';
 const CardRegname = 'tgshiftschedule-card';
 const CardName = 'TG Schichtplan Card';
 const CardDescription = 'Eine Schichtplan-Karte für Arbeitszeiten';
 const CardFilename = 'tgshiftschedule-card.js';
-const DebugMode = 'false'; // Aktiviere Debug für alle Komponenten
+const DebugMode = 'true'; // Aktiviere Debug für alle Komponenten
 const UseDummyData = 'false';
 const showVersion = false;
 const SaveDebounceTime = 300; // Debounce-Zeit in Millisekunden für das Speichern von Änderungen (0 = sofort, ohne Debouncing)

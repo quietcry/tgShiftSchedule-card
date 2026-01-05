@@ -9,11 +9,10 @@ export class EditorImpl extends EditorBase {
 
   constructor() {
     super({
-      entity: '',
       numberOfMonths: 14,
       initialDisplayedMonths: 2,
       selectedCalendar: 'a',
-      store_mode: 'text_entity',
+      store_mode: 'saver',
       saver_key: 'Schichtplan',
       calendars: [
         { shortcut: 'a', name: 'Schicht A', color: '#ff9800', enabled: true, statusRelevant: true },
@@ -154,16 +153,21 @@ export class EditorImpl extends EditorBase {
       return defaultCal;
     });
 
-    // Stelle sicher, dass store_mode und saver_key gesetzt sind
-    if (!this.config.store_mode) {
-      this.config.store_mode = 'text_entity';
-    }
+    // Stelle sicher, dass store_mode immer 'saver' ist und saver_key gesetzt ist
+    this.config.store_mode = 'saver';
     if (!this.config.saver_key) {
       this.config.saver_key = 'Schichtplan';
     }
 
     return html`
       <div class="card-config">
+        <div class="saver-info-message">
+          <p>
+            <strong>💾 Saver-Integration:</strong> Diese Karte verwendet die 
+            <a href="https://github.com/PiotrMachowski/Home-Assistant-custom-components-Saver" target="_blank" rel="noopener noreferrer">Saver-Integration</a> 
+            zur Speicherung der Schichtdaten. Die Daten werden in Saver-Variablen gespeichert, ohne Längenbegrenzung.
+          </p>
+        </div>
         <ha-form
           .hass=${this.hass}
           .data=${this.config}
@@ -171,11 +175,6 @@ export class EditorImpl extends EditorBase {
           .computeLabel=${this._computeLabel}
           @value-changed=${this._valueChanged}
         ></ha-form>
-        <div class="elements-section">
-          <div class="calendars-list">
-            ${this.config.calendars.map((calendar, index) => this._renderCalendar(index, calendar))}
-          </div>
-        </div>
         <div class="elements-section">${this._renderHolidays()}</div>
       </div>
     `;
@@ -764,14 +763,10 @@ export class EditorImpl extends EditorBase {
 
   _computeLabel(schema) {
     switch (schema.name) {
-      case 'entity':
-        return 'Entity (input_text)';
       case 'numberOfMonths':
         return 'Maximale Anzahl Monate';
       case 'initialDisplayedMonths':
         return 'Standardwert sichtbare Monate';
-      case 'store_mode':
-        return 'Speichermodus';
       case 'saver_key':
         return 'Saver-Variablenname';
       default:
@@ -803,10 +798,8 @@ export class EditorImpl extends EditorBase {
       }
     }
 
-    // Stelle sicher, dass store_mode und saver_key gesetzt sind
-    if (newValue.store_mode === undefined) {
-      newValue.store_mode = this.config.store_mode || 'text_entity';
-    }
+    // Stelle sicher, dass store_mode immer 'saver' ist und saver_key gesetzt ist
+    newValue.store_mode = 'saver';
     if (newValue.saver_key === undefined) {
       newValue.saver_key = this.config.saver_key || 'Schichtplan';
     }
@@ -816,11 +809,6 @@ export class EditorImpl extends EditorBase {
       ...newValue,
     };
     this._debug('EditorImpl config nach _valueChanged:', this.config);
-
-    // Wenn store_mode geändert wurde, aktualisiere die Ansicht (für bedingte Anzeige von saver_key)
-    if (newValue.store_mode !== undefined && newValue.store_mode !== oldStoreMode) {
-      this.requestUpdate();
-    }
 
     this.dispatchEvent(
       new CustomEvent('config-changed', {
@@ -856,8 +844,38 @@ export class EditorImpl extends EditorBase {
         width: 100%;
       }
 
-      .calendars-list {
+      .saver-info-message {
+        margin-bottom: 20px;
+        padding: 12px;
+        background-color: var(--info-color, #2196f3);
+        color: white;
+        border-radius: 4px;
+      }
+
+      .saver-info-message p {
+        margin: 0;
+      }
+
+      .saver-info-message a {
+        color: white;
+        text-decoration: underline;
+        font-weight: 500;
+      }
+
+      .saver-info-message a:hover {
+        text-decoration: none;
+      }
+
+      .info-message {
         margin-top: 15px;
+        padding: 12px;
+        background-color: var(--info-color, #2196f3);
+        color: white;
+        border-radius: 4px;
+      }
+
+      .info-message p {
+        margin: 0;
       }
 
       .calendar-item {
@@ -1163,10 +1181,9 @@ export class EditorImpl extends EditorBase {
 
   static getStubConfig() {
     return {
-      entity: '',
       numberOfMonths: 14,
       initialDisplayedMonths: 2,
-      store_mode: 'text_entity',
+      store_mode: 'saver',
       saver_key: 'Schichtplan',
       useElements: false,
       selectedElement: null,
@@ -1200,22 +1217,9 @@ export class EditorImpl extends EditorBase {
   _getBasicSchema() {
     const schema = [
       {
-        name: 'entity',
+        name: 'saver_key',
         selector: {
-          entity: {
-            domain: 'input_text',
-          },
-        },
-      },
-      {
-        name: 'store_mode',
-        selector: {
-          select: {
-            options: [
-              { value: 'text_entity', label: 'Text-Entity' },
-              { value: 'saver', label: 'Saver' },
-            ],
-          },
+          text: {},
         },
       },
       {
@@ -1241,16 +1245,6 @@ export class EditorImpl extends EditorBase {
         },
       },
     ];
-
-    // Füge saver_key nur hinzu, wenn store_mode === 'saver'
-    if (this.config?.store_mode === 'saver') {
-      schema.splice(2, 0, {
-        name: 'saver_key',
-        selector: {
-          text: {},
-        },
-      });
-    }
 
     return schema;
   }

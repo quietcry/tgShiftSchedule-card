@@ -46,6 +46,10 @@ scripts/
 *.log
 logs/
 
+# markdown
+*.md
+!README.md
+
 # OS files
 .DS_Store
 .DS_Store?

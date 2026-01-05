@@ -1,6 +1,22 @@
 import { html, css, unsafeCSS } from 'lit';
 import { ViewBase } from '../view-base.js';
 import { SaveDebounceTime } from '../../card-config.js';
+import { StorageFactory } from '../../storage/storage-factory.js';
+// Mixins für wiederverwendbare Funktionalität
+import { HolidayMixin } from './mixins/holiday-mixin.js';
+import { DataManagementMixin } from './mixins/data-management-mixin.js';
+import { CalendarMixin } from './mixins/calendar-mixin.js';
+import { ConfigManagementMixin } from './mixins/config-management-mixin.js';
+import { RenderingMixin } from './mixins/rendering-mixin.js';
+// Utilities
+import { DateUtils } from '../../utils/date-utils.js';
+import { ColorUtils } from '../../utils/color-utils.js';
+// Gemeinsame Menu-Styles
+import { sharedMenuStyles } from './shared-menu-styles.js';
+// Menu-Bar Template
+import { renderMenuBar } from './menu-bar-template.js';
+// Konfigurationspanel
+import './shift-config-panel.js';
 
 export class ShiftScheduleView extends ViewBase {
   static className = 'ShiftScheduleView';
@@ -30,6 +46,7 @@ export class ShiftScheduleView extends ViewBase {
       _displayedMonths: { type: Number },
       _startMonthOffset: { type: Number },
       _selectedCalendar: { type: String },
+      _showConfigPanel: { type: Boolean },
     };
   }
 
@@ -39,7 +56,7 @@ export class ShiftScheduleView extends ViewBase {
     this._storageWarning = null; // { show: boolean, currentLength: number, maxLength: number, percentage: number }
     this._configWarning = null; // { show: boolean, configEntityId: string }
     this._statusWarning = null; // { show: boolean, statusEntityId: string }
-    this._knownEntityIds = null; // Cache für bekannte Entities [mainEntity, ...additionalEntities]
+    this._knownEntityIds = null; // Cache für bekannte Entities [mainEntity, ...additionalEntities] - WIRD VON ENTITY-STORAGE VERWENDET
     this._cleanupDone = false; // Flag, ob die Bereinigung bereits beim initialen Laden ausgeführt wurde
     this._displayedMonths = 2; // Anzahl der angezeigten Monate (wird aus config.numberOfMonths initialisiert)
     this._startMonthOffset = 0; // Offset für den Startmonat (0 = aktueller Monat, -1 = Vormonat, +1 = nächster Monat)
@@ -55,12 +72,22 @@ export class ShiftScheduleView extends ViewBase {
     this._editorModeCacheTime = 0; // Zeitstempel für Cache-Invalidierung
     // Debouncing für Speicher-Operationen
     this._saveDebounceTimer = null; // Timer für Debouncing beim Speichern
+    // Storage-Adapter (wird bei setConfig oder set hass initialisiert)
+    this._storage = null;
+    // Konfigurationspanel
+    this._showConfigPanel = false;
+    
+    // Mixins hinzufügen (für wiederverwendbare Funktionalität)
+    Object.assign(this, DateUtils);
+    Object.assign(this, ColorUtils);
+    Object.assign(this, HolidayMixin);
+    Object.assign(this, DataManagementMixin);
+    Object.assign(this, CalendarMixin);
+    Object.assign(this, ConfigManagementMixin);
+    Object.assign(this, RenderingMixin);
   }
 
-  // Formatiert eine Zahl auf zwei Ziffern (z.B. 1 -> "01", 25 -> "25")
-  formatTwoDigits(num) {
-    return String(num).padStart(2, '0');
-  }
+  // formatTwoDigits() ist jetzt in DateUtils
 
   // Prüft, ob die Karte im Editor-Modus angezeigt wird (mit Cache)
   _isInEditorMode() {
@@ -182,208 +209,27 @@ export class ShiftScheduleView extends ViewBase {
   }
 
   // Berechnet die Kontrastfarbe (schwarz oder weiß) für eine gegebene Hintergrundfarbe
-  _getContrastColor(hexColor) {
-    if (!hexColor) return '#000000';
+  // _getContrastColor() ist jetzt in ColorUtils
+  // _getEasterDate(), _isHoliday(), _isWeekend() sind jetzt in HolidayMixin
 
-    // Entferne # falls vorhanden
-    const hex = hexColor.replace('#', '');
-
-    // Konvertiere zu RGB
-    const r = parseInt(hex.substr(0, 2), 16);
-    const g = parseInt(hex.substr(2, 2), 16);
-    const b = parseInt(hex.substr(4, 2), 16);
-
-    // Berechne relative Luminanz (nach WCAG)
-    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-
-    // Wenn Luminanz > 0.5, verwende schwarz, sonst weiß
-    return luminance > 0.5 ? '#000000' : '#ffffff';
-  }
-
-  // Berechnet das Osterdatum für ein gegebenes Jahr (nach Gauß-Algorithmus)
-  _getEasterDate(year) {
-    const a = year % 19;
-    const b = Math.floor(year / 100);
-    const c = year % 100;
-    const d = Math.floor(b / 4);
-    const e = b % 4;
-    const f = Math.floor((b + 8) / 25);
-    const g = Math.floor((b - f + 1) / 3);
-    const h = (19 * a + b - d - g + 15) % 30;
-    const i = Math.floor(c / 4);
-    const k = c % 4;
-    const l = (32 + 2 * e + 2 * i - h - k) % 7;
-    const m = Math.floor((a + 11 * h + 22 * l) / 451);
-    const month = Math.floor((h + l - 7 * m + 114) / 31);
-    const day = ((h + l - 7 * m + 114) % 31) + 1;
-    return new Date(year, month - 1, day);
-  }
-
-  // Prüft ob ein Datum ein Feiertag ist (mit Cache)
-  // Versucht zuerst Home Assistant Holiday-Sensoren zu verwenden, falls vorhanden
-  _isHoliday(year, month, day) {
-    // Cache-Key: "2025-12" für Monat/Jahr
-    const cacheKey = `${year}-${String(month + 1).padStart(2, '0')}`;
-
-    // Prüfe Cache
-    if (this._holidayCache[cacheKey] && this._holidayCache[cacheKey][day] !== undefined) {
-      return this._holidayCache[cacheKey][day];
+  /**
+   * Initialisiert den Storage-Adapter basierend auf der Konfiguration
+   * @private
+   */
+  _initializeStorage() {
+    if (!this._hass || !this._config) {
+      this._debug('[Storage] _initializeStorage: hass oder config fehlt');
+      this._storage = null;
+      return;
     }
 
-    // Initialisiere Cache für diesen Monat
-    if (!this._holidayCache[cacheKey]) {
-      this._holidayCache[cacheKey] = {};
+    try {
+      this._storage = StorageFactory.createStorage(this._hass, this._config, this._debug.bind(this));
+      this._debug(`[Storage] _initializeStorage: Storage-Adapter erstellt, store_mode: "${this._config.store_mode}"`);
+    } catch (error) {
+      this._debug(`[Storage] _initializeStorage: Fehler beim Erstellen des Storage-Adapters: ${error.message}`, error);
+      this._storage = null;
     }
-
-    let result = false;
-
-    // Prüfe ob Home Assistant Holiday-Sensoren verfügbar sind
-    if (this._hass && this._hass.states) {
-      // Suche nach Holiday-Sensoren (z.B. sensor.germany_holidays, sensor.holidays, etc.)
-      // OPTIMIERUNG: Cache Holiday-Entities, nicht bei jedem Aufruf suchen
-      if (!this._cachedHolidayEntities) {
-        this._cachedHolidayEntities = Object.keys(this._hass.states).filter(entityId => {
-          return (
-            entityId.startsWith('sensor.') &&
-            (entityId.includes('holiday') || entityId.includes('feiertag')) &&
-            this._hass.states[entityId].state === 'on'
-          );
-        });
-      }
-
-      const holidayEntities = this._cachedHolidayEntities;
-
-      if (holidayEntities.length > 0) {
-        // Prüfe ob das Datum in den Holiday-Attributen enthalten ist
-        for (const entityId of holidayEntities) {
-          const entity = this._hass.states[entityId];
-          if (entity && entity.attributes) {
-            // Prüfe verschiedene mögliche Attribute-Formate
-            const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-            const dateStrShort = `${String(day).padStart(2, '0')}.${String(month + 1).padStart(2, '0')}.${year}`;
-
-            // Prüfe verschiedene Attribute-Namen
-            const possibleAttrs = [
-              'dates',
-              'holidays',
-              'feiertage',
-              'date',
-              'next_date',
-              'upcoming',
-            ];
-            for (const attr of possibleAttrs) {
-              if (entity.attributes[attr]) {
-                const attrValue = entity.attributes[attr];
-                if (Array.isArray(attrValue)) {
-                  if (
-                    attrValue.some(
-                      d =>
-                        d === dateStr ||
-                        d === dateStrShort ||
-                        d.includes(dateStr) ||
-                        d.includes(dateStrShort)
-                    )
-                  ) {
-                    result = true;
-                    break;
-                  }
-                } else if (typeof attrValue === 'string') {
-                  if (attrValue.includes(dateStr) || attrValue.includes(dateStrShort)) {
-                    result = true;
-                    break;
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-
-    // Hole Feiertags-Konfiguration aus der Config (Standard: alle aktiviert)
-    const holidaysConfig = this.config?.holidays || {};
-    const isHolidayEnabled = key => holidaysConfig[key] !== false; // Default: true wenn nicht gesetzt
-
-    // Fallback: Berechne deutsche Feiertage selbst
-    const easter = this._getEasterDate(year);
-
-    // Feste Feiertage mit Konfigurationsprüfung
-    const fixedHolidays = [
-      { month: 0, day: 1, key: 'neujahr' }, // Neujahr
-      { month: 0, day: 6, key: 'heilige_drei_koenige' }, // Heilige Drei Könige
-      { month: 4, day: 1, key: 'tag_der_arbeit' }, // Tag der Arbeit
-      { month: 7, day: 8, key: 'friedensfest' }, // Friedensfest (nur in Augsburg)
-      { month: 7, day: 15, key: 'mariae_himmelfahrt' }, // Mariä Himmelfahrt
-      { month: 9, day: 3, key: 'tag_der_deutschen_einheit' }, // Tag der Deutschen Einheit
-      { month: 9, day: 31, key: 'reformationstag' }, // Reformationstag
-      { month: 10, day: 1, key: 'allerheiligen' }, // Allerheiligen
-      { month: 11, day: 25, key: 'weihnachten_1' }, // 1. Weihnachtsfeiertag
-      { month: 11, day: 26, key: 'weihnachten_2' }, // 2. Weihnachtsfeiertag
-    ];
-
-    if (!result) {
-      // Prüfe feste Feiertage
-      for (const holiday of fixedHolidays) {
-        if (month === holiday.month && day === holiday.day && isHolidayEnabled(holiday.key)) {
-          result = true;
-          break;
-        }
-      }
-    }
-
-    if (!result) {
-      // Bewegliche Feiertage (abhängig von Ostern)
-      const easterTime = easter.getTime();
-      const oneDay = 24 * 60 * 60 * 1000;
-
-      // Buß- und Bettag: Mittwoch vor dem 23. November (oder am 23. November, falls es ein Mittwoch ist)
-      const nov23 = new Date(year, 10, 23); // 23. November (month ist 0-basiert)
-      const dayOfWeekNov23 = nov23.getDay(); // 0 = Sonntag, 1 = Montag, ..., 3 = Mittwoch, ..., 6 = Samstag
-      // Berechne wie viele Tage zurück zum Mittwoch
-      // Wenn Mittwoch (3): 0 Tage zurück
-      // Wenn Donnerstag (4): 1 Tag zurück → 4 - 3 = 1
-      // Wenn Freitag (5): 2 Tage zurück → 5 - 3 = 2
-      // Wenn Samstag (6): 3 Tage zurück → 6 - 3 = 3
-      // Wenn Sonntag (0): 4 Tage zurück → (0 + 7) - 3 = 4
-      // Wenn Montag (1): 5 Tage zurück → (1 + 7) - 3 = 5
-      // Wenn Dienstag (2): 6 Tage zurück → (2 + 7) - 3 = 6
-      const daysToSubtract = dayOfWeekNov23 <= 3 ? 3 - dayOfWeekNov23 : dayOfWeekNov23 + 7 - 3;
-      const busstag = new Date(year, 10, 23 - daysToSubtract);
-
-      const movableHolidays = [
-        { date: new Date(easterTime - 2 * oneDay), key: 'karfreitag' }, // Karfreitag
-        { date: new Date(easterTime + 1 * oneDay), key: 'ostermontag' }, // Ostermontag
-        { date: new Date(easterTime + 39 * oneDay), key: 'christi_himmelfahrt' }, // Christi Himmelfahrt
-        { date: new Date(easterTime + 50 * oneDay), key: 'pfingstmontag' }, // Pfingstmontag
-        { date: new Date(easterTime + 60 * oneDay), key: 'fronleichnam' }, // Fronleichnam (nur in bestimmten Bundesländern)
-        { date: busstag, key: 'busstag' }, // Buß- und Bettag (nur in Sachsen)
-      ];
-
-      // Prüfe bewegliche Feiertage
-      for (const holiday of movableHolidays) {
-        if (
-          holiday.date.getFullYear() === year &&
-          holiday.date.getMonth() === month &&
-          holiday.date.getDate() === day &&
-          isHolidayEnabled(holiday.key)
-        ) {
-          result = true;
-          break;
-        }
-      }
-    }
-
-    // Cache speichern
-    this._holidayCache[cacheKey][day] = result;
-
-    return result;
-  }
-
-  // Prüft ob ein Datum ein Wochenende ist
-  _isWeekend(year, month, day) {
-    const date = new Date(year, month, day);
-    const dayOfWeek = date.getDay();
-    return dayOfWeek === 0 || dayOfWeek === 6; // Sonntag = 0, Samstag = 6
   }
 
   get hass() {
@@ -398,39 +244,234 @@ export class ShiftScheduleView extends ViewBase {
       return;
     }
 
-    const previousEntityState = this._hass?.states[this._config?.entity]?.state;
-    const newEntityState = hass?.states[this._config?.entity]?.state;
+    const previousEntityState = this._hass?.states?.[this._config?.entity]?.state;
+    const newEntityState = hass?.states?.[this._config?.entity]?.state;
 
     // Prüfe auch zusätzliche Entities auf Änderungen
     let hasAnyEntityChanged = previousEntityState !== newEntityState;
-    if (!hasAnyEntityChanged && this._config && this._knownEntityIds) {
+    if (!hasAnyEntityChanged && this._config && this._knownEntityIds && hass?.states) {
       // Prüfe alle bekannten zusätzlichen Entities
       for (let i = 1; i < this._knownEntityIds.length; i++) {
         const entityId = this._knownEntityIds[i];
-        const prevState = this._hass?.states[entityId]?.state;
-        const newState = hass?.states[entityId]?.state;
+        const prevState = this._hass?.states?.[entityId]?.state;
+        const newState = hass?.states?.[entityId]?.state;
         if (prevState !== newState) {
           hasAnyEntityChanged = true;
           break;
         }
       }
     }
+    
+    // Prüfe ob sich die saver_config geändert hat (nur bei store_mode === 'saver')
+    let hasSaverConfigChanged = false;
+    if (this._config && this._config.store_mode === 'saver' && this._hass && hass && hass?.states) {
+      try {
+        const saverEntity = hass.states['saver.saver'];
+        const previousSaverEntity = this._hass?.states?.['saver.saver'];
+        if (saverEntity && saverEntity.attributes && saverEntity.attributes.variables) {
+          const configKey = `${this._config.saver_key || 'Schichtplan'}_config`;
+          const previousConfigValue = previousSaverEntity?.attributes?.variables?.[configKey];
+          const newConfigValue = saverEntity.attributes.variables[configKey];
+          if (previousConfigValue !== newConfigValue) {
+            hasSaverConfigChanged = true;
+            this._debug('[Config] set hass: saver_config hat sich geändert, lade Konfiguration neu');
+          }
+        }
+      } catch (error) {
+        this._debug('[Config] set hass: Fehler beim Prüfen der saver_config:', error);
+      }
+    }
 
+    const wasHassSet = !!this._hass;
     this._hass = hass;
 
     // Cache-Invalidierung: Holiday-Entities Cache zurücksetzen bei hass-Update
     this._cachedHolidayEntities = null;
+    
+    // Initialisiere Storage-Adapter neu, falls Config bereits vorhanden
+    if (this._config) {
+      this._initializeStorage();
+    }
+
+    // Wenn hass zum ersten Mal gesetzt wird und die Konfiguration bereits vorhanden ist,
+    // markiere initialen Load als abgeschlossen
+    if (!wasHassSet && hass && this._config && this._isInitialLoad) {
+      this._debug('[Config] set hass: hass zum ersten Mal gesetzt - markiere initialen Load als abgeschlossen');
+      this._isInitialLoad = false;
+    }
 
     if (this._config) {
-      // Nur laden, wenn sich ein State tatsächlich geändert hat (nicht bei jedem Update)
-      if (hasAnyEntityChanged) {
-        this.loadWorkingDays();
+      // Lade Daten beim ersten Setzen von hass oder wenn sich ein State geändert hat
+      if ((!wasHassSet || hasAnyEntityChanged) && hass?.states) {
+        try {
+          this.loadWorkingDays();
+        } catch (error) {
+          this._debug('[Config] set hass: Fehler beim Laden der Arbeitszeiten:', error);
+        }
       }
+      
+      // Beim ersten Setzen von hass: Lade die Konfiguration aus dem Storage, falls noch nicht geladen
+      if (!wasHassSet && this._storage) {
+        this._debug('[Config] set hass: hass zum ersten Mal gesetzt - lade Konfiguration aus Storage');
+        // Verwende Promise ohne await, da set hass() nicht async ist
+        this._storage.loadConfig().then(storageConfig => {
+          if (storageConfig) {
+            try {
+              const parsedConfig = JSON.parse(storageConfig);
+              
+              // Neues Format: Objekt mit "calendars" Property
+              if (parsedConfig && typeof parsedConfig === 'object' && Array.isArray(parsedConfig.calendars)) {
+                this._debug('[Config] set hass: Konfiguration aus Storage geladen (neues Format mit calendars) beim ersten hass-Set');
+                
+                // Ersetze this._config.calendars vollständig mit den geladenen Kalendern
+                this._config.calendars = parsedConfig.calendars.map(cal => {
+                  // Stelle sicher, dass timeRanges im korrekten Format sind
+                  let timeRanges = [];
+                  if (cal.timeRanges && Array.isArray(cal.timeRanges)) {
+                    timeRanges = cal.timeRanges.map((range, idx) => {
+                      // Prüfe zuerst, ob es ein Array ist (altes Format)
+                      if (Array.isArray(range)) {
+                        // Altes Format: [start, end] - konvertiere zu neuem Format
+                        this._debug(`[Config] set hass: Zeitraum ${idx} für "${cal.shortcut}": Altes Format [start, end] erkannt`);
+                        return {
+                          id: null,
+                          times: [...range],
+                        };
+                      } else if (typeof range === 'object' && range !== null && range.times && Array.isArray(range.times)) {
+                        // Neues Format: { id, times: [start, end] }
+                        const normalizedRange = {
+                          id: range.id || null,
+                          times: [...range.times],
+                        };
+                        this._debug(`[Config] set hass: Zeitraum ${idx} für "${cal.shortcut}": Neues Format erkannt, id="${normalizedRange.id}", times=[${normalizedRange.times.join(',')}]`);
+                        return normalizedRange;
+                      } else {
+                        this._debug(`[Config] set hass: Zeitraum ${idx} für "${cal.shortcut}": Unbekanntes Format, verwende Default`);
+                        return { id: null, times: [null, null] };
+                      }
+                    });
+                  }
+                  
+                  return {
+                    shortcut: cal.shortcut,
+                    name: cal.name || `Schicht ${cal.shortcut?.toUpperCase() || ''}`,
+                    color: cal.color || this._getDefaultColorForShortcut(cal.shortcut),
+                    enabled: cal.enabled === true || cal.enabled === 'true' || cal.enabled === 1,
+                    statusRelevant: cal.statusRelevant === true || cal.statusRelevant === 'true' || cal.statusRelevant === 1,
+                    timeRanges: timeRanges,
+                  };
+                });
+                
+                this._debug(`[Config] set hass: ${this._config.calendars.length} Kalender geladen beim ersten hass-Set`);
+                this._config.calendars.forEach(cal => {
+                  this._debug(`[Config] set hass: Kalender "${cal.shortcut}":`, {
+                    name: cal.name,
+                    enabled: cal.enabled,
+                    statusRelevant: cal.statusRelevant,
+                    timeRanges_count: cal.timeRanges?.length || 0,
+                  });
+                });
+                
+                this._debug('[Config] set hass: Konfiguration aus Saver geladen und this._config aktualisiert');
+                this.requestUpdate();
+              } else {
+                this._debug('[Config] set hass: Konfiguration konnte nicht geparst werden - erwartetes Format: { calendars: [...] }');
+              }
+            } catch (error) {
+              this._debug('[Config] set hass: Fehler beim Parsen der Konfiguration aus dem Storage:', error);
+            }
+          }
+        }).catch(error => {
+          this._debug('[Config] set hass: Fehler beim Laden der Konfiguration aus dem Storage:', error);
+        });
+      }
+      
+      // Wenn sich die saver_config geändert hat, lade die Konfiguration neu
+      if (hasSaverConfigChanged && this._storage) {
+        this._debug('[Config] set hass: Lade Konfiguration aus Storage neu');
+        // Lade die Konfiguration aus dem Storage und aktualisiere this._config
+        this._storage.loadConfig().then(storageConfig => {
+          if (storageConfig) {
+            try {
+              const parsedConfig = JSON.parse(storageConfig);
+              
+              // Neues Format: Objekt mit "calendars" Property
+              if (parsedConfig && typeof parsedConfig === 'object' && Array.isArray(parsedConfig.calendars)) {
+                this._debug('[Config] set hass: Konfiguration aus Saver neu geladen (neues Format mit calendars)');
+                
+                // Ersetze this._config.calendars vollständig mit den geladenen Kalendern
+                this._config.calendars = parsedConfig.calendars.map(cal => {
+                  // Stelle sicher, dass timeRanges im korrekten Format sind
+                  let timeRanges = [];
+                  if (cal.timeRanges && Array.isArray(cal.timeRanges)) {
+                    timeRanges = cal.timeRanges.map((range, idx) => {
+                      // Prüfe zuerst, ob es ein Array ist (altes Format)
+                      if (Array.isArray(range)) {
+                        // Altes Format: [start, end] - konvertiere zu neuem Format
+                        this._debug(`[Config] set hass: Zeitraum ${idx} für "${cal.shortcut}": Altes Format [start, end] erkannt`);
+                        return {
+                          id: null,
+                          times: [...range],
+                        };
+                      } else if (typeof range === 'object' && range !== null && range.times && Array.isArray(range.times)) {
+                        // Neues Format: { id, times: [start, end] }
+                        const normalizedRange = {
+                          id: range.id || null,
+                          times: [...range.times],
+                        };
+                        this._debug(`[Config] set hass: Zeitraum ${idx} für "${cal.shortcut}": Neues Format erkannt, id="${normalizedRange.id}", times=[${normalizedRange.times.join(',')}]`);
+                        return normalizedRange;
+                      } else {
+                        this._debug(`[Config] set hass: Zeitraum ${idx} für "${cal.shortcut}": Unbekanntes Format, verwende Default`);
+                        return { id: null, times: [null, null] };
+                      }
+                    });
+                  }
+                  
+                  return {
+                    shortcut: cal.shortcut,
+                    name: cal.name || `Schicht ${cal.shortcut?.toUpperCase() || ''}`,
+                    color: cal.color || this._getDefaultColorForShortcut(cal.shortcut),
+                    enabled: cal.enabled === true || cal.enabled === 'true' || cal.enabled === 1,
+                    statusRelevant: cal.statusRelevant === true || cal.statusRelevant === 'true' || cal.statusRelevant === 1,
+                    timeRanges: timeRanges,
+                  };
+                });
+                
+                this._debug(`[Config] set hass: ${this._config.calendars.length} Kalender geladen`);
+                this._config.calendars.forEach(cal => {
+                  this._debug(`[Config] set hass: Kalender "${cal.shortcut}":`, {
+                    name: cal.name,
+                    enabled: cal.enabled,
+                    statusRelevant: cal.statusRelevant,
+                    timeRanges_count: cal.timeRanges?.length || 0,
+                  });
+                });
+                
+                this._debug('[Config] set hass: Konfiguration aus Storage neu geladen und this._config aktualisiert');
+                // Wichtig: requestUpdate() aufrufen, damit die UI neu gerendert wird
+                this.requestUpdate();
+              } else {
+                this._debug('[Config] set hass: Konfiguration konnte nicht geparst werden - erwartetes Format: { calendars: [...] }');
+              }
+          } catch (error) {
+            this._debug('[Config] set hass: Fehler beim Parsen der neu geladenen Konfiguration:', error);
+          }
+        }
+        }).catch(error => {
+          this._debug('[Config] set hass: Fehler beim Neuladen der Konfiguration aus dem Storage:', error);
+        });
+      }
+      
       // Prüfe Config-Entity und Status-Entity nur bei text_entity Modus
       // (bei Saver werden diese nicht benötigt)
-      if (this._config.store_mode !== 'saver') {
-        this.checkConfigEntity();
-        this.checkStatusEntity();
+      if (this._config.store_mode !== 'saver' && hass?.states) {
+        try {
+          this.checkConfigEntity();
+          this.checkStatusEntity();
+        } catch (error) {
+          this._debug('[Config] set hass: Fehler beim Prüfen der Config/Status-Entities:', error);
+        }
       }
     }
     this.requestUpdate();
@@ -441,8 +482,111 @@ export class ShiftScheduleView extends ViewBase {
   }
 
   set config(config) {
+    this._debug('[Config] set config: === WIRD AUFGERUFEN ===');
+    this._debug('[Config] set config: _isInitialLoad Status:', this._isInitialLoad);
     const wasInitialLoad = this._isInitialLoad;
+    
+    // Lade Konfiguration aus dem Storage, wenn store_mode == 'saver' und hass verfügbar ist
+    // ABER: Nur beim initialen Laden, nicht wenn die Konfiguration vom Editor kommt
+    // (beim Editor-Schließen wird die Konfiguration gespeichert, dann sollte sie nicht wieder überschrieben werden)
+    if (config && config.store_mode === 'saver' && this._hass && wasInitialLoad) {
+      this._debug('[Config] set config: Initialer Load - lade Konfiguration aus dem Storage und merge mit übergebener Config');
+      // Initialisiere Storage, falls noch nicht geschehen
+      if (!this._storage) {
+        this._initializeStorage();
+      }
+      if (this._storage) {
+        // Verwende Promise, da set config() nicht async ist
+        this._storage.loadConfig().then(storageConfig => {
+          if (storageConfig) {
+            try {
+              const parsedConfig = JSON.parse(storageConfig);
+              
+              // Neues Format: Objekt mit "calendars" Property
+              if (parsedConfig && typeof parsedConfig === 'object' && Array.isArray(parsedConfig.calendars)) {
+                this._debug('[Config] set config: Konfiguration aus Saver geparst (neues Format mit calendars)');
+                
+                // Starte mit der bestehenden internen Konfiguration (falls vorhanden) oder der übergebenen Config
+                // Die übergebene Config hat Vorrang für Darstellungsparameter
+                const mergedConfig = {
+                  ...this._config, // Starte mit bestehender interner Konfiguration
+                  ...config, // Überschreibe mit übergebener Config (Darstellungsparameter)
+                };
+                
+                // Ersetze calendars vollständig mit den geladenen Kalendern aus dem Saver
+                mergedConfig.calendars = parsedConfig.calendars.map(cal => {
+                  // Stelle sicher, dass timeRanges im korrekten Format sind
+                  let timeRanges = [];
+                  if (cal.timeRanges && Array.isArray(cal.timeRanges)) {
+                    timeRanges = cal.timeRanges.map((range, idx) => {
+                      // Prüfe zuerst, ob es ein Array ist (altes Format)
+                      if (Array.isArray(range)) {
+                        // Altes Format: [start, end] - konvertiere zu neuem Format
+                        this._debug(`[Config] set config: Zeitraum ${idx} für "${cal.shortcut}": Altes Format [start, end] erkannt`);
+                        return {
+                          id: null,
+                          times: [...range],
+                        };
+                      } else if (typeof range === 'object' && range !== null && range.times && Array.isArray(range.times)) {
+                        // Neues Format: { id, times: [start, end] }
+                        const normalizedRange = {
+                          id: range.id || null,
+                          times: [...range.times],
+                        };
+                        this._debug(`[Config] set config: Zeitraum ${idx} für "${cal.shortcut}": Neues Format erkannt, id="${normalizedRange.id}", times=[${normalizedRange.times.join(',')}]`);
+                        return normalizedRange;
+                      } else {
+                        this._debug(`[Config] set config: Zeitraum ${idx} für "${cal.shortcut}": Unbekanntes Format, verwende Default`);
+                        return { id: null, times: [null, null] };
+                      }
+                    });
+                  }
+                  
+                  return {
+                    shortcut: cal.shortcut,
+                    name: cal.name || `Schicht ${cal.shortcut?.toUpperCase() || ''}`,
+                    color: cal.color || this._getDefaultColorForShortcut(cal.shortcut),
+                    enabled: cal.enabled === true || cal.enabled === 'true' || cal.enabled === 1,
+                    statusRelevant: cal.statusRelevant === true || cal.statusRelevant === 'true' || cal.statusRelevant === 1,
+                    timeRanges: timeRanges,
+                  };
+                });
+                
+                this._debug(`[Config] set config: ${mergedConfig.calendars.length} Kalender aus Saver geladen`);
+                mergedConfig.calendars.forEach(cal => {
+                  this._debug(`[Config] set config: Kalender "${cal.shortcut}":`, {
+                    name: cal.name,
+                    enabled: cal.enabled,
+                    statusRelevant: cal.statusRelevant,
+                    timeRanges_count: cal.timeRanges?.length || 0,
+                  });
+                });
+                
+                // Verwende die gemergte Konfiguration - diese überschreibt vollständig this._config
+                config = mergedConfig;
+                this._config = mergedConfig;
+                this._debug('[Config] set config: Konfiguration vollständig mit storage_config synchronisiert');
+                this.requestUpdate();
+              } else {
+                this._debug('[Config] set config: Konfiguration konnte nicht geparst werden - erwartetes Format: { calendars: [...] }');
+              }
+            } catch (error) {
+              this._debug('[Config] set config: Fehler beim Parsen der Konfiguration aus dem Storage:', error);
+            }
+          }
+        }).catch(error => {
+          this._debug('[Config] set config: Fehler beim Laden der Konfiguration aus dem Storage:', error);
+        });
+      }
+    }
+    
     this._config = config;
+    this._debug('[Config] set config: Neue Konfiguration erhalten', {
+      store_mode: config?.store_mode,
+      saver_key: config?.saver_key,
+      calendars_count: config?.calendars?.length,
+      hasHass: !!this._hass,
+    });
 
     // Initialisiere _displayedMonths aus der Config
     if (config && config.initialDisplayedMonths) {
@@ -538,16 +682,39 @@ export class ShiftScheduleView extends ViewBase {
       }
     }
 
+    // Wenn hass vorhanden ist, bedeutet das, dass die Karte bereits initialisiert wurde
+    // Setze _isInitialLoad auf false, wenn hass vorhanden ist (Karte ist bereit)
+    if (this._hass && this._isInitialLoad) {
+      this._debug('[Config] set config: hass vorhanden - markiere initialen Load als abgeschlossen');
+      this._isInitialLoad = false;
+    }
+
     if (this._hass) {
+      // Initialisiere Storage-Adapter
+      this._initializeStorage();
+      
       this.loadWorkingDays();
-      // Prüfe Config-Entity und Status-Entity nur bei text_entity Modus
-      // (bei Saver werden diese nicht benötigt)
-      if (this._config && this._config.store_mode !== 'saver') {
-        this.checkConfigEntity();
-        this.checkStatusEntity();
+      // Prüfe Warnungen über Storage-Adapter
+      this._updateWarnings();
+      
+      // Wenn die Konfiguration gesetzt wird und es nicht der initiale Load ist,
+      // speichere die Konfiguration (z.B. wenn der Editor geschlossen wird)
+      // Dies stellt sicher, dass Änderungen im Editor immer gespeichert werden
+      // Prüfe jetzt nochmal, da _isInitialLoad möglicherweise gerade auf false gesetzt wurde
+      const isStillInitialLoad = this._isInitialLoad;
+      if (!isStillInitialLoad && this._config) {
+        this._debug('[Config] set config: Konfiguration wurde gesetzt (nicht initialer Load)');
+        this._debug('[Config] set config: Editor wurde geschlossen - speichere Konfiguration');
+        // Verwende setTimeout, um sicherzustellen, dass die Konfiguration vollständig gesetzt ist
+        setTimeout(() => {
+          this._debug('[Config] set config: Starte saveConfigToEntity() nach setTimeout');
+          this.saveConfigToEntity();
+        }, 0);
+      } else if (isStillInitialLoad) {
+        this._debug('[Config] set config: Initialer Load erkannt - überspringe Speichern');
       }
-      // saveConfigToEntity() wird nur durch config-changed Events aufgerufen,
-      // nicht beim initialen Laden im config Setter
+    } else {
+      this._debug('[Config] set config: hass noch nicht verfügbar - warte auf Initialisierung');
     }
 
     // Markiere initialen Load als abgeschlossen NACH dem ersten Rendering
@@ -559,16 +726,29 @@ export class ShiftScheduleView extends ViewBase {
   // Wird aufgerufen, wenn ein config-changed Event empfangen wird
   // (nur dann wird die Config gespeichert, nicht beim initialen Laden)
   _handleConfigChanged() {
+    this._debug('[Config] _handleConfigChanged: Event empfangen - Konfiguration wurde geändert');
+    
     // Verhindere Speichern beim initialen Load
     if (this._isInitialLoad) {
-      this._debug('[Config] _handleConfigChanged: Initialer Load, überspringe Config-Speichern');
+      this._debug('[Config] _handleConfigChanged: Initialer Load erkannt, überspringe Config-Speichern');
+      this._debug('[Config] _handleConfigChanged: Markiere initialen Load als abgeschlossen');
       // Markiere initialen Load als abgeschlossen NACH dem ersten Event
       this._isInitialLoad = false;
       return;
     }
-    if (this._hass && this._config) {
-      this.saveConfigToEntity();
+    
+    if (!this._hass) {
+      this._debug('[Config] _handleConfigChanged: Abbruch - hass nicht verfügbar');
+      return;
     }
+    
+    if (!this._config) {
+      this._debug('[Config] _handleConfigChanged: Abbruch - config nicht verfügbar');
+      return;
+    }
+    
+    this._debug('[Config] _handleConfigChanged: Starte saveConfigToEntity()');
+    this.saveConfigToEntity();
   }
 
   // Liest eine Saver-Variable (z.B. "Schichtplan" aus saver.saver.attributes.variables)
@@ -579,7 +759,7 @@ export class ShiftScheduleView extends ViewBase {
     }
 
     // Saver-Variablen sind in saver.saver.attributes.variables gespeichert
-    const saverEntity = this._hass.states['saver.saver'];
+    const saverEntity = this._hass?.states?.['saver.saver'];
     if (saverEntity && saverEntity.attributes && saverEntity.attributes.variables) {
       const variables = saverEntity.attributes.variables;
       const variableValue = variables[key];
@@ -677,9 +857,51 @@ export class ShiftScheduleView extends ViewBase {
     return null;
   }
 
+  /**
+   * Aktualisiert Warnungen basierend auf dem Storage-Adapter
+   * @private
+   */
+  _updateWarnings() {
+    if (!this._storage) {
+      return;
+    }
+
+    const warnings = this._storage.getWarnings();
+    if (warnings) {
+      if (warnings.config) {
+        this._configWarning = warnings.config;
+        this._updateConfigWarningDirectly();
+      }
+      if (warnings.status) {
+        this._statusWarning = warnings.status;
+        this._updateStatusWarningDirectly();
+      }
+    } else {
+      // Keine Warnungen - setze auf null
+      if (this._configWarning) {
+        this._configWarning = null;
+        this._updateConfigWarningDirectly();
+      }
+      if (this._statusWarning) {
+        this._statusWarning = null;
+        this._updateStatusWarningDirectly();
+      }
+    }
+  }
+
   async loadWorkingDays() {
     if (!this._hass || !this._config || !this._config.entity) {
       this._debug('[Laden] loadWorkingDays: Kein hass, config oder entity vorhanden');
+      return;
+    }
+
+    // Stelle sicher, dass Storage initialisiert ist
+    if (!this._storage) {
+      this._initializeStorage();
+    }
+
+    if (!this._storage) {
+      this._debug('[Laden] loadWorkingDays: Kein Storage-Adapter verfügbar');
       return;
     }
 
@@ -690,79 +912,62 @@ export class ShiftScheduleView extends ViewBase {
     let dataString = null;
     let dataSource = 'none';
 
-    // Versuche zuerst Saver (wenn store_mode == 'saver')
-    if (this._config.store_mode === 'saver') {
-      this._debug('[Laden] loadWorkingDays: Versuche Daten vom Saver zu laden');
-      const saverData = this._loadDataFromSaver();
-      if (saverData) {
-        dataString = saverData;
-        dataSource = 'saver';
+    // Versuche zuerst den primären Storage-Adapter
+    try {
+      dataString = await this._storage.loadData();
+      if (dataString) {
+        dataSource = this._config.store_mode === 'saver' ? 'saver' : 'entities';
         this._debug(
-          `[Laden] loadWorkingDays: Daten vom Saver geladen, Länge: ${dataString.length} Zeichen`
+          `[Laden] loadWorkingDays: Daten von ${dataSource} geladen, Länge: ${dataString.length} Zeichen`
         );
-      } else {
-        this._debug('[Laden] loadWorkingDays: Keine Daten vom Saver, Fallback zu Entities');
       }
-    } else {
-      this._debug(
-        '[Laden] loadWorkingDays: store_mode ist nicht "saver", lade direkt von Entities'
-      );
+    } catch (error) {
+      this._debug(`[Laden] loadWorkingDays: Fehler beim Laden: ${error.message}`, error);
     }
 
-    // Fallback: Lade von Entities (wenn Saver-Daten fehlen oder store_mode != 'saver')
-    if (!dataString || dataString.trim() === '') {
-      this._debug('[Laden] loadWorkingDays: Lade Daten von Entities');
-      // Ermittle die maximale Länge für alle Entities
-      const maxLengths = this.getAllEntityMaxLengths();
-
-      // Sammle alle Daten-Strings aus der Haupt-Entity und zusätzlichen Entities
-      const dataStrings = [];
-
-      // Prüfe auf zusätzliche Entities (z.B. input_text.arbeitszeiten_001, _002, etc.)
-      const baseEntityId = this._config.entity;
-      const additionalEntities = this.findAdditionalEntities(baseEntityId);
-      this._debug(
-        `[Laden] loadWorkingDays: Gefundene Entities: Haupt: "${baseEntityId}", Zusätzliche: ${additionalEntities.length}`
-      );
-
-      // Speichere die Liste der bekannten Entities für späteres Schreiben
-      // Diese Liste enthält: Haupt-Entity + alle zusätzlichen Entities
-      this._knownEntityIds = [baseEntityId, ...additionalEntities];
-
-      // Lade Daten aus allen Entities (Haupt-Entity + zusätzliche)
-      for (const entityId of this._knownEntityIds) {
-        const entity = this._hass.states[entityId];
-        if (entity && entity.state && entity.state.trim() !== '') {
-          const entityData = entity.state;
-          dataStrings.push(entityData);
+    // Fallback: Wenn Saver-Modus und keine Daten, versuche EntityStorage
+    if ((!dataString || dataString.trim() === '') && this._config.store_mode === 'saver') {
+      this._debug('[Laden] loadWorkingDays: Keine Daten vom Saver, Fallback zu Entities');
+      try {
+        const fallbackStorage = StorageFactory.createStorage(this._hass, { ...this._config, store_mode: 'text_entity' }, this._debug.bind(this));
+        dataString = await fallbackStorage.loadData();
+        if (dataString) {
+          dataSource = 'entities-fallback';
           this._debug(
-            `[Laden] loadWorkingDays: Entity "${entityId}" hat Daten, Länge: ${entityData.length} Zeichen`
-          );
-        } else {
-          this._debug(
-            `[Laden] loadWorkingDays: Entity "${entityId}" ist leer oder nicht vorhanden`
+            `[Laden] loadWorkingDays: Daten von Entities (Fallback) geladen, Länge: ${dataString.length} Zeichen`
           );
         }
+      } catch (error) {
+        this._debug(`[Laden] loadWorkingDays: Fehler beim Fallback-Laden: ${error.message}`, error);
       }
+    }
 
-      // Füge alle Strings zusammen (mit ";" als Trennzeichen)
-      if (dataStrings.length > 0) {
-        dataString = dataStrings.join(';');
-        dataSource = 'entities';
-        this._debug(
-          `[Laden] loadWorkingDays: Daten von Entities kombiniert, Gesamtlänge: ${dataString.length} Zeichen`
-        );
-      } else {
-        this._debug('[Laden] loadWorkingDays: Keine Daten in Entities gefunden');
-      }
+    // Synchronisiere _knownEntityIds mit EntityStorage (falls verwendet)
+    if (this._storage && this._storage._knownEntityIds) {
+      this._knownEntityIds = this._storage._knownEntityIds;
     }
 
     // Parse die Daten (egal ob von Saver oder Entities)
     if (dataString && dataString.trim() !== '') {
       this._debug(`[Laden] loadWorkingDays: Parse Daten von Quelle: "${dataSource}"`);
+      this._debug(`[Laden] loadWorkingDays: Daten-String (erste 200 Zeichen): ${dataString.substring(0, 200)}...`);
       this.parseWorkingDays(dataString);
       const workingDaysCount = Object.keys(this._workingDays).length;
       this._debug(`[Laden] loadWorkingDays: Daten geparst, ${workingDaysCount} Monate gefunden`);
+      this._debug(`[Laden] loadWorkingDays: Verfügbare Keys in _workingDays:`, Object.keys(this._workingDays));
+      // Zeige Details für jeden Monat
+      Object.keys(this._workingDays).forEach(key => {
+        const monthData = this._workingDays[key];
+        if (typeof monthData === 'object' && !Array.isArray(monthData)) {
+          const daysCount = Object.keys(monthData).length;
+          this._debug(`[Laden] loadWorkingDays: Monat "${key}": ${daysCount} Tage mit Daten`);
+          // Zeige erste 5 Tage als Beispiel
+          const sampleDays = Object.keys(monthData).slice(0, 5);
+          sampleDays.forEach(day => {
+            this._debug(`[Laden] loadWorkingDays: Monat "${key}", Tag ${day}:`, monthData[day]);
+          });
+        }
+      });
     } else {
       this._debug(
         '[Laden] loadWorkingDays: Keine Daten zum Parsen vorhanden, setze _workingDays auf {}'
@@ -981,7 +1186,7 @@ export class ShiftScheduleView extends ViewBase {
       const suffix = String(i).padStart(3, '0'); // _001, _002, ..., _999
       const additionalEntityId = `${domain}.${baseName}_${suffix}`;
 
-      if (this._hass.states[additionalEntityId]) {
+      if (this._hass?.states?.[additionalEntityId]) {
         additionalEntities.push(additionalEntityId);
       } else {
         // Wenn eine Entity nicht existiert, breche ab (Entities sind sequenziell)
@@ -998,7 +1203,7 @@ export class ShiftScheduleView extends ViewBase {
       return null;
     }
 
-    const entity = this._hass.states[entityId];
+    const entity = this._hass?.states?.[entityId];
     if (!entity || !entity.attributes) {
       return null;
     }
@@ -1080,7 +1285,7 @@ export class ShiftScheduleView extends ViewBase {
     } else {
       // Lese Längen aus den aktuellen States
       for (const entityId of allEntityIds) {
-        const entity = this._hass.states[entityId];
+        const entity = this._hass?.states?.[entityId];
         if (entity && entity.state) {
           totalCurrentLength += entity.state.length;
         }
@@ -1162,7 +1367,7 @@ export class ShiftScheduleView extends ViewBase {
     }
 
     // Wenn kein hass vorhanden ist (z.B. im Editor), zeige Warnung im Editor-Modus
-    if (!this._hass) {
+    if (!this._hass || !this._hass.states) {
       if (this._isInEditorMode()) {
         this._configWarning = {
           show: true,
@@ -1243,7 +1448,7 @@ export class ShiftScheduleView extends ViewBase {
     }
 
     // Wenn kein hass vorhanden ist (z.B. im Editor), zeige Warnung im Editor-Modus
-    if (!this._hass) {
+    if (!this._hass || !this._hass.states) {
       if (this._isInEditorMode()) {
         this._statusWarning = {
           show: true,
@@ -1313,11 +1518,22 @@ export class ShiftScheduleView extends ViewBase {
 
   // Erstellt die Config-Daten im vollständigen JSON-Format (für Saver)
   _createFullJsonConfig(activeShifts) {
-    // Vollständiges JSON-Format: Array mit Anführungszeichen und null-Werten
-    return JSON.stringify(activeShifts);
+    // Vollständiges JSON-Format: Objekt mit shifts, setup und lastchange
+    // Format: {shifts:[], setup:{}, lastchange:123456789}
+    const configObject = {
+      shifts: activeShifts,
+      setup: {
+        timer_entity: this._config?.entity || '',
+        store_mode: this._config?.store_mode || 'saver',
+      },
+      lastchange: Math.floor(Date.now() / 1000), // Unix-Timestamp (Sekunden seit 1970-01-01)
+    };
+    return JSON.stringify(configObject);
   }
 
   async saveConfigToEntity() {
+    this._debug('[Config] saveConfigToEntity: === START: Speichere Konfiguration ===');
+    
     // Speichere die Konfiguration in der Config-Entity oder im Saver
     // Verhindere Speichern beim initialen Load
     if (this._isInitialLoad) {
@@ -1325,132 +1541,180 @@ export class ShiftScheduleView extends ViewBase {
       return;
     }
     if (!this._hass || !this._config || !this._config.entity) {
+      this._debug('[Config] saveConfigToEntity: Abbruch - hass, config oder entity fehlt', {
+        hasHass: !!this._hass,
+        hasConfig: !!this._config,
+        hasEntity: !!(this._config && this._config.entity),
+      });
       return;
     }
 
-    // Sammle aktive Schichten als Array mit Subarrays [shortcut, name, start1, end1, start2, end2, statusRelevant]
-    // Reihenfolge: [0] = shortcut, [1] = name, [2] = Startzeit 1, [3] = Endzeit 1, [4] = Startzeit 2, [5] = Endzeit 2, [6] = statusRelevant (0 oder 1)
-    // Leere Positionen bleiben leer (null) wenn Zeiträume nicht gesetzt sind
-    const activeShifts = [];
-    if (this._config.calendars) {
-      for (const calendar of this._config.calendars) {
-        if (
-          calendar &&
-          calendar.shortcut &&
-          (calendar.enabled === true || calendar.enabled === 'true' || calendar.enabled === 1)
-        ) {
+    this._debug('[Config] saveConfigToEntity: Prüfe Konfiguration', {
+      store_mode: this._config.store_mode,
+      saver_key: this._config.saver_key,
+      entity: this._config.entity,
+      calendars_count: this._config.calendars ? this._config.calendars.length : 0,
+    });
+
+    // Debug: Zeige alle empfangenen Kalender-Daten
+    if (this._config.calendars && this._config.calendars.length > 0) {
+      this._debug('[Config] saveConfigToEntity: Empfangene Kalender-Daten:', 
+        JSON.stringify(this._config.calendars, null, 2)
+      );
+      this._config.calendars.forEach((cal, index) => {
+        this._debug(`[Config] saveConfigToEntity: Kalender ${index + 1}:`, {
+          shortcut: cal.shortcut,
+          name: cal.name,
+          color: cal.color,
+          enabled: cal.enabled,
+          statusRelevant: cal.statusRelevant,
+          timeRanges_count: cal.timeRanges ? cal.timeRanges.length : 0,
+          timeRanges: cal.timeRanges || []
+        });
+      });
+    } else {
+      this._debug('[Config] saveConfigToEntity: Keine Kalender-Daten vorhanden');
+    }
+
+    // Verwende direkt das calendars-Format vom Config-Panel (keine Konvertierung mehr nötig)
+    const calendars = this._config.calendars || [];
+    
+    this._debug(`[Config] saveConfigToEntity: Speichere ${calendars.length} Kalender im neuen Format (direkt vom Config-Panel)`);
+    
+    // Debug: Zeige alle Kalender-Daten
+    calendars.forEach((cal, index) => {
+      this._debug(`[Config] saveConfigToEntity: Kalender ${index + 1}:`, {
+        shortcut: cal.shortcut,
+        name: cal.name,
+        color: cal.color,
+        enabled: cal.enabled,
+        statusRelevant: cal.statusRelevant,
+        timeRanges_count: cal.timeRanges ? cal.timeRanges.length : 0,
+        timeRanges: cal.timeRanges || []
+      });
+    });
+
+    // Stelle sicher, dass Storage initialisiert ist
+    if (!this._storage) {
+      this._debug('[Config] saveConfigToEntity: Storage nicht initialisiert, initialisiere...');
+      this._initializeStorage();
+    }
+
+    if (!this._storage) {
+      this._debug('[Config] saveConfigToEntity: Kein Storage-Adapter verfügbar');
+      return;
+    }
+
+    this._debug('[Config] saveConfigToEntity: Storage-Adapter gefunden, starte Speichern...', {
+      storageType: this._config.store_mode,
+      storageAdapter: this._storage.constructor.name
+    });
+
+    try {
+      // Verwende Storage-Adapter zum Speichern der Config
+      // Für Saver: Direkt calendars-Format verwenden
+      // Für Entity: Konvertierung zu komprimiertem Format (bleibt unverändert)
+      this._debug('[Config] saveConfigToEntity: Rufe _storage.saveConfig() auf...');
+      if (this._config.store_mode === 'saver') {
+        // Saver: Direkt calendars-Format verwenden
+        await this._storage.saveConfig(calendars);
+      } else {
+        // Entity: Konvertierung zu komprimiertem Format (für Rückwärtskompatibilität)
+        // TODO: Könnte später auch auf calendars-Format umgestellt werden
+        const allShifts = this._convertCalendarsToShifts(calendars);
+        await this._storage.saveConfig(allShifts);
+      }
+      
+      // Aktualisiere Warnungen
+      this._updateWarnings();
+      
+      this._debug('[Config] saveConfigToEntity: === ENDE: Erfolgreich gespeichert ===');
+    } catch (error) {
+      // Fehler beim Schreiben - versuche Fallback
+      this._debug(`[Config] saveConfigToEntity: === FEHLER === Beim Schreiben: ${error.message}`, error);
+      
+      // Fallback: Wenn SaverStorage fehlschlägt, versuche EntityStorage
+      if (this._config.store_mode === 'saver') {
+        this._debug('[Config] saveConfigToEntity: Fallback zu EntityStorage');
+        try {
+          const fallbackStorage = StorageFactory.createStorage(this._hass, { ...this._config, store_mode: 'text_entity' }, this._debug.bind(this));
+          // Entity-Storage benötigt komprimiertes Format
+          const allShifts = this._convertCalendarsToShifts(calendars);
+          await fallbackStorage.saveConfig(allShifts);
+          this._updateWarnings();
+        } catch (fallbackError) {
+          this._debug(`[Config] saveConfigToEntity: Auch Fallback fehlgeschlagen: ${fallbackError.message}`, fallbackError);
+          this.checkConfigEntity();
+        }
+      } else {
+        this.checkConfigEntity();
+      }
+    }
+  }
+
+  /**
+   * Konvertiert calendars-Format zu komprimiertem shifts-Format (für Entity-Storage)
+   * @private
+   */
+  _convertCalendarsToShifts(calendars) {
+    const allShifts = [];
+    if (calendars && Array.isArray(calendars)) {
+      for (const calendar of calendars) {
+        if (calendar && calendar.shortcut) {
+          const isEnabled = calendar.enabled === true || calendar.enabled === 'true' || calendar.enabled === 1;
           const shiftData = [
             calendar.shortcut,
             calendar.name || `Schicht ${calendar.shortcut.toUpperCase()}`,
           ];
 
-          // Füge Zeiträume hinzu (feste Positionen, flach ohne Verschachtelung)
-          if (calendar.timeRanges && Array.isArray(calendar.timeRanges)) {
-            // Zeitraum 1: [2] = Startzeit 1, [3] = Endzeit 1
+          // Konvertiere Zeiträume vom neuen Format zu altem Format
+          if (calendar.timeRanges && Array.isArray(calendar.timeRanges) && calendar.timeRanges.length > 0) {
+            // Zeitraum 1
             const range1 = calendar.timeRanges[0];
-            if (range1 && Array.isArray(range1) && range1.length >= 2) {
-              const start1 = range1[0] && range1[0].trim() !== '' ? range1[0].trim() : null;
-              const end1 = range1[1] && range1[1].trim() !== '' ? range1[1].trim() : null;
-              // Nur hinzufügen wenn beide Zeiten gesetzt sind (vollständiger Zeitraum)
-              if (start1 && end1) {
-                shiftData.push(start1, end1);
-              } else {
-                shiftData.push(null, null);
+            let start1 = null;
+            let end1 = null;
+            if (range1) {
+              if (typeof range1 === 'object' && range1.times && Array.isArray(range1.times)) {
+                start1 = range1.times[0] && range1.times[0].trim() !== '' ? range1.times[0].trim() : null;
+                end1 = range1.times[1] && range1.times[1].trim() !== '' ? range1.times[1].trim() : null;
+              } else if (Array.isArray(range1) && range1.length >= 2) {
+                start1 = range1[0] && range1[0].trim() !== '' ? range1[0].trim() : null;
+                end1 = range1[1] && range1[1].trim() !== '' ? range1[1].trim() : null;
               }
-            } else {
-              shiftData.push(null, null);
             }
+            shiftData.push(start1, end1);
 
-            // Zeitraum 2: [4] = Startzeit 2, [5] = Endzeit 2
+            // Zeitraum 2
             const range2 = calendar.timeRanges[1];
-            if (range2 && Array.isArray(range2) && range2.length >= 2) {
-              const start2 = range2[0] && range2[0].trim() !== '' ? range2[0].trim() : null;
-              const end2 = range2[1] && range2[1].trim() !== '' ? range2[1].trim() : null;
-              // Nur hinzufügen wenn beide Zeiten gesetzt sind (vollständiger Zeitraum)
-              if (start2 && end2) {
-                shiftData.push(start2, end2);
-              } else {
-                shiftData.push(null, null);
+            let start2 = null;
+            let end2 = null;
+            if (range2) {
+              if (typeof range2 === 'object' && range2.times && Array.isArray(range2.times)) {
+                start2 = range2.times[0] && range2.times[0].trim() !== '' ? range2.times[0].trim() : null;
+                end2 = range2.times[1] && range2.times[1].trim() !== '' ? range2.times[1].trim() : null;
+              } else if (Array.isArray(range2) && range2.length >= 2) {
+                start2 = range2[0] && range2[0].trim() !== '' ? range2[0].trim() : null;
+                end2 = range2[1] && range2[1].trim() !== '' ? range2[1].trim() : null;
               }
-            } else {
-              shiftData.push(null, null);
             }
+            shiftData.push(start2, end2);
           } else {
-            // Keine Zeiträume definiert, füge leere Positionen hinzu
             shiftData.push(null, null, null, null);
           }
 
-          // Füge statusRelevant hinzu: [6] = statusRelevant (0 oder 1)
-          // Default: true (1), wenn nicht explizit auf false gesetzt
+          // statusRelevant
           const statusRelevant = calendar.statusRelevant !== false ? 1 : 0;
           shiftData.push(statusRelevant);
 
-          activeShifts.push(shiftData);
+          // enabled
+          const enabled = isEnabled ? 1 : 0;
+          shiftData.push(enabled);
+
+          allShifts.push(shiftData);
         }
       }
     }
-
-    this._debug(`[Config] saveConfigToEntity: ${activeShifts.length} aktive Schichten gefunden`);
-
-    // Unterschiedliche Formate je nach store_mode
-    if (this._config.store_mode === 'saver') {
-      // Saver: Vollständiges JSON-Format
-      const saverKey = this._config.saver_key || 'Schichtplan';
-      const configKey = `${saverKey}_config`;
-      const configJson = this._createFullJsonConfig(activeShifts);
-      this._debug(
-        `[Config] saveConfigToEntity: Speichere Config in Saver "${configKey}", Länge: ${configJson.length} Zeichen (vollständiges JSON)`
-      );
-
-      try {
-        // Prüfe ob die Saver-Variable existiert und ob sich der Wert geändert hat
-        // Suche in saver.saver.attributes.variables (nicht als direkte Entity)
-        const saverEntity = this._hass.states['saver.saver'];
-        let oldValue = '';
-
-        if (saverEntity && saverEntity.attributes && saverEntity.attributes.variables) {
-          const existingValue = saverEntity.attributes.variables[configKey];
-          if (existingValue !== undefined && existingValue !== null) {
-            oldValue = String(existingValue).trim();
-          }
-        }
-
-        this._debug(
-          `[Config] saveConfigToEntity: Saver-Variable "${configKey}" existiert: ${oldValue !== ''}, alte Länge: ${oldValue.length} Zeichen`
-        );
-
-        // Nur schreiben wenn Variable nicht existiert oder Wert sich geändert hat
-        if (oldValue === '' || oldValue !== configJson) {
-          this._debug(
-            `[Config] saveConfigToEntity: Schreibe Config in Saver (Variable existiert nicht oder Wert hat sich geändert)`
-          );
-          await this._hass.callService('saver', 'set_variable', {
-            name: configKey,
-            value: configJson,
-          });
-          this._debug(`[Config] saveConfigToEntity: Erfolgreich in Saver geschrieben`);
-        } else {
-          this._debug(
-            `[Config] saveConfigToEntity: Kein Schreiben nötig, Wert hat sich nicht geändert`
-          );
-        }
-        // Warnung entfernen, da Saver erfolgreich beschrieben wurde
-        this._configWarning = null;
-        this._updateConfigWarningDirectly();
-      } catch (error) {
-        // Fehler beim Schreiben - könnte bedeuten, dass Saver nicht verfügbar ist
-        // Fallback: Versuche Entity
-        this._debug(
-          `[Config] saveConfigToEntity: Fehler beim Schreiben in Saver, Fallback zu Entity: ${error.message}`,
-          error
-        );
-        this._saveConfigToEntityFallback(activeShifts);
-      }
-    } else {
-      // text_entity: Komprimiertes Format
-      this._debug(`[Config] saveConfigToEntity: Speichere Config in Entity (komprimiertes Format)`);
-      this._saveConfigToEntityFallback(activeShifts);
-    }
+    return allShifts;
   }
 
   async _saveConfigToEntityFallback(activeShifts) {
@@ -1969,28 +2233,63 @@ export class ShiftScheduleView extends ViewBase {
   async _saveToHA() {
     try {
       this._debug('[Speichern] _saveToHA: Start');
+      
+      // Stelle sicher, dass Storage initialisiert ist
+      if (!this._storage) {
+        this._initializeStorage();
+      }
+      
+      if (!this._storage) {
+        this._debug('[Speichern] _saveToHA: Kein Storage-Adapter verfügbar');
+        return;
+      }
+
       const serializedData = this.serializeWorkingDays();
       this._debug(
         `[Speichern] _saveToHA: Daten serialisiert, Länge: ${serializedData.length} Zeichen, store_mode: "${this._config.store_mode}"`
       );
 
-      // Unterschiedliche Speicherung je nach store_mode
-      if (this._config.store_mode === 'saver') {
-        // Saver-Modus: Schreibe direkt in Saver-Variable
-        this._debug('[Speichern] _saveToHA: Speichere in Saver');
-        await this._saveDataToSaver(serializedData);
-      } else {
-        // text_entity-Modus: Verteile die Daten auf mehrere Entities, falls nötig
-        this._debug('[Speichern] _saveToHA: Speichere in Entities');
-        await this.distributeDataToEntities(serializedData);
+      // Setze Schreib-Lock
+      this._isWriting = true;
+      if (this._writeLockTimer) {
+        clearTimeout(this._writeLockTimer);
       }
 
-      // Prüfe Speicherverbrauch nach dem Toggle (nur bei text_entity)
-      // Verwende die Länge der serialisierten Daten, da die States noch nicht aktualisiert sind
-      if (this._config.store_mode !== 'saver') {
-        this.checkStorageUsage(serializedData.length);
+      try {
+        // Verwende Storage-Adapter zum Speichern
+        await this._storage.saveData(serializedData);
+        
+        // Prüfe Speicherverbrauch (nur für EntityStorage relevant)
+        const storageUsage = this._storage.checkStorageUsage(serializedData.length);
+        if (storageUsage) {
+          this._storageWarning = storageUsage;
+          this._updateStorageWarningDirectly();
+        } else {
+          this._storageWarning = null;
+          this._updateStorageWarningDirectly();
+        }
+        
+        this._debug('[Speichern] _saveToHA: Erfolgreich abgeschlossen');
+      } catch (error) {
+        // Fehler beim Speichern - versuche Fallback
+        this._debug(`[Speichern] _saveToHA: Fehler beim Speichern, versuche Fallback: ${error.message}`, error);
+        
+        // Fallback: Wenn SaverStorage fehlschlägt, versuche EntityStorage
+        if (this._config.store_mode === 'saver') {
+          this._debug('[Speichern] _saveToHA: Fallback zu EntityStorage');
+          const fallbackStorage = StorageFactory.createStorage(this._hass, { ...this._config, store_mode: 'text_entity' }, this._debug.bind(this));
+          await fallbackStorage.saveData(serializedData);
+        } else {
+          throw error; // Bei EntityStorage gibt es keinen Fallback
+        }
+      } finally {
+        // Setze Timer für Schreib-Lock (5 Sekunden)
+        this._writeLockTimer = setTimeout(() => {
+          this._isWriting = false;
+          this._writeLockTimer = null;
+          this._debug('[Speichern] _saveToHA: Schreib-Lock entfernt');
+        }, 5000);
       }
-      this._debug('[Speichern] _saveToHA: Erfolgreich abgeschlossen');
     } catch (error) {
       this._debug(`[Speichern] _saveToHA: Fehler beim Speichern: ${error.message}`, error);
       console.error('[TG Schichtplan] Fehler beim Speichern:', error);
@@ -2013,7 +2312,7 @@ export class ShiftScheduleView extends ViewBase {
     try {
       // Prüfe ob die Saver-Variable existiert und ob sich der Wert geändert hat
       // Saver-Variablen sind in saver.saver.attributes.variables gespeichert
-      const saverEntity = this._hass.states['saver.saver'];
+      const saverEntity = this._hass?.states?.['saver.saver'];
       let oldValue = '';
 
       if (saverEntity && saverEntity.attributes && saverEntity.attributes.variables) {
@@ -2557,6 +2856,12 @@ export class ShiftScheduleView extends ViewBase {
     return this._config.calendars.find(cal => cal.shortcut === shortcut) || null;
   }
 
+  _getDefaultColorForShortcut(shortcut) {
+    // Gibt die Standardfarbe für einen gegebenen Shortcut zurück
+    const defaultCalendar = ShiftScheduleView.CALENDARS.find(cal => cal.shortcut === shortcut);
+    return defaultCalendar ? defaultCalendar.defaultColor : '#ff9800';
+  }
+
   _getAllCalendars() {
     // Gibt nur aktivierte Kalender zurück
     if (!this._config?.calendars) {
@@ -2676,7 +2981,8 @@ export class ShiftScheduleView extends ViewBase {
 
       if (!monthKey || !dayNum || !yearKey) return;
 
-      const key = `${yearKey}:${monthKey}`;
+      // Formatiere den Key mit formatTwoDigits, damit er mit den gespeicherten Daten übereinstimmt
+      const key = `${this.formatTwoDigits(parseInt(yearKey))}:${this.formatTwoDigits(parseInt(monthKey))}`;
       const dayElements = this._getDayElements(key, dayNum);
       const hasSelectedShift = selectedShortcut && dayElements.includes(selectedShortcut);
 
@@ -2985,16 +3291,33 @@ export class ShiftScheduleView extends ViewBase {
 
   _getDayElements(monthKey, day) {
     // Gibt die Elemente für einen bestimmten Tag zurück
+    // Reduziere Debug-Ausgaben: Nur bei ersten 3 Tagen oder wenn keine Daten gefunden werden
+    const shouldDebug = day <= 3 || !this._workingDays[monthKey];
+    
+    if (shouldDebug) {
+      this._debug(`[Render] _getDayElements: Suche nach monthKey="${monthKey}", day=${day}`);
+    }
+    
     if (!this._workingDays[monthKey] || typeof this._workingDays[monthKey] !== 'object') {
+      if (shouldDebug) {
+        this._debug(`[Render] _getDayElements: Keine Daten für monthKey="${monthKey}" gefunden oder kein Objekt`);
+        this._debug(`[Render] _getDayElements: Verfügbare Keys in _workingDays:`, Object.keys(this._workingDays));
+      }
       return [];
     }
 
     if (Array.isArray(this._workingDays[monthKey])) {
       // Altes Format: Array von Tagen
+      if (shouldDebug) {
+        this._debug(`[Render] _getDayElements: Altes Format (Array) für monthKey="${monthKey}"`);
+      }
       return [];
     }
 
     const elements = this._workingDays[monthKey][day] || [];
+    if (shouldDebug && elements.length > 0) {
+      this._debug(`[Render] _getDayElements: Gefundene Elemente für "${monthKey}", Tag ${day}:`, elements);
+    }
 
     return elements;
   }
@@ -3012,6 +3335,7 @@ export class ShiftScheduleView extends ViewBase {
       '_storageWarning',
       '_configWarning',
       '_statusWarning',
+      '_showConfigPanel',
     ];
 
     // Wenn nur _workingDays geändert wurde und direkte DOM-Updates im Gange sind,
@@ -3061,6 +3385,7 @@ export class ShiftScheduleView extends ViewBase {
 
     return html`
       <div class="calendar-wrapper ${hasStorageWarning ? 'storage-warning-active' : ''}">
+        <div class="schichtplan-wrapper">
         ${hasStorageWarning
           ? html`
               <div class="storage-warning" data-warning-type="storage">
@@ -3141,115 +3466,130 @@ export class ShiftScheduleView extends ViewBase {
               </div>
             `
           : ''}
-        <div class="menu-bar">
-          <button
-            class="menu-button navigation-button"
-            @click=${() => this.changeStartMonth(-1)}
-            ?disabled=${!navBounds.canGoBack}
-            title="Vorheriger Monat"
-          >
-            ←
-          </button>
-          <button
-            class="menu-button decrease-button"
-            @click=${() => this.changeDisplayedMonths(-1)}
-            ?disabled=${displayedMonths <= 1}
-            title="Weniger Monate anzeigen"
-          >
-            −
-          </button>
-          <div class="menu-number">${displayedMonths}</div>
-          <button
-            class="menu-button increase-button"
-            @click=${() => this.changeDisplayedMonths(1)}
-            ?disabled=${displayedMonths >= maxMonths}
-            title="Mehr Monate anzeigen"
-          >
-            +
-          </button>
-          <button
-            class="menu-button navigation-button"
-            @click=${() => this.changeStartMonth(1)}
-            ?disabled=${!navBounds.canGoForward}
-            title="Nächster Monat"
-          >
-            →
-          </button>
-          ${(() => {
-            const allCalendars = this._getAllCalendars();
-            const selectedValue = this._getSelectedCalendarValue();
-            return html`
-              <div class="calendar-selector">
-                <ha-select
-                  .value=${selectedValue || 'a'}
-                  @selected=${e => {
-                    try {
-                      // Verhindere Event-Propagation zu Home Assistant's Card-Picker
-                      if (e) {
-                        if (typeof e.stopPropagation === 'function') {
+        ${!this._showConfigPanel
+          ? html`
+              <div class="schichtplan-wrapper">
+                <div class="schichtplan-menu-bar">
+                  ${renderMenuBar({
+                    left: '',
+                    center: html`
+                      <div class="menu-controls">
+                        <button
+                          class="menu-button navigation-button"
+                          @click=${() => this.changeStartMonth(-1)}
+                          ?disabled=${!navBounds.canGoBack}
+                          title="Vorheriger Monat"
+                        >
+                          ←
+                        </button>
+                        <button
+                          class="menu-button decrease-button"
+                          @click=${() => this.changeDisplayedMonths(-1)}
+                          ?disabled=${displayedMonths <= 1}
+                          title="Weniger Monate anzeigen"
+                        >
+                          −
+                        </button>
+                        <div class="menu-number">${displayedMonths}</div>
+                        <button
+                          class="menu-button increase-button"
+                          @click=${() => this.changeDisplayedMonths(1)}
+                          ?disabled=${displayedMonths >= maxMonths}
+                          title="Mehr Monate anzeigen"
+                        >
+                          +
+                        </button>
+                        <button
+                          class="menu-button navigation-button"
+                          @click=${() => this.changeStartMonth(1)}
+                          ?disabled=${!navBounds.canGoForward}
+                          title="Nächster Monat"
+                        >
+                          →
+                        </button>
+                      </div>
+                    `,
+                    right: html`
+                      <button
+                        class="menu-button config-button"
+                        @click=${e => {
                           e.stopPropagation();
-                        }
-                        if (typeof e.stopImmediatePropagation === 'function') {
-                          e.stopImmediatePropagation();
-                        }
-                      }
-
-                      if (!e || !e.detail) {
-                        return;
-                      }
-
-                      const index = e.detail.index;
-                      if (
-                        index !== undefined &&
-                        index !== null &&
-                        index >= 0 &&
-                        allCalendars &&
-                        allCalendars[index]
-                      ) {
-                        const selectedCalendar = allCalendars[index];
-                        if (selectedCalendar && selectedCalendar.shortcut) {
-                          if (typeof this._onCalendarSelectedByIndex === 'function') {
-                            this._onCalendarSelectedByIndex(selectedCalendar.shortcut);
-                          }
-                        }
-                      }
-                    } catch (error) {
-                      console.error('Error in calendar selection handler:', error);
-                    }
-                  }}
-                  naturalMenuWidth
-                  fixedMenuPosition
-                >
-                  ${allCalendars.map(calendar => {
-                    const bgColor = calendar.color || '';
-                    const textColor = calendar.color ? this._getContrastColor(calendar.color) : '';
-                    return html`
-                      <mwc-list-item
-                        value="${calendar.shortcut}"
-                        data-calendar-color="${bgColor}"
-                        data-calendar-text-color="${textColor}"
-                        style="${bgColor
-                          ? `--calendar-bg-color: ${bgColor}; --calendar-text-color: ${textColor};`
-                          : ''}"
+                          e.preventDefault();
+                          this._showConfigPanel = true;
+                          this.requestUpdate();
+                        }}
+                        title="Schichtkonfiguration"
                       >
-                        ${calendar.name || `Schicht ${calendar.shortcut.toUpperCase()}`}
-                      </mwc-list-item>
-                    `;
+                        ⚙️
+                      </button>
+                    `,
+                    fullWidth: (() => {
+                      const allCalendars = this._getAllCalendars();
+                      const selectedShortcut = this._getSelectedCalendarShortcut();
+                      return html`
+                        <div class="color-bar">
+                          ${allCalendars.map(calendar => {
+                            const isSelected = calendar.shortcut === selectedShortcut;
+                            const textColor = this._getContrastColor(calendar.color || '#ff9800');
+                            return html`
+                              <button
+                                class="color-button ${isSelected ? 'selected' : ''}"
+                                style="background-color: ${calendar.color || '#ff9800'}; color: ${textColor};"
+                                @click=${() => this._onCalendarSelectedByIndex(calendar.shortcut)}
+                                title="${calendar.name || `Schicht ${calendar.shortcut.toUpperCase()}`}"
+                              >${calendar.name || `Schicht ${calendar.shortcut.toUpperCase()}`}</button>
+                            `;
+                          })}
+                        </div>
+                      `;
+                    })(),
                   })}
-                </ha-select>
+                </div>
+                <div class="schichtplan-panel">
+                  ${months.map(({ year, month }) => this.renderMonth(year, month))}
+                </div>
               </div>
-            `;
-          })()}
-        </div>
-        <div class="calendar-container">
-          ${months.map(({ year, month }) => this.renderMonth(year, month))}
-        </div>
+            `
+          : html``}
+        ${this._showConfigPanel
+          ? html`
+              <div class="config-wrapper">
+                <shift-config-panel
+                  .calendars=${this._config?.calendars || []}
+                  .selectedShortcut=${this._getSelectedCalendarShortcut()}
+                  .hass=${this._hass}
+                  @close=${() => {
+                    this._showConfigPanel = false;
+                    this.requestUpdate();
+                  }}
+                  @save=${e => this._handleConfigPanelSave(e.detail.calendars)}
+                ></shift-config-panel>
+              </div>
+            `
+          : html``}
       </div>
     `;
   }
 
+  _handleConfigPanelSave(calendars) {
+    // Aktualisiere die Config mit den neuen Kalendern
+    if (this._config) {
+      this._config.calendars = calendars;
+      
+      // Speichere nur über Saver (nicht über Editor)
+      this.saveConfigToEntity();
+      
+      // Schließe das Panel
+      this._showConfigPanel = false;
+      
+      // Aktualisiere die Ansicht
+      this.requestUpdate();
+    }
+  }
+
   static styles = [
     super.styles || [],
+    sharedMenuStyles,
     css`
       :host {
         display: block;
@@ -3270,53 +3610,27 @@ export class ShiftScheduleView extends ViewBase {
         box-shadow: 0 0 10px rgba(244, 67, 54, 0.3);
       }
 
-      .menu-bar {
+      .schichtplan-wrapper {
         display: flex;
-        align-items: center;
-        justify-content: center;
+        flex-direction: column;
+        gap: 0;
+        margin-bottom: 16px;
+      }
+
+      .schichtplan-menu-bar,
+      .config-menu-bar {
+        position: relative;
+        display: flex;
+        flex-direction: column;
         gap: 12px;
         padding: 12px;
-        margin-bottom: 16px;
         background-color: var(--card-background-color, #ffffff);
-        border-radius: 4px;
+        border-radius: 4px 4px 0 0;
         border: 1px solid var(--divider-color, #e0e0e0);
-        flex-wrap: wrap;
+        border-bottom: none;
       }
 
-      .menu-button {
-        width: 32px;
-        height: 32px;
-        border-radius: 4px;
-        border: 1px solid var(--divider-color, #e0e0e0);
-        background-color: var(--primary-color, #03a9f4);
-        color: var(--text-primary-color, #ffffff);
-        font-size: 20px;
-        font-weight: bold;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        transition:
-          background-color 0.2s ease,
-          opacity 0.2s ease;
-      }
-
-      .menu-button.navigation-button {
-        background-color: var(--secondary-color, #757575);
-      }
-
-      .menu-button.navigation-button:hover:not(:disabled) {
-        background-color: var(--secondary-color-dark, #616161);
-      }
-
-      .menu-button:hover:not(:disabled) {
-        background-color: var(--primary-color-dark, #0288d1);
-      }
-
-      .menu-button:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
-      }
+      /* Gemeinsame Menu-Styles und Farbleisten-Styles werden aus shared-menu-styles.js importiert */
 
       .menu-number {
         font-size: 18px;
@@ -3331,54 +3645,35 @@ export class ShiftScheduleView extends ViewBase {
         min-width: 200px;
       }
 
-      .calendar-selector {
-        flex: 1;
-        min-width: 0;
-        max-width: 100%;
-        margin-left: 12px;
+      .config-button {
+        font-size: 20px;
+        background: none !important;
+        border: none !important;
+        color: var(--primary-text-color, #212121) !important;
+        width: auto !important;
+        height: auto !important;
+        padding: 4px !important;
       }
 
-      .calendar-selector ha-select {
-        width: 100%;
-        max-width: 100%;
+      .config-button:hover {
+        background: none !important;
+        color: var(--primary-color, #03a9f4) !important;
+        transform: scale(1.1);
       }
 
-      /* Stelle sicher, dass alle Items die Schichtfarbe als Hintergrund haben */
-      .calendar-selector mwc-list-item[data-calendar-color] {
-        background-color: var(--calendar-bg-color) !important;
-        color: var(--calendar-text-color) !important;
-      }
-
-      /* Stelle sicher, dass auch das ausgewählte/aktivierte Item die Schichtfarbe behält */
-      .calendar-selector mwc-list-item[data-calendar-color][selected],
-      .calendar-selector mwc-list-item[data-calendar-color][activated],
-      .calendar-selector mwc-list-item[data-calendar-color].selected,
-      .calendar-selector mwc-list-item[data-calendar-color].activated {
-        background-color: var(--calendar-bg-color) !important;
-        color: var(--calendar-text-color) !important;
-        --mdc-list-item-selected-background-color: var(--calendar-bg-color) !important;
-        --mdc-list-item-activated-background-color: var(--calendar-bg-color) !important;
-      }
-
-      /* Überschreibe die Standard-Hintergrundfarbe für ausgewählte Items (::before Pseudo-Element) */
-      .calendar-selector mwc-list-item[data-calendar-color][selected]::before,
-      .calendar-selector mwc-list-item[data-calendar-color][activated]::before,
-      .calendar-selector mwc-list-item[data-calendar-color].selected::before,
-      .calendar-selector mwc-list-item[data-calendar-color].activated::before {
-        background-color: var(--calendar-bg-color) !important;
-        opacity: 1 !important;
-      }
-
-      /* Überschreibe auch für den Hover-State */
-      .calendar-selector mwc-list-item[data-calendar-color]:hover {
-        background-color: var(--calendar-bg-color) !important;
-        opacity: 0.9 !important;
-      }
-
-      .calendar-container {
+      .schichtplan-panel {
         display: flex;
         flex-direction: column;
         gap: 24px;
+        padding: 12px;
+        background-color: var(--card-background-color, #ffffff);
+        border-radius: 0 0 4px 4px;
+        border: 1px solid var(--divider-color, #e0e0e0);
+        border-top: none;
+      }
+
+      .config-wrapper {
+        margin-bottom: 16px;
       }
 
       .month-container {
