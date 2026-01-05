@@ -484,102 +484,9 @@ export class ShiftScheduleView extends ViewBase {
   set config(config) {
     this._debug('[Config] set config: === WIRD AUFGERUFEN ===');
     this._debug('[Config] set config: _isInitialLoad Status:', this._isInitialLoad);
-    const wasInitialLoad = this._isInitialLoad;
     
-    // Lade Konfiguration aus dem Storage, wenn store_mode == 'saver' und hass verfügbar ist
-    // ABER: Nur beim initialen Laden, nicht wenn die Konfiguration vom Editor kommt
-    // (beim Editor-Schließen wird die Konfiguration gespeichert, dann sollte sie nicht wieder überschrieben werden)
-    if (config && config.store_mode === 'saver' && this._hass && wasInitialLoad) {
-      this._debug('[Config] set config: Initialer Load - lade Konfiguration aus dem Storage und merge mit übergebener Config');
-      // Initialisiere Storage, falls noch nicht geschehen
-      if (!this._storage) {
-        this._initializeStorage();
-      }
-      if (this._storage) {
-        // Verwende Promise, da set config() nicht async ist
-        this._storage.loadConfig().then(storageConfig => {
-          if (storageConfig) {
-            try {
-              const parsedConfig = JSON.parse(storageConfig);
-              
-              // Neues Format: Objekt mit "calendars" Property
-              if (parsedConfig && typeof parsedConfig === 'object' && Array.isArray(parsedConfig.calendars)) {
-                this._debug('[Config] set config: Konfiguration aus Saver geparst (neues Format mit calendars)');
-                
-                // Starte mit der bestehenden internen Konfiguration (falls vorhanden) oder der übergebenen Config
-                // Die übergebene Config hat Vorrang für Darstellungsparameter
-                const mergedConfig = {
-                  ...this._config, // Starte mit bestehender interner Konfiguration
-                  ...config, // Überschreibe mit übergebener Config (Darstellungsparameter)
-                };
-                
-                // Ersetze calendars vollständig mit den geladenen Kalendern aus dem Saver
-                mergedConfig.calendars = parsedConfig.calendars.map(cal => {
-                  // Stelle sicher, dass timeRanges im korrekten Format sind
-                  let timeRanges = [];
-                  if (cal.timeRanges && Array.isArray(cal.timeRanges)) {
-                    timeRanges = cal.timeRanges.map((range, idx) => {
-                      // Prüfe zuerst, ob es ein Array ist (altes Format)
-                      if (Array.isArray(range)) {
-                        // Altes Format: [start, end] - konvertiere zu neuem Format
-                        this._debug(`[Config] set config: Zeitraum ${idx} für "${cal.shortcut}": Altes Format [start, end] erkannt`);
-                        return {
-                          id: null,
-                          times: [...range],
-                        };
-                      } else if (typeof range === 'object' && range !== null && range.times && Array.isArray(range.times)) {
-                        // Neues Format: { id, times: [start, end] }
-                        const normalizedRange = {
-                          id: range.id || null,
-                          times: [...range.times],
-                        };
-                        this._debug(`[Config] set config: Zeitraum ${idx} für "${cal.shortcut}": Neues Format erkannt, id="${normalizedRange.id}", times=[${normalizedRange.times.join(',')}]`);
-                        return normalizedRange;
-                      } else {
-                        this._debug(`[Config] set config: Zeitraum ${idx} für "${cal.shortcut}": Unbekanntes Format, verwende Default`);
-                        return { id: null, times: [null, null] };
-                      }
-                    });
-                  }
-                  
-                  return {
-                    shortcut: cal.shortcut,
-                    name: cal.name || `Schicht ${cal.shortcut?.toUpperCase() || ''}`,
-                    color: cal.color || this._getDefaultColorForShortcut(cal.shortcut),
-                    enabled: cal.enabled === true || cal.enabled === 'true' || cal.enabled === 1,
-                    statusRelevant: cal.statusRelevant === true || cal.statusRelevant === 'true' || cal.statusRelevant === 1,
-                    timeRanges: timeRanges,
-                  };
-                });
-                
-                this._debug(`[Config] set config: ${mergedConfig.calendars.length} Kalender aus Saver geladen`);
-                mergedConfig.calendars.forEach(cal => {
-                  this._debug(`[Config] set config: Kalender "${cal.shortcut}":`, {
-                    name: cal.name,
-                    enabled: cal.enabled,
-                    statusRelevant: cal.statusRelevant,
-                    timeRanges_count: cal.timeRanges?.length || 0,
-                  });
-                });
-                
-                // Verwende die gemergte Konfiguration - diese überschreibt vollständig this._config
-                config = mergedConfig;
-                this._config = mergedConfig;
-                this._debug('[Config] set config: Konfiguration vollständig mit storage_config synchronisiert');
-                this.requestUpdate();
-              } else {
-                this._debug('[Config] set config: Konfiguration konnte nicht geparst werden - erwartetes Format: { calendars: [...] }');
-              }
-            } catch (error) {
-              this._debug('[Config] set config: Fehler beim Parsen der Konfiguration aus dem Storage:', error);
-            }
-          }
-        }).catch(error => {
-          this._debug('[Config] set config: Fehler beim Laden der Konfiguration aus dem Storage:', error);
-        });
-      }
-    }
-    
+    // Editor und View sind unabhängig: Editor verwendet nur YAML-Config, View lädt Schichtdaten aus Saver
+    // Die übergebene Config wird direkt verwendet, ohne Merge mit Saver-Config
     this._config = config;
     this._debug('[Config] set config: Neue Konfiguration erhalten', {
       store_mode: config?.store_mode,
@@ -602,8 +509,6 @@ export class ShiftScheduleView extends ViewBase {
     }
 
     // Initialisiere _selectedCalendar - prüfe nur aktivierte Kalender
-    // Setze _config zuerst, damit _getAllCalendars() funktioniert
-    this._config = config;
     const allCalendars = this._getAllCalendars();
 
     // Synchronisiere _selectedCalendar immer mit config.selectedCalendar
@@ -619,16 +524,6 @@ export class ShiftScheduleView extends ViewBase {
           this._selectedCalendar = allCalendars[0].shortcut;
           if (config) {
             config.selectedCalendar = this._selectedCalendar;
-            // Nur config-changed Event auslösen, wenn nicht initialer Load
-            if (!wasInitialLoad) {
-              this.dispatchEvent(
-                new CustomEvent('config-changed', {
-                  detail: { config: config },
-                  bubbles: true,
-                  composed: true,
-                })
-              );
-            }
           }
         } else {
           // Ausgewählter Kalender ist nicht aktiviert, verwende den ersten aktivierten
@@ -636,16 +531,6 @@ export class ShiftScheduleView extends ViewBase {
             this._selectedCalendar = allCalendars[0].shortcut;
             if (config) {
               config.selectedCalendar = this._selectedCalendar;
-              // Nur config-changed Event auslösen, wenn nicht initialer Load
-              if (!wasInitialLoad) {
-                this.dispatchEvent(
-                  new CustomEvent('config-changed', {
-                    detail: { config: config },
-                    bubbles: true,
-                    composed: true,
-                  })
-                );
-              }
             }
           } else {
             // Kein Kalender aktiviert - keine automatische Aktivierung
@@ -662,16 +547,6 @@ export class ShiftScheduleView extends ViewBase {
         this._selectedCalendar = allCalendars[0].shortcut;
         if (config) {
           config.selectedCalendar = this._selectedCalendar;
-          // Nur config-changed Event auslösen, wenn nicht initialer Load
-          if (!wasInitialLoad) {
-            this.dispatchEvent(
-              new CustomEvent('config-changed', {
-                detail: { config: config },
-                bubbles: true,
-                composed: true,
-              })
-            );
-          }
         }
       } else {
         // Kein Kalender aktiviert - keine automatische Aktivierung
@@ -890,8 +765,14 @@ export class ShiftScheduleView extends ViewBase {
   }
 
   async loadWorkingDays() {
-    if (!this._hass || !this._config || !this._config.entity) {
-      this._debug('[Laden] loadWorkingDays: Kein hass, config oder entity vorhanden');
+    if (!this._hass || !this._config) {
+      this._debug('[Laden] loadWorkingDays: Kein hass oder config vorhanden');
+      return;
+    }
+    
+    // Prüfe Entity nur bei text_entity Modus (bei Saver wird keine Entity benötigt)
+    if (this._config.store_mode !== 'saver' && !this._config.entity) {
+      this._debug('[Laden] loadWorkingDays: Keine entity vorhanden (text_entity Modus benötigt entity)');
       return;
     }
 
@@ -906,7 +787,7 @@ export class ShiftScheduleView extends ViewBase {
     }
 
     this._debug(
-      `[Laden] loadWorkingDays: Start, store_mode: "${this._config.store_mode}", entity: "${this._config.entity}"`
+      `[Laden] loadWorkingDays: Start, store_mode: "${this._config.store_mode}", entity: "${this._config.entity || 'nicht benötigt (Saver-Modus)'}"`
     );
 
     let dataString = null;
