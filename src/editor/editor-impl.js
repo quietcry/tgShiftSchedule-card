@@ -180,22 +180,6 @@ export class EditorImpl extends EditorBase {
     `;
   }
 
-  _updateUseElements(value) {
-    this.config = {
-      ...this.config,
-      useElements: value,
-    };
-
-    this.dispatchEvent(
-      new CustomEvent('config-changed', {
-        detail: { config: this.config },
-        bubbles: true,
-        composed: true,
-      })
-    );
-    this.requestUpdate();
-  }
-
   _getColorOptions() {
     // Liste von vordefinierten Farben
     return [
@@ -1185,14 +1169,6 @@ export class EditorImpl extends EditorBase {
       initialDisplayedMonths: 2,
       store_mode: 'saver',
       saver_key: 'Schichtplan',
-      useElements: false,
-      selectedElement: null,
-      elements: [
-        { benennung: 'Element 1', aktiv: true, color: '#ff0000', shortcut: '1' },
-        { benennung: 'Element 2', aktiv: true, color: '#00ff00', shortcut: '2' },
-        { benennung: 'Element 3', aktiv: true, color: '#0000ff', shortcut: '3' },
-        { benennung: 'Element 4', aktiv: true, color: '#ffff00', shortcut: '4' },
-      ],
       holidays: {
         neujahr: true,
         heilige_drei_koenige: true,

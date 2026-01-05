@@ -3353,8 +3353,8 @@ export class ShiftScheduleView extends ViewBase {
   }
 
   render() {
-    if (!this._config || !this._config.entity) {
-      return html`<div class="error">Keine Entity konfiguriert</div>`;
+    if (!this._config) {
+      return html`<div class="error">Keine Konfiguration vorhanden</div>`;
     }
 
     const maxMonths = this._config.numberOfMonths || 14;

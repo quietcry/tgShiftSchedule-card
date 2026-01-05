@@ -26,14 +26,6 @@ export class CardImpl extends CardBase {
       initialDisplayedMonths: 2,
       store_mode: 'saver',
       saver_key: 'Schichtplan',
-      useElements: false,
-      selectedElement: null,
-      elements: [
-        { benennung: 'Element 1', aktiv: true, color: '#ff0000', shortcut: '1' },
-        { benennung: 'Element 2', aktiv: true, color: '#00ff00', shortcut: '2' },
-        { benennung: 'Element 3', aktiv: true, color: '#0000ff', shortcut: '3' },
-        { benennung: 'Element 4', aktiv: true, color: '#ffff00', shortcut: '4' },
-      ],
     };
   }
 
