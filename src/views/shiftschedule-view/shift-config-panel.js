@@ -379,6 +379,7 @@ export class ShiftConfigPanel extends LitElement {
 
   updated(changedProperties) {
     super.updated(changedProperties);
+
     if (changedProperties.has('calendars') || changedProperties.has('selectedShortcut')) {
       this._updateValidationErrors();
     }
@@ -692,6 +693,7 @@ export class ShiftConfigPanel extends LitElement {
 
 
   _handleClose() {
+    this._hasLocalCopy = false;
     this.dispatchEvent(new CustomEvent('close'));
   }
 

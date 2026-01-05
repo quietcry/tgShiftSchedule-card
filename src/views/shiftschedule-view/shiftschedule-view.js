@@ -76,6 +76,7 @@ export class ShiftScheduleView extends ViewBase {
     this._storage = null;
     // Konfigurationspanel
     this._showConfigPanel = false;
+    this._configPanelCalendars = null; // Gespeicherte calendars beim Öffnen des Panels
     
     // Mixins hinzufügen (für wiederverwendbare Funktionalität)
     Object.assign(this, DateUtils);
@@ -311,7 +312,8 @@ export class ShiftScheduleView extends ViewBase {
       }
       
       // Beim ersten Setzen von hass: Lade die Konfiguration aus dem Storage, falls noch nicht geladen
-      if (!wasHassSet && this._storage) {
+      // ABER: Nicht wenn das Konfigurationspanel offen ist, um ungespeicherte Änderungen nicht zu überschreiben
+      if (!wasHassSet && this._storage && !this._showConfigPanel) {
         this._debug('[Config] set hass: hass zum ersten Mal gesetzt - lade Konfiguration aus Storage');
         // Verwende Promise ohne await, da set hass() nicht async ist
         this._storage.loadConfig().then(storageConfig => {
@@ -3397,6 +3399,8 @@ export class ShiftScheduleView extends ViewBase {
                         @click=${e => {
                           e.stopPropagation();
                           e.preventDefault();
+                          // Speichere die aktuellen calendars beim Öffnen des Panels
+                          this._configPanelCalendars = JSON.parse(JSON.stringify(this._config?.calendars || []));
                           this._showConfigPanel = true;
                           this.requestUpdate();
                         }}
@@ -3437,11 +3441,12 @@ export class ShiftScheduleView extends ViewBase {
           ? html`
               <div class="config-wrapper">
                 <shift-config-panel
-                  .calendars=${this._config?.calendars || []}
+                  .calendars=${this._configPanelCalendars || this._config?.calendars || []}
                   .selectedShortcut=${this._getSelectedCalendarShortcut()}
                   .hass=${this._hass}
                   @close=${() => {
                     this._showConfigPanel = false;
+                    this._configPanelCalendars = null;
                     this.requestUpdate();
                   }}
                   @save=${e => this._handleConfigPanelSave(e.detail.calendars)}
