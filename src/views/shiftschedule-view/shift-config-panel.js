@@ -27,6 +27,9 @@ export class ShiftConfigPanel extends LitElement {
     selectedShortcut: { type: String },
     hass: { type: Object },
     _validationErrors: { type: Object, state: true },
+    _currentView: { type: String, state: true },
+    holidays: { type: Object },
+    statusOnlyInTimeRange: { type: Boolean },
   };
 
   static styles = [
@@ -227,6 +230,113 @@ export class ShiftConfigPanel extends LitElement {
       align-items: center;
     }
 
+    .view-switcher {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      justify-content: center;
+      padding: 8px;
+      margin: 8px 0;
+      border-top: 1px solid var(--divider-color, #e0e0e0);
+      border-bottom: 1px solid var(--divider-color, #e0e0e0);
+    }
+
+    .view-radio-button {
+      flex: 1;
+      padding: 8px 16px;
+      border: 1px solid var(--divider-color, #e0e0e0);
+      border-radius: 4px;
+      background-color: var(--card-background-color, #ffffff);
+      color: var(--primary-text-color, #212121);
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: center;
+      font-size: 14px;
+    }
+
+    .view-radio-button:hover {
+      background-color: var(--divider-color, #e0e0e0);
+    }
+
+    .view-radio-button.selected {
+      background-color: var(--primary-color, #03a9f4);
+      color: var(--text-primary-color, #ffffff);
+      border-color: var(--primary-color, #03a9f4);
+    }
+
+    .view-content {
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    .no-selection {
+      padding: 20px;
+      text-align: center;
+      color: var(--secondary-text-color);
+    }
+
+    .holidays-view,
+    .other-view {
+      padding: 20px;
+    }
+
+    .holidays-view h3,
+    .other-view h3 {
+      margin-top: 0;
+      color: var(--primary-text-color);
+    }
+
+    .other-options {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      margin-top: 16px;
+    }
+
+    .option-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px;
+      background-color: var(--card-background-color, #ffffff);
+      border: 1px solid var(--divider-color, #e0e0e0);
+      border-radius: 4px;
+    }
+
+    .option-label {
+      flex: 1;
+      font-size: 14px;
+      color: var(--primary-text-color, #000000);
+      cursor: pointer;
+    }
+
+    .holidays-fields {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .holiday-switch-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 8px 0;
+    }
+
+    .holiday-label {
+      flex: 1;
+      font-size: 14px;
+      color: var(--primary-text-color);
+      cursor: pointer;
+    }
+
+    .holidays-fields ha-switch {
+      flex-shrink: 0;
+    }
+
     .version-info {
       position: absolute;
       bottom: 8px;
@@ -394,6 +504,7 @@ export class ShiftConfigPanel extends LitElement {
     this.calendars = [];
     this.selectedShortcut = null;
     this._validationErrors = {};
+    this._currentView = 'shifts'; // 'shifts', 'holidays', 'other'
   }
 
   connectedCallback() {
@@ -504,7 +615,40 @@ export class ShiftConfigPanel extends LitElement {
           left: html`
             <button class="cancel-button menu-button" @click=${this._handleClose} title="Abbrechen">×</button>
           `,
-          center: '',
+          center: html`
+            <div class="view-switcher">
+              <button
+                class="view-radio-button ${this._currentView === 'shifts' ? 'selected' : ''}"
+                @click=${() => {
+                  this._currentView = 'shifts';
+                  this.requestUpdate();
+                }}
+                title="Schichten"
+              >
+                Schichten
+              </button>
+              <button
+                class="view-radio-button ${this._currentView === 'holidays' ? 'selected' : ''}"
+                @click=${() => {
+                  this._currentView = 'holidays';
+                  this.requestUpdate();
+                }}
+                title="Feiertage"
+              >
+                Feiertage
+              </button>
+              <button
+                class="view-radio-button ${this._currentView === 'other' ? 'selected' : ''}"
+                @click=${() => {
+                  this._currentView = 'other';
+                  this.requestUpdate();
+                }}
+                title="Sonstiges"
+              >
+                Sonstiges
+              </button>
+            </div>
+          `,
           right: html`
             <button 
               class="confirm-button menu-button" 
@@ -513,7 +657,7 @@ export class ShiftConfigPanel extends LitElement {
               ?disabled=${this._hasValidationErrors()}
             >✓</button>
           `,
-          fullWidth: html`
+          fullWidth: this._currentView === 'shifts' ? html`
             <div class="color-bar">
               ${this.calendars.map((calendar, index) => {
                 const isSelected = calendar.shortcut === this.selectedShortcut;
@@ -542,12 +686,23 @@ export class ShiftConfigPanel extends LitElement {
                 +
               </button>
             </div>
-          `,
+          ` : '',
         })}
       </div>
       <div class="config-panel">
-        ${editingCalendar
-          ? html`
+        <div class="view-content">
+          ${this._currentView === 'shifts' ? this._renderShiftsView(editingCalendar, selectedIndex) : ''}
+          ${this._currentView === 'holidays' ? this._renderHolidaysView() : ''}
+          ${this._currentView === 'other' ? this._renderOtherView() : ''}
+        </div>
+        <span class="version-info">v${Version}</span>
+      </div>
+    `;
+  }
+
+  _renderShiftsView(editingCalendar, selectedIndex) {
+    return editingCalendar
+      ? html`
               <div class="shift-editor">
                 <!-- Zeile 1: Name, Farbe, ID -->
                 <div class="editor-row">
@@ -727,8 +882,98 @@ export class ShiftConfigPanel extends LitElement {
                 </div>
               </div>
               `
-            : ''}
-        <span class="version-info">v${Version}</span>
+      : html`<div class="no-selection">Bitte wählen Sie eine Schicht aus</div>`;
+  }
+
+  _renderHolidaysView() {
+    // Stelle sicher, dass holidays Konfiguration existiert
+    if (!this.holidays) {
+      this.holidays = {
+        neujahr: true,
+        heilige_drei_koenige: true,
+        tag_der_arbeit: true,
+        friedensfest: true,
+        mariae_himmelfahrt: true,
+        tag_der_deutschen_einheit: true,
+        reformationstag: true,
+        allerheiligen: true,
+        weihnachten_1: true,
+        weihnachten_2: true,
+        karfreitag: true,
+        ostermontag: true,
+        christi_himmelfahrt: true,
+        pfingstmontag: true,
+        fronleichnam: true,
+        busstag: true,
+      };
+    }
+
+    const holidays = [
+      { key: 'neujahr', label: 'Neujahr (1. Januar)' },
+      { key: 'heilige_drei_koenige', label: 'Heilige Drei Könige (6. Januar)' },
+      { key: 'tag_der_arbeit', label: 'Tag der Arbeit (1. Mai)' },
+      { key: 'friedensfest', label: 'Friedensfest (8. August)' },
+      { key: 'mariae_himmelfahrt', label: 'Mariä Himmelfahrt (15. August)' },
+      { key: 'tag_der_deutschen_einheit', label: 'Tag der Deutschen Einheit (3. Oktober)' },
+      { key: 'reformationstag', label: 'Reformationstag (31. Oktober)' },
+      { key: 'allerheiligen', label: 'Allerheiligen (1. November)' },
+      { key: 'weihnachten_1', label: '1. Weihnachtsfeiertag (25. Dezember)' },
+      { key: 'weihnachten_2', label: '2. Weihnachtsfeiertag (26. Dezember)' },
+      { key: 'karfreitag', label: 'Karfreitag' },
+      { key: 'ostermontag', label: 'Ostermontag' },
+      { key: 'christi_himmelfahrt', label: 'Christi Himmelfahrt' },
+      { key: 'pfingstmontag', label: 'Pfingstmontag' },
+      { key: 'fronleichnam', label: 'Fronleichnam' },
+      { key: 'busstag', label: 'Buß- und Bettag' },
+    ];
+
+    return html`
+      <div class="holidays-view">
+        <h3>Feiertage</h3>
+        <div class="holidays-fields">
+          ${holidays.map(
+            holiday => html`
+              <div class="holiday-switch-item">
+                <label class="holiday-label">${holiday.label}</label>
+                <ha-switch
+                  .checked=${this.holidays[holiday.key] !== false}
+                  @change=${e => this._updateHoliday(holiday.key, e.target.checked)}
+                ></ha-switch>
+              </div>
+            `
+          )}
+        </div>
+      </div>
+    `;
+  }
+
+  _updateHoliday(key, enabled) {
+    if (!this.holidays) {
+      this.holidays = {};
+    }
+    this.holidays = {
+      ...this.holidays,
+      [key]: enabled,
+    };
+    this.requestUpdate();
+  }
+
+  _renderOtherView() {
+    return html`
+      <div class="other-view">
+        <h3>Sonstiges</h3>
+        <div class="other-options">
+          <div class="option-item">
+            <label class="option-label">Status nur bei aktivem Zeitraum setzen</label>
+            <ha-switch
+              .checked=${this.statusOnlyInTimeRange || false}
+              @change=${e => {
+                this.statusOnlyInTimeRange = e.target.checked;
+                this.requestUpdate();
+              }}
+            ></ha-switch>
+          </div>
+        </div>
       </div>
     `;
   }
@@ -742,7 +987,11 @@ export class ShiftConfigPanel extends LitElement {
   _handleSave() {
     this.dispatchEvent(
       new CustomEvent('save', {
-        detail: { calendars: this.calendars },
+        detail: {
+          calendars: this.calendars,
+          holidays: this.holidays,
+          statusOnlyInTimeRange: this.statusOnlyInTimeRange,
+        },
       })
     );
   }
