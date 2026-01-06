@@ -2014,7 +2014,14 @@ export class ShiftScheduleView extends ViewBase {
       return;
     }
 
-    if (!this._hass || !this._config || !this._config.entity) {
+    // Prüfe ob hass und config vorhanden sind
+    // Im Saver-Modus wird keine entity benötigt
+    if (!this._hass || !this._config) {
+      return;
+    }
+
+    // Bei text_entity Modus muss eine entity vorhanden sein
+    if (this._config.store_mode !== 'saver' && !this._config.entity) {
       return;
     }
 
