@@ -75,7 +75,7 @@ export class SaverStorage extends IStorageAdapter {
           name: this._saverKey,
           value: serializedData || '',
         });
-        this._debug(`[SaverStorage] saveData: Erfolgreich in Saver geschrieben`);
+        this._debug(`[Sync] [SaverStorage] saveData: Erfolgreich in Saver geschrieben - andere Karten sollten Änderung erkennen`);
       } else {
         this._debug(
           `[SaverStorage] saveData: Kein Schreiben nötig, Wert hat sich nicht geändert`
@@ -119,9 +119,11 @@ export class SaverStorage extends IStorageAdapter {
    * Verwendet direkt das Format vom Config-Panel (calendars-Array)
    * @private
    */
-  _createFullJsonConfig(calendars) {
+  _createFullJsonConfig(calendars, holidays, statusOnlyInTimeRange) {
     const configObject = {
       calendars: calendars,
+      holidays: holidays || {},
+      statusOnlyInTimeRange: statusOnlyInTimeRange !== undefined ? statusOnlyInTimeRange : false,
       setup: {
         timer_entity: this._config?.entity || '',
         store_mode: this._config?.store_mode || 'saver',
@@ -132,7 +134,7 @@ export class SaverStorage extends IStorageAdapter {
     return JSON.stringify(configObject);
   }
 
-  async saveConfig(calendars) {
+  async saveConfig(calendars, holidays, statusOnlyInTimeRange) {
     if (!this.isAvailable()) {
       this._debug('[SaverStorage] saveConfig: Nicht verfügbar');
       return;
@@ -141,7 +143,7 @@ export class SaverStorage extends IStorageAdapter {
     const configKey = `${this._saverKey}_config`;
     this._debug(`[SaverStorage] saveConfig: Saver-Key: "${this._saverKey}", Config-Key: "${configKey}"`);
     
-    const configJson = this._createFullJsonConfig(calendars);
+    const configJson = this._createFullJsonConfig(calendars, holidays, statusOnlyInTimeRange);
     this._debug(
       `[SaverStorage] saveConfig: JSON-Config erstellt, Länge: ${configJson.length} Zeichen, Kalender: ${calendars?.length || 0}`
     );

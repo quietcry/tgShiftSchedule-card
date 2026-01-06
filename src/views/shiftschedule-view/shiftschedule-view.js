@@ -77,7 +77,9 @@ export class ShiftScheduleView extends ViewBase {
     // Konfigurationspanel
     this._showConfigPanel = false;
     this._configPanelCalendars = null; // Gespeicherte calendars beim Öffnen des Panels
-    
+    this._configPanelHolidays = null; // Gespeicherte holidays beim Öffnen des Panels
+    this._configPanelStatusOnlyInTimeRange = null; // Gespeicherte statusOnlyInTimeRange beim Öffnen des Panels
+
     // Mixins hinzufügen (für wiederverwendbare Funktionalität)
     Object.assign(this, DateUtils);
     Object.assign(this, ColorUtils);
@@ -271,32 +273,44 @@ export class ShiftScheduleView extends ViewBase {
                 }
                 }
 
-    // Prüfe ob sich die saver_config geändert hat (nur bei store_mode === 'saver')
+    // Prüfe ob sich die saver_config oder die saver-Daten geändert haben (nur bei store_mode === 'saver')
     let hasSaverConfigChanged = false;
+    let hasSaverDataChanged = false;
     if (this._config && this._config.store_mode === 'saver' && this._hass && hass && hass?.states) {
       try {
         const saverEntity = hass.states['saver.saver'];
         const previousSaverEntity = this._hass?.states?.['saver.saver'];
         if (saverEntity && saverEntity.attributes && saverEntity.attributes.variables) {
           const configKey = `${this._config.saver_key || 'Schichtplan'}_config`;
+          const dataKey = this._config.saver_key || 'Schichtplan';
+
+          // Prüfe Config-Variable
           const previousConfigValue = previousSaverEntity?.attributes?.variables?.[configKey];
           const newConfigValue = saverEntity.attributes.variables[configKey];
           if (previousConfigValue !== newConfigValue) {
             hasSaverConfigChanged = true;
             this._debug('[Config] set hass: saver_config hat sich geändert, lade Konfiguration neu');
-                }
-                }
+          }
+
+          // Prüfe Daten-Variable
+          const previousDataValue = previousSaverEntity?.attributes?.variables?.[dataKey];
+          const newDataValue = saverEntity.attributes.variables[dataKey];
+          if (previousDataValue !== newDataValue) {
+            hasSaverDataChanged = true;
+            this._debug(`[Sync] set hass: Saver-Daten-Variable "${dataKey}" hat sich geändert (alte Länge: ${previousDataValue?.length || 0}, neue Länge: ${newDataValue?.length || 0}), lade Daten neu`);
+          }
+        }
       } catch (error) {
-        this._debug('[Config] set hass: Fehler beim Prüfen der saver_config:', error);
-                }
-                }
+        this._debug('[Config] set hass: Fehler beim Prüfen der saver-Variablen:', error);
+      }
+    }
 
     const wasHassSet = !!this._hass;
     this._hass = hass;
 
     // Cache-Invalidierung: Holiday-Entities Cache zurücksetzen bei hass-Update
     this._cachedHolidayEntities = null;
-    
+
     // Initialisiere Storage-Adapter neu, falls Config bereits vorhanden
     if (this._config) {
       this._initializeStorage();
@@ -310,14 +324,17 @@ export class ShiftScheduleView extends ViewBase {
                 }
 
     if (this._config) {
-      // Lade Daten beim ersten Setzen von hass oder wenn sich ein State geändert hat
-      if ((!wasHassSet || hasAnyEntityChanged) && hass?.states) {
+      // Lade Daten beim ersten Setzen von hass, wenn sich ein State geändert hat, oder wenn sich Saver-Daten geändert haben
+      if ((!wasHassSet || hasAnyEntityChanged || hasSaverDataChanged) && hass?.states) {
+        if (hasSaverDataChanged) {
+          this._debug('[Sync] set hass: Lade Daten neu aufgrund von Saver-Daten-Änderung (Synchronisation mit anderer Karte)');
+        }
         try {
           this.loadWorkingDays();
         } catch (error) {
           this._debug('[Config] set hass: Fehler beim Laden der Arbeitszeiten:', error);
-                }
-                }
+        }
+      }
 
       // Beim ersten Setzen von hass: Lade die Konfiguration aus dem Storage, falls noch nicht geladen
       // ABER: Nicht wenn das Konfigurationspanel offen ist, um ungespeicherte Änderungen nicht zu überschreiben
@@ -337,7 +354,7 @@ export class ShiftScheduleView extends ViewBase {
           if (storageConfig) {
             try {
               const parsedConfig = JSON.parse(storageConfig);
-              
+
               // WICHTIG: Prüfe NOCHMAL nach dem Parsen, ob das Panel geöffnet wurde
               const isPanelOpenAfterParse = this._showConfigPanel;
               if (isPanelOpenAfterParse) {
@@ -348,7 +365,7 @@ export class ShiftScheduleView extends ViewBase {
               // Neues Format: Objekt mit "calendars" Property
               if (parsedConfig && typeof parsedConfig === 'object' && Array.isArray(parsedConfig.calendars)) {
                 this._debug('[Config] set hass: Konfiguration aus Storage geladen (neues Format mit calendars) beim ersten hass-Set');
-                
+
                 // WICHTIG: Prüfe NOCHMAL vor dem Aktualisieren von this._config.calendars
                 const isPanelOpenBeforeUpdate = this._showConfigPanel;
                 if (isPanelOpenBeforeUpdate) {
@@ -402,7 +419,20 @@ export class ShiftScheduleView extends ViewBase {
                     timeRanges: timeRanges,
                   };
                 });
-                
+
+                // Lade Feiertage aus der Config, falls vorhanden
+                if (parsedConfig.holidays && typeof parsedConfig.holidays === 'object') {
+                  this._config.holidays = { ...parsedConfig.holidays };
+                  this._debug('[Config] set hass: Feiertage aus Saver geladen:', this._config.holidays);
+                  // Invalidiere Holiday-Cache, damit Feiertage neu berechnet werden
+                  this._holidayCache = {};
+                  this._debug('[Config] set hass: Holiday-Cache invalidiert aufgrund von Feiertags-Änderung');
+                }
+                if (parsedConfig.statusOnlyInTimeRange !== undefined) {
+                  this._config.statusOnlyInTimeRange = parsedConfig.statusOnlyInTimeRange;
+                  this._debug('[Config] set hass: statusOnlyInTimeRange aus Saver geladen:', this._config.statusOnlyInTimeRange);
+                }
+
                 this._debug(`[Config] set hass: ${this._config.calendars.length} Kalender geladen beim ersten hass-Set`);
                 this._config.calendars.forEach(cal => {
                   this._debug(`[Config] set hass: Kalender "${cal.shortcut}":`, {
@@ -412,7 +442,7 @@ export class ShiftScheduleView extends ViewBase {
                     timeRanges_count: cal.timeRanges?.length || 0,
                   });
                 });
-                
+
                 this._debug('[Config] set hass: Konfiguration aus Saver geladen und this._config aktualisiert');
                 // Prüfe nochmal, ob das Panel geöffnet wurde, bevor wir updaten
                 if (!this._showConfigPanel) {
@@ -447,7 +477,7 @@ export class ShiftScheduleView extends ViewBase {
           if (storageConfig) {
             try {
               const parsedConfig = JSON.parse(storageConfig);
-              
+
               // WICHTIG: Prüfe NOCHMAL nach dem Parsen, ob das Panel geöffnet wurde
               if (this._showConfigPanel) {
                 this._debug('[Config] set hass: Panel wurde geöffnet - überspringe Config-Update (nach Parsen bei saver_config)');
@@ -457,7 +487,7 @@ export class ShiftScheduleView extends ViewBase {
               // Neues Format: Objekt mit "calendars" Property
               if (parsedConfig && typeof parsedConfig === 'object' && Array.isArray(parsedConfig.calendars)) {
                 this._debug('[Config] set hass: Konfiguration aus Saver neu geladen (neues Format mit calendars)');
-                
+
                 // WICHTIG: Prüfe NOCHMAL vor dem Aktualisieren von this._config.calendars
                 if (this._showConfigPanel) {
                   this._debug('[Config] set hass: Panel wurde geöffnet - überspringe Config-Update (vor calendars-Update bei saver_config)');
@@ -510,7 +540,20 @@ export class ShiftScheduleView extends ViewBase {
                     timeRanges: timeRanges,
                   };
                 });
-                
+
+                // Lade Feiertage aus der Config, falls vorhanden
+                if (parsedConfig.holidays && typeof parsedConfig.holidays === 'object') {
+                  this._config.holidays = { ...parsedConfig.holidays };
+                  this._debug('[Config] set hass: Feiertage aus Saver neu geladen:', this._config.holidays);
+                  // Invalidiere Holiday-Cache, damit Feiertage neu berechnet werden
+                  this._holidayCache = {};
+                  this._debug('[Config] set hass: Holiday-Cache invalidiert aufgrund von Feiertags-Änderung');
+                }
+                if (parsedConfig.statusOnlyInTimeRange !== undefined) {
+                  this._config.statusOnlyInTimeRange = parsedConfig.statusOnlyInTimeRange;
+                  this._debug('[Config] set hass: statusOnlyInTimeRange aus Saver neu geladen:', this._config.statusOnlyInTimeRange);
+                }
+
                 this._debug(`[Config] set hass: ${this._config.calendars.length} Kalender geladen`);
                 this._config.calendars.forEach(cal => {
                   this._debug(`[Config] set hass: Kalender "${cal.shortcut}":`, {
@@ -520,7 +563,7 @@ export class ShiftScheduleView extends ViewBase {
                     timeRanges_count: cal.timeRanges?.length || 0,
                   });
                 });
-                
+
                 this._debug('[Config] set hass: Konfiguration aus Storage neu geladen und this._config aktualisiert');
                 // Prüfe nochmal, ob das Panel geöffnet wurde, bevor wir updaten
                 if (!this._showConfigPanel) {
@@ -564,7 +607,7 @@ export class ShiftScheduleView extends ViewBase {
   set config(config) {
     this._debug('[Config] set config: === WIRD AUFGERUFEN ===');
     this._debug('[Config] set config: _isInitialLoad Status:', this._isInitialLoad);
-    
+
     // Editor und View sind unabhängig: Editor verwendet nur YAML-Config, View lädt Schichtdaten aus Saver
     // Die übergebene Config wird direkt verwendet, ohne Merge mit Saver-Config
     this._config = config;
@@ -647,11 +690,11 @@ export class ShiftScheduleView extends ViewBase {
     if (this._hass) {
       // Initialisiere Storage-Adapter
       this._initializeStorage();
-      
+
       this.loadWorkingDays();
       // Prüfe Warnungen über Storage-Adapter
       this._updateWarnings();
-      
+
       // Wenn die Konfiguration gesetzt wird und es nicht der initiale Load ist,
       // speichere die Konfiguration (z.B. wenn der Editor geschlossen wird)
       // Dies stellt sicher, dass Änderungen im Editor immer gespeichert werden
@@ -682,7 +725,7 @@ export class ShiftScheduleView extends ViewBase {
   // (nur dann wird die Config gespeichert, nicht beim initialen Laden)
   _handleConfigChanged() {
     this._debug('[Config] _handleConfigChanged: Event empfangen - Konfiguration wurde geändert');
-    
+
     // Verhindere Speichern beim initialen Load
     if (this._isInitialLoad) {
       this._debug('[Config] _handleConfigChanged: Initialer Load erkannt, überspringe Config-Speichern');
@@ -1492,23 +1535,42 @@ return value;
     return JSON.stringify(configObject);
                 }
 
-  async saveConfigToEntity() {
-    this._debug('[Config] saveConfigToEntity: === START: Speichere Konfiguration ===');
-    
+  async saveConfigToEntity(forceSave = false) {
+    this._debug('[Config] saveConfigToEntity: === START: Speichere Konfiguration ===', {
+      forceSave: forceSave,
+      _isInitialLoad: this._isInitialLoad,
+    });
+
     // Speichere die Konfiguration in der Config-Entity oder im Saver
-    // Verhindere Speichern beim initialen Load
-    if (this._isInitialLoad) {
+    // Verhindere Speichern beim initialen Load (außer wenn forceSave=true)
+    if (this._isInitialLoad && !forceSave) {
       this._debug('[Config] saveConfigToEntity: Initialer Load, überspringe Config-Speichern');
       return;
                 }
-    if (!this._hass || !this._config || !this._config.entity) {
-      this._debug('[Config] saveConfigToEntity: Abbruch - hass, config oder entity fehlt', {
+    // Für Saver-Storage brauchen wir kein entity, nur saver_key
+    // Für Entity-Storage brauchen wir entity
+    const needsEntity = this._config.store_mode !== 'saver';
+    if (!this._hass || !this._config) {
+      this._debug('[Config] saveConfigToEntity: Abbruch - hass oder config fehlt', {
         hasHass: !!this._hass,
         hasConfig: !!this._config,
+      });
+      return;
+    }
+    if (needsEntity && !this._config.entity) {
+      this._debug('[Config] saveConfigToEntity: Abbruch - entity fehlt (benötigt für Entity-Storage)', {
+        store_mode: this._config.store_mode,
         hasEntity: !!(this._config && this._config.entity),
       });
       return;
-                }
+    }
+    if (!needsEntity && !this._config.saver_key) {
+      this._debug('[Config] saveConfigToEntity: Abbruch - saver_key fehlt (benötigt für Saver-Storage)', {
+        store_mode: this._config.store_mode,
+        hasSaverKey: !!(this._config && this._config.saver_key),
+      });
+      return;
+    }
 
     this._debug('[Config] saveConfigToEntity: Prüfe Konfiguration', {
       store_mode: this._config.store_mode,
@@ -1519,7 +1581,7 @@ return value;
 
     // Debug: Zeige alle empfangenen Kalender-Daten
     if (this._config.calendars && this._config.calendars.length > 0) {
-      this._debug('[Config] saveConfigToEntity: Empfangene Kalender-Daten:', 
+      this._debug('[Config] saveConfigToEntity: Empfangene Kalender-Daten:',
         JSON.stringify(this._config.calendars, null, 2)
       );
       this._config.calendars.forEach((cal, index) => {
@@ -1539,9 +1601,9 @@ return value;
 
     // Verwende direkt das calendars-Format vom Config-Panel (keine Konvertierung mehr nötig)
     const calendars = this._config.calendars || [];
-    
+
     this._debug(`[Config] saveConfigToEntity: Speichere ${calendars.length} Kalender im neuen Format (direkt vom Config-Panel)`);
-    
+
     // Debug: Zeige alle Kalender-Daten
     calendars.forEach((cal, index) => {
       this._debug(`[Config] saveConfigToEntity: Kalender ${index + 1}:`, {
@@ -1577,8 +1639,10 @@ return value;
       // Für Entity: Konvertierung zu komprimiertem Format (bleibt unverändert)
       this._debug('[Config] saveConfigToEntity: Rufe _storage.saveConfig() auf...');
       if (this._config.store_mode === 'saver') {
-        // Saver: Direkt calendars-Format verwenden
-        await this._storage.saveConfig(calendars);
+        // Saver: Direkt calendars-Format verwenden und holidays übergeben
+        const holidays = this._config.holidays || {};
+        const statusOnlyInTimeRange = this._config.statusOnlyInTimeRange || false;
+        await this._storage.saveConfig(calendars, holidays, statusOnlyInTimeRange);
       } else {
         // Entity: Konvertierung zu komprimiertem Format (für Rückwärtskompatibilität)
         // TODO: Könnte später auch auf calendars-Format umgestellt werden
@@ -1588,12 +1652,12 @@ return value;
 
       // Aktualisiere Warnungen
       this._updateWarnings();
-      
+
       this._debug('[Config] saveConfigToEntity: === ENDE: Erfolgreich gespeichert ===');
     } catch (error) {
       // Fehler beim Schreiben - versuche Fallback
       this._debug(`[Config] saveConfigToEntity: === FEHLER === Beim Schreiben: ${error.message}`, error);
-      
+
       // Fallback: Wenn SaverStorage fehlschlägt, versuche EntityStorage
       if (this._config.store_mode === 'saver') {
         this._debug('[Config] saveConfigToEntity: Fallback zu EntityStorage');
@@ -2170,6 +2234,7 @@ return value;
     this._updateDayButtonDirectly(monthNum, dayNum, yearNum, key, finalElements);
 
     // OPTIMIERUNG: Debounced Speichern - warte nach dem letzten Klick, bevor gespeichert wird
+    this._debug(`[Sync] toggleDay: Tag geändert (${yearNum}:${monthNum}:${dayNum}), plane Speichern für Synchronisation`);
     this._scheduleDebouncedSave();
                 }
 
@@ -2180,19 +2245,24 @@ return value;
 
     // Wenn Debounce-Zeit 0 ist, speichere sofort
     if (debounceTime === 0) {
+      this._debug('[Sync] _scheduleDebouncedSave: Speichere sofort (Debounce=0)');
       this._saveToHA();
       return;
                 }
 
     // Lösche vorhandenen Timer
     if (this._saveDebounceTimer) {
+      this._debug(`[Sync] _scheduleDebouncedSave: Timer bereits vorhanden, setze neu (${debounceTime}ms)`);
       clearTimeout(this._saveDebounceTimer);
       this._saveDebounceTimer = null;
+                } else {
+      this._debug(`[Sync] _scheduleDebouncedSave: Neuer Timer gesetzt (${debounceTime}ms)`);
                 }
 
     // Setze neuen Timer
     this._saveDebounceTimer = setTimeout(() => {
       this._saveDebounceTimer = null;
+      this._debug('[Sync] _scheduleDebouncedSave: Timer abgelaufen, speichere jetzt');
       this._saveToHA();
     }, debounceTime);
                 }
@@ -2201,7 +2271,7 @@ return value;
   async _saveToHA() {
     try {
       this._debug('[Speichern] _saveToHA: Start');
-      
+
       // Stelle sicher, dass Storage initialisiert ist
       if (!this._storage) {
         this._initializeStorage();
@@ -2226,7 +2296,7 @@ return value;
       try {
         // Verwende Storage-Adapter zum Speichern
         await this._storage.saveData(serializedData);
-        
+
         // Prüfe Speicherverbrauch (nur für EntityStorage relevant)
         const storageUsage = this._storage.checkStorageUsage(serializedData.length);
         if (storageUsage) {
@@ -2241,7 +2311,7 @@ return value;
       } catch (error) {
         // Fehler beim Speichern - versuche Fallback
         this._debug(`[Speichern] _saveToHA: Fehler beim Speichern, versuche Fallback: ${error.message}`, error);
-        
+
         // Fallback: Wenn SaverStorage fehlschlägt, versuche EntityStorage
         if (this._config.store_mode === 'saver') {
           this._debug('[Speichern] _saveToHA: Fallback zu EntityStorage');
@@ -3261,7 +3331,7 @@ return null;
     // Gibt die Elemente für einen bestimmten Tag zurück
     // Reduziere Debug-Ausgaben: Nur bei ersten 3 Tagen oder wenn keine Daten gefunden werden
     const shouldDebug = day <= 3 || !this._workingDays[monthKey];
-    
+
     if (shouldDebug) {
       this._debug(`[Render] _getDayElements: Suche nach monthKey="${monthKey}", day=${day}`);
                 }
@@ -3501,8 +3571,10 @@ return null;
                         @click=${e => {
                           e.stopPropagation();
                           e.preventDefault();
-                          // Speichere die aktuellen calendars beim Öffnen des Panels
+                          // Speichere die aktuellen calendars, holidays und statusOnlyInTimeRange beim Öffnen des Panels
                           this._configPanelCalendars = JSON.parse(JSON.stringify(this._config?.calendars || []));
+                          this._configPanelHolidays = this._config?.holidays ? { ...this._config.holidays } : null;
+                          this._configPanelStatusOnlyInTimeRange = this._config?.statusOnlyInTimeRange !== undefined ? this._config.statusOnlyInTimeRange : false;
                           this._showConfigPanel = true;
                           this.requestUpdate();
                         }                              }
@@ -3549,9 +3621,13 @@ return null;
                   @close=${() => {
                     this._showConfigPanel = false;
                     this._configPanelCalendars = null;
+                    this._configPanelHolidays = null;
+                    this._configPanelStatusOnlyInTimeRange = null;
                     this.requestUpdate();
                   }                              }
-                  @save=${e => this._handleConfigPanelSave(e.detail.calendars)                              }
+                  .holidays=${this._configPanelHolidays || this._config?.holidays || {}                              }
+                  .statusOnlyInTimeRange=${this._configPanelStatusOnlyInTimeRange !== null ? this._configPanelStatusOnlyInTimeRange : (this._config?.statusOnlyInTimeRange || false)}
+                  @save=${e => this._handleConfigPanelSave(e.detail.calendars, e.detail.holidays, e.detail.statusOnlyInTimeRange)                              }
                 ></shift-config-panel>
               </div>
             `
@@ -3560,20 +3636,52 @@ return null;
     `;
                 }
 
-  _handleConfigPanelSave(calendars) {
-    // Aktualisiere die Config mit den neuen Kalendern
-    if (this._config) {
-      this._config.calendars = calendars;
-      
-      // Speichere nur über Saver (nicht über Editor)
-      this.saveConfigToEntity();
-      
-      // Schließe das Panel
-      this._showConfigPanel = false;
-      
-      // Aktualisiere die Ansicht
-      this.requestUpdate();
-                }
+  async _handleConfigPanelSave(calendars, holidays, statusOnlyInTimeRange) {
+    this._debug('[Config] _handleConfigPanelSave: === START ===', {
+      calendars_count: calendars?.length || 0,
+      hasHolidays: !!holidays,
+      statusOnlyInTimeRange: statusOnlyInTimeRange,
+      hasConfig: !!this._config,
+      hasEntity: !!(this._config && this._config.entity),
+      store_mode: this._config?.store_mode,
+      saver_key: this._config?.saver_key,
+    });
+
+    // Aktualisiere die Config mit den neuen Kalendern, Feiertagen und Optionen
+    if (!this._config) {
+      this._debug('[Config] _handleConfigPanelSave: FEHLER - this._config existiert nicht!');
+      return;
+    }
+
+    this._config.calendars = calendars;
+    if (holidays) {
+      this._config.holidays = holidays;
+      // Invalidiere Holiday-Cache, damit Feiertage neu berechnet werden
+      this._holidayCache = {};
+      this._debug('[Config] _handleConfigPanelSave: Holiday-Cache invalidiert aufgrund von Feiertags-Änderung');
+    }
+    if (statusOnlyInTimeRange !== undefined) {
+      this._config.statusOnlyInTimeRange = statusOnlyInTimeRange;
+      this._debug('[Config] _handleConfigPanelSave: statusOnlyInTimeRange auf', statusOnlyInTimeRange, 'gesetzt');
+    }
+
+    // Speichere nur über Saver (nicht über Editor)
+    // Verwende forceSave=true, damit auch beim initialen Load gespeichert wird
+    try {
+      await this.saveConfigToEntity(true);
+      this._debug('[Config] _handleConfigPanelSave: Speichern erfolgreich abgeschlossen');
+    } catch (error) {
+      this._debug('[Config] _handleConfigPanelSave: FEHLER beim Speichern:', error);
+      // Panel trotzdem schließen, damit der Benutzer den Fehler sieht
+    }
+
+    // Schließe das Panel
+    this._showConfigPanel = false;
+    this._configPanelHolidays = null;
+    this._configPanelStatusOnlyInTimeRange = null;
+
+    // Aktualisiere die Ansicht
+    this.requestUpdate();
                 }
 
   static styles = [
