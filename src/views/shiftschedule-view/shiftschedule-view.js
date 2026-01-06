@@ -271,25 +271,37 @@ export class ShiftScheduleView extends ViewBase {
                 }
                 }
 
-    // Prüfe ob sich die saver_config geändert hat (nur bei store_mode === 'saver')
+    // Prüfe ob sich die saver_config oder die saver-Daten geändert haben (nur bei store_mode === 'saver')
     let hasSaverConfigChanged = false;
+    let hasSaverDataChanged = false;
     if (this._config && this._config.store_mode === 'saver' && this._hass && hass && hass?.states) {
       try {
         const saverEntity = hass.states['saver.saver'];
         const previousSaverEntity = this._hass?.states?.['saver.saver'];
         if (saverEntity && saverEntity.attributes && saverEntity.attributes.variables) {
           const configKey = `${this._config.saver_key || 'Schichtplan'}_config`;
+          const dataKey = this._config.saver_key || 'Schichtplan';
+
+          // Prüfe Config-Variable
           const previousConfigValue = previousSaverEntity?.attributes?.variables?.[configKey];
           const newConfigValue = saverEntity.attributes.variables[configKey];
           if (previousConfigValue !== newConfigValue) {
             hasSaverConfigChanged = true;
             this._debug('[Config] set hass: saver_config hat sich geändert, lade Konfiguration neu');
-                }
-                }
+          }
+
+          // Prüfe Daten-Variable
+          const previousDataValue = previousSaverEntity?.attributes?.variables?.[dataKey];
+          const newDataValue = saverEntity.attributes.variables[dataKey];
+          if (previousDataValue !== newDataValue) {
+            hasSaverDataChanged = true;
+            this._debug(`[Sync] set hass: Saver-Daten-Variable "${dataKey}" hat sich geändert (alte Länge: ${previousDataValue?.length || 0}, neue Länge: ${newDataValue?.length || 0}), lade Daten neu`);
+          }
+        }
       } catch (error) {
-        this._debug('[Config] set hass: Fehler beim Prüfen der saver_config:', error);
-                }
-                }
+        this._debug('[Config] set hass: Fehler beim Prüfen der saver-Variablen:', error);
+      }
+    }
 
     const wasHassSet = !!this._hass;
     this._hass = hass;
@@ -310,14 +322,17 @@ export class ShiftScheduleView extends ViewBase {
                 }
 
     if (this._config) {
-      // Lade Daten beim ersten Setzen von hass oder wenn sich ein State geändert hat
-      if ((!wasHassSet || hasAnyEntityChanged) && hass?.states) {
+      // Lade Daten beim ersten Setzen von hass, wenn sich ein State geändert hat, oder wenn sich Saver-Daten geändert haben
+      if ((!wasHassSet || hasAnyEntityChanged || hasSaverDataChanged) && hass?.states) {
+        if (hasSaverDataChanged) {
+          this._debug('[Sync] set hass: Lade Daten neu aufgrund von Saver-Daten-Änderung (Synchronisation mit anderer Karte)');
+        }
         try {
           this.loadWorkingDays();
         } catch (error) {
           this._debug('[Config] set hass: Fehler beim Laden der Arbeitszeiten:', error);
-                }
-                }
+        }
+      }
 
       // Beim ersten Setzen von hass: Lade die Konfiguration aus dem Storage, falls noch nicht geladen
       // ABER: Nicht wenn das Konfigurationspanel offen ist, um ungespeicherte Änderungen nicht zu überschreiben
@@ -2170,6 +2185,7 @@ return value;
     this._updateDayButtonDirectly(monthNum, dayNum, yearNum, key, finalElements);
 
     // OPTIMIERUNG: Debounced Speichern - warte nach dem letzten Klick, bevor gespeichert wird
+    this._debug(`[Sync] toggleDay: Tag geändert (${yearNum}:${monthNum}:${dayNum}), plane Speichern für Synchronisation`);
     this._scheduleDebouncedSave();
                 }
 
@@ -2180,19 +2196,24 @@ return value;
 
     // Wenn Debounce-Zeit 0 ist, speichere sofort
     if (debounceTime === 0) {
+      this._debug('[Sync] _scheduleDebouncedSave: Speichere sofort (Debounce=0)');
       this._saveToHA();
       return;
                 }
 
     // Lösche vorhandenen Timer
     if (this._saveDebounceTimer) {
+      this._debug(`[Sync] _scheduleDebouncedSave: Timer bereits vorhanden, setze neu (${debounceTime}ms)`);
       clearTimeout(this._saveDebounceTimer);
       this._saveDebounceTimer = null;
+                } else {
+      this._debug(`[Sync] _scheduleDebouncedSave: Neuer Timer gesetzt (${debounceTime}ms)`);
                 }
 
     // Setze neuen Timer
     this._saveDebounceTimer = setTimeout(() => {
       this._saveDebounceTimer = null;
+      this._debug('[Sync] _scheduleDebouncedSave: Timer abgelaufen, speichere jetzt');
       this._saveToHA();
     }, debounceTime);
                 }

@@ -75,7 +75,7 @@ export class SaverStorage extends IStorageAdapter {
           name: this._saverKey,
           value: serializedData || '',
         });
-        this._debug(`[SaverStorage] saveData: Erfolgreich in Saver geschrieben`);
+        this._debug(`[Sync] [SaverStorage] saveData: Erfolgreich in Saver geschrieben - andere Karten sollten Änderung erkennen`);
       } else {
         this._debug(
           `[SaverStorage] saveData: Kein Schreiben nötig, Wert hat sich nicht geändert`
