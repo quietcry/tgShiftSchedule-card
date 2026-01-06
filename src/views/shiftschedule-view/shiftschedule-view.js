@@ -48,14 +48,14 @@ export class ShiftScheduleView extends ViewBase {
       _selectedCalendar: { type: String },
       _showConfigPanel: { type: Boolean },
     };
-  }
+                }
 
   constructor() {
     super();
-    this._workingDays = {}; // {"year:month": {day: [elements]}} - z.B. {"25:11": {1: ["a"], 2: ["a", "h"], 3: ["b"]}}
-    this._storageWarning = null; // { show: boolean, currentLength: number, maxLength: number, percentage: number }
-    this._configWarning = null; // { show: boolean, configEntityId: string }
-    this._statusWarning = null; // { show: boolean, statusEntityId: string }
+    this._workingDays = {}; // {"year:month": {day: [elements]}} - z.B. {"25:11": {1: ["a"], 2: ["a", "h"], 3: ["b"]}                              }
+    this._storageWarning = null; // { show: boolean, currentLength: number, maxLength: number, percentage: number                               }
+    this._configWarning = null; // { show: boolean, configEntityId: string                               }
+    this._statusWarning = null; // { show: boolean, statusEntityId: string                               }
     this._knownEntityIds = null; // Cache für bekannte Entities [mainEntity, ...additionalEntities] - WIRD VON ENTITY-STORAGE VERWENDET
     this._cleanupDone = false; // Flag, ob die Bereinigung bereits beim initialen Laden ausgeführt wurde
     this._displayedMonths = 2; // Anzahl der angezeigten Monate (wird aus config.numberOfMonths initialisiert)
@@ -66,7 +66,7 @@ export class ShiftScheduleView extends ViewBase {
     this._isInitialLoad = true; // Flag, ob gerade der initiale Load läuft (verhindert Config-Schreiben beim Laden)
     this._directDOMUpdateInProgress = new Set(); // Set von Button-Keys, die gerade per direkter DOM-Manipulation aktualisiert werden
     // Performance-Caches
-    this._holidayCache = {}; // Cache für Feiertage: {"2025-12": {1: true, 25: true, ...}}
+    this._holidayCache = {}; // Cache für Feiertage: {"2025-12": {1: true, 25: true, ...}                              }
     this._cachedHolidayEntities = null; // Cache für Holiday-Entities (wird bei hass-Update invalidiert)
     this._editorModeCache = null; // Cache für Editor-Mode-Erkennung
     this._editorModeCacheTime = 0; // Zeitstempel für Cache-Invalidierung
@@ -86,7 +86,7 @@ export class ShiftScheduleView extends ViewBase {
     Object.assign(this, CalendarMixin);
     Object.assign(this, ConfigManagementMixin);
     Object.assign(this, RenderingMixin);
-  }
+                }
 
   // formatTwoDigits() ist jetzt in DateUtils
 
@@ -96,7 +96,7 @@ export class ShiftScheduleView extends ViewBase {
     const now = Date.now();
     if (this._editorModeCache !== null && now - this._editorModeCacheTime < 5000) {
       return this._editorModeCache;
-    }
+                }
 
     let result = false;
 
@@ -105,15 +105,15 @@ export class ShiftScheduleView extends ViewBase {
       const urlParams = new URLSearchParams(window.location.search);
       if (urlParams.get('edit') === '1') {
         result = true;
-      }
-    }
+                }
+                }
 
     if (!result) {
       // Methode 2: Prüfe lovelace.editMode
       if (this.lovelace?.editMode === true) {
         result = true;
-      }
-    }
+                }
+                }
 
     if (!result) {
       // Methode 3: Prüfe, ob hui-dialog-edit-card im DOM existiert
@@ -121,9 +121,9 @@ export class ShiftScheduleView extends ViewBase {
         const editDialog = document.querySelector('hui-dialog-edit-card');
         if (editDialog) {
           result = true;
-        }
-      }
-    }
+                }
+                }
+                }
 
     if (!result) {
       // Methode 4: Prüfe, ob die Karte in einem Editor-Container ist
@@ -136,7 +136,7 @@ export class ShiftScheduleView extends ViewBase {
         if (element.tagName?.toLowerCase() === 'hui-dialog-edit-card') {
           result = true;
           break;
-        }
+                }
 
         // Prüfe auf Editor-spezifische Klassen oder Attribute
         if (
@@ -150,13 +150,13 @@ export class ShiftScheduleView extends ViewBase {
         ) {
           result = true;
           break;
-        }
+                }
 
         // Prüfe auf Editor-spezifische IDs
         if (element.id && (element.id.includes('editor') || element.id.includes('config'))) {
           result = true;
           break;
-        }
+                }
 
         // Prüfe auf Editor-spezifische Attribute
         if (
@@ -165,12 +165,12 @@ export class ShiftScheduleView extends ViewBase {
         ) {
           result = true;
           break;
-        }
+                }
 
         element = element.parentElement || element.parentNode;
         depth++;
-      }
-    }
+                }
+                }
 
     if (!result) {
       // Methode 5: Prüfe, ob die Karte in einem Shadow DOM mit Editor-Klassen ist
@@ -187,10 +187,10 @@ export class ShiftScheduleView extends ViewBase {
             host.tagName?.toLowerCase() === 'hui-card-element-editor'
           ) {
             result = true;
-          }
-        }
-      }
-    }
+                }
+                }
+                }
+                }
 
     if (!result) {
       // Methode 6: Prüfe URL-Pfad (falls im Editor-Modus)
@@ -198,16 +198,16 @@ export class ShiftScheduleView extends ViewBase {
         const url = window.location.href || window.location.pathname;
         if (url && (url.includes('/config/lovelace/dashboards') || url.includes('/editor'))) {
           result = true;
-        }
-      }
-    }
+                }
+                }
+                }
 
     // Cache speichern
     this._editorModeCache = result;
     this._editorModeCacheTime = now;
 
     return result;
-  }
+                }
 
   // Berechnet die Kontrastfarbe (schwarz oder weiß) für eine gegebene Hintergrundfarbe
   // _getContrastColor() ist jetzt in ColorUtils
@@ -222,7 +222,7 @@ export class ShiftScheduleView extends ViewBase {
       this._debug('[Storage] _initializeStorage: hass oder config fehlt');
       this._storage = null;
       return;
-    }
+                }
 
     try {
       this._storage = StorageFactory.createStorage(this._hass, this._config, this._debug.bind(this));
@@ -230,20 +230,28 @@ export class ShiftScheduleView extends ViewBase {
     } catch (error) {
       this._debug(`[Storage] _initializeStorage: Fehler beim Erstellen des Storage-Adapters: ${error.message}`, error);
       this._storage = null;
-    }
-  }
+                }
+                }
 
   get hass() {
     return this._hass;
-  }
+                }
 
   set hass(hass) {
+    // WICHTIG: Verhindere alle hass-Updates wenn das Konfigurationspanel geöffnet ist
+    if (this._showConfigPanel) {
+      // Aktualisiere hass trotzdem (für später), aber führe keine Operationen aus
+      this._debug('[Update-Block] set hass() blockiert (Panel ist geöffnet)');
+      this._hass = hass;
+      return; // Kein requestUpdate(), kein Laden von Daten, nichts
+                }
+
     // Ignoriere Updates während des Schreibens und 5 Sekunden danach
     if (this._isWriting) {
       this._hass = hass; // Aktualisiere hass trotzdem, aber lade keine Daten
       this.requestUpdate();
       return;
-    }
+                }
 
     const previousEntityState = this._hass?.states?.[this._config?.entity]?.state;
     const newEntityState = hass?.states?.[this._config?.entity]?.state;
@@ -259,10 +267,10 @@ export class ShiftScheduleView extends ViewBase {
         if (prevState !== newState) {
           hasAnyEntityChanged = true;
           break;
-        }
-      }
-    }
-    
+                }
+                }
+                }
+
     // Prüfe ob sich die saver_config geändert hat (nur bei store_mode === 'saver')
     let hasSaverConfigChanged = false;
     if (this._config && this._config.store_mode === 'saver' && this._hass && hass && hass?.states) {
@@ -276,12 +284,12 @@ export class ShiftScheduleView extends ViewBase {
           if (previousConfigValue !== newConfigValue) {
             hasSaverConfigChanged = true;
             this._debug('[Config] set hass: saver_config hat sich geändert, lade Konfiguration neu');
-          }
-        }
+                }
+                }
       } catch (error) {
         this._debug('[Config] set hass: Fehler beim Prüfen der saver_config:', error);
-      }
-    }
+                }
+                }
 
     const wasHassSet = !!this._hass;
     this._hass = hass;
@@ -292,14 +300,14 @@ export class ShiftScheduleView extends ViewBase {
     // Initialisiere Storage-Adapter neu, falls Config bereits vorhanden
     if (this._config) {
       this._initializeStorage();
-    }
+                }
 
     // Wenn hass zum ersten Mal gesetzt wird und die Konfiguration bereits vorhanden ist,
     // markiere initialen Load als abgeschlossen
     if (!wasHassSet && hass && this._config && this._isInitialLoad) {
       this._debug('[Config] set hass: hass zum ersten Mal gesetzt - markiere initialen Load als abgeschlossen');
       this._isInitialLoad = false;
-    }
+                }
 
     if (this._config) {
       // Lade Daten beim ersten Setzen von hass oder wenn sich ein State geändert hat
@@ -308,23 +316,54 @@ export class ShiftScheduleView extends ViewBase {
           this.loadWorkingDays();
         } catch (error) {
           this._debug('[Config] set hass: Fehler beim Laden der Arbeitszeiten:', error);
-        }
-      }
-      
+                }
+                }
+
       // Beim ersten Setzen von hass: Lade die Konfiguration aus dem Storage, falls noch nicht geladen
       // ABER: Nicht wenn das Konfigurationspanel offen ist, um ungespeicherte Änderungen nicht zu überschreiben
       if (!wasHassSet && this._storage && !this._showConfigPanel) {
         this._debug('[Config] set hass: hass zum ersten Mal gesetzt - lade Konfiguration aus Storage');
         // Verwende Promise ohne await, da set hass() nicht async ist
         this._storage.loadConfig().then(storageConfig => {
+          // WICHTIG: Prüfe nochmal, ob das Panel geöffnet wurde, während das Promise lief
+          // Verwende eine lokale Variable, um sicherzustellen, dass wir den aktuellen Wert prüfen
+          const isPanelOpen = this._showConfigPanel;
+          this._debug('[Config] set hass: Promise-Callback aufgerufen. _showConfigPanel=' + isPanelOpen + ', storageConfig vorhanden=' + !!storageConfig);
+          if (isPanelOpen) {
+            this._debug('[Config] set hass: Panel wurde geöffnet - überspringe Config-Update (beim ersten hass-Set). _showConfigPanel=' + isPanelOpen);
+            return;
+                }
+
           if (storageConfig) {
             try {
               const parsedConfig = JSON.parse(storageConfig);
               
+              // WICHTIG: Prüfe NOCHMAL nach dem Parsen, ob das Panel geöffnet wurde
+              const isPanelOpenAfterParse = this._showConfigPanel;
+              if (isPanelOpenAfterParse) {
+                this._debug('[Config] set hass: Panel wurde geöffnet - überspringe Config-Update (nach Parsen). _showConfigPanel=' + isPanelOpenAfterParse);
+                return;
+                }
+
               // Neues Format: Objekt mit "calendars" Property
               if (parsedConfig && typeof parsedConfig === 'object' && Array.isArray(parsedConfig.calendars)) {
                 this._debug('[Config] set hass: Konfiguration aus Storage geladen (neues Format mit calendars) beim ersten hass-Set');
                 
+                // WICHTIG: Prüfe NOCHMAL vor dem Aktualisieren von this._config.calendars
+                const isPanelOpenBeforeUpdate = this._showConfigPanel;
+                if (isPanelOpenBeforeUpdate) {
+                  this._debug('[Config] set hass: Panel wurde geöffnet - überspringe Config-Update (vor calendars-Update). _showConfigPanel=' + isPanelOpenBeforeUpdate);
+                  return;
+                }
+
+                // WICHTIG: Finale Prüfung direkt vor dem Aktualisieren von this._config.calendars
+                // Verwende eine lokale Variable, um sicherzustellen, dass wir den aktuellen Wert prüfen
+                const finalPanelCheck = this._showConfigPanel;
+                if (finalPanelCheck) {
+                  this._debug('[Config] set hass: Panel wurde geöffnet - überspringe Config-Update (finale Prüfung vor calendars-Update). _showConfigPanel=' + finalPanelCheck);
+                  return;
+                }
+
                 // Ersetze this._config.calendars vollständig mit den geladenen Kalendern
                 this._config.calendars = parsedConfig.calendars.map(cal => {
                   // Stelle sicher, dass timeRanges im korrekten Format sind
@@ -340,7 +379,7 @@ export class ShiftScheduleView extends ViewBase {
                           times: [...range],
                         };
                       } else if (typeof range === 'object' && range !== null && range.times && Array.isArray(range.times)) {
-                        // Neues Format: { id, times: [start, end] }
+                        // Neues Format: { id, times: [start, end]                               }
                         const normalizedRange = {
                           id: range.id || null,
                           times: [...range.times],
@@ -350,10 +389,10 @@ export class ShiftScheduleView extends ViewBase {
                       } else {
                         this._debug(`[Config] set hass: Zeitraum ${idx} für "${cal.shortcut}": Unbekanntes Format, verwende Default`);
                         return { id: null, times: [null, null] };
-                      }
-                    });
-                  }
-                  
+                }
+          });
+                }
+
                   return {
                     shortcut: cal.shortcut,
                     name: cal.name || `Schicht ${cal.shortcut?.toUpperCase() || ''}`,
@@ -375,33 +414,64 @@ export class ShiftScheduleView extends ViewBase {
                 });
                 
                 this._debug('[Config] set hass: Konfiguration aus Saver geladen und this._config aktualisiert');
-                this.requestUpdate();
-              } else {
+                // Prüfe nochmal, ob das Panel geöffnet wurde, bevor wir updaten
+                if (!this._showConfigPanel) {
+                  this.requestUpdate();
+                } else {
+                  this._debug('[Config] set hass: Panel wurde geöffnet - überspringe requestUpdate()');
+                }
+    } else {
                 this._debug('[Config] set hass: Konfiguration konnte nicht geparst werden - erwartetes Format: { calendars: [...] }');
-              }
-            } catch (error) {
+                }
+  } catch (error) {
               this._debug('[Config] set hass: Fehler beim Parsen der Konfiguration aus dem Storage:', error);
-            }
-          }
+                }
+                }
         }).catch(error => {
           this._debug('[Config] set hass: Fehler beim Laden der Konfiguration aus dem Storage:', error);
         });
-      }
-      
+                }
+
       // Wenn sich die saver_config geändert hat, lade die Konfiguration neu
       // ABER: Nicht wenn das Konfigurationspanel offen ist, um ungespeicherte Änderungen nicht zu überschreiben
       if (hasSaverConfigChanged && this._storage && !this._showConfigPanel) {
         this._debug('[Config] set hass: Lade Konfiguration aus Storage neu');
         // Lade die Konfiguration aus dem Storage und aktualisiere this._config
         this._storage.loadConfig().then(storageConfig => {
+          // WICHTIG: Prüfe nochmal, ob das Panel geöffnet wurde, während das Promise lief
+          if (this._showConfigPanel) {
+            this._debug('[Config] set hass: Panel wurde geöffnet - überspringe Config-Update (bei saver_config-Änderung)');
+            return;
+                }
+
           if (storageConfig) {
             try {
               const parsedConfig = JSON.parse(storageConfig);
               
+              // WICHTIG: Prüfe NOCHMAL nach dem Parsen, ob das Panel geöffnet wurde
+              if (this._showConfigPanel) {
+                this._debug('[Config] set hass: Panel wurde geöffnet - überspringe Config-Update (nach Parsen bei saver_config)');
+                return;
+                }
+
               // Neues Format: Objekt mit "calendars" Property
               if (parsedConfig && typeof parsedConfig === 'object' && Array.isArray(parsedConfig.calendars)) {
                 this._debug('[Config] set hass: Konfiguration aus Saver neu geladen (neues Format mit calendars)');
                 
+                // WICHTIG: Prüfe NOCHMAL vor dem Aktualisieren von this._config.calendars
+                if (this._showConfigPanel) {
+                  this._debug('[Config] set hass: Panel wurde geöffnet - überspringe Config-Update (vor calendars-Update bei saver_config)');
+                  return;
+                }
+
+                // WICHTIG: Finale Prüfung direkt vor dem Aktualisieren von this._config.calendars
+                // Verwende eine lokale Variable, um sicherzustellen, dass wir den aktuellen Wert prüfen
+                const finalPanelCheckSaver = this._showConfigPanel;
+                if (finalPanelCheckSaver) {
+                  this._debug('[Config] set hass: Panel wurde geöffnet - überspringe Config-Update (finale Prüfung vor calendars-Update bei saver_config). _showConfigPanel=' + finalPanelCheckSaver);
+                  return;
+                }
+
                 // Ersetze this._config.calendars vollständig mit den geladenen Kalendern
                 this._config.calendars = parsedConfig.calendars.map(cal => {
                   // Stelle sicher, dass timeRanges im korrekten Format sind
@@ -417,7 +487,7 @@ export class ShiftScheduleView extends ViewBase {
                           times: [...range],
                         };
                       } else if (typeof range === 'object' && range !== null && range.times && Array.isArray(range.times)) {
-                        // Neues Format: { id, times: [start, end] }
+                        // Neues Format: { id, times: [start, end]                               }
                         const normalizedRange = {
                           id: range.id || null,
                           times: [...range.times],
@@ -427,10 +497,10 @@ export class ShiftScheduleView extends ViewBase {
                       } else {
                         this._debug(`[Config] set hass: Zeitraum ${idx} für "${cal.shortcut}": Unbekanntes Format, verwende Default`);
                         return { id: null, times: [null, null] };
-                      }
-                    });
-                  }
-                  
+                }
+          });
+                }
+
                   return {
                     shortcut: cal.shortcut,
                     name: cal.name || `Schicht ${cal.shortcut?.toUpperCase() || ''}`,
@@ -452,20 +522,24 @@ export class ShiftScheduleView extends ViewBase {
                 });
                 
                 this._debug('[Config] set hass: Konfiguration aus Storage neu geladen und this._config aktualisiert');
-                // Wichtig: requestUpdate() aufrufen, damit die UI neu gerendert wird
-                this.requestUpdate();
-              } else {
+                // Prüfe nochmal, ob das Panel geöffnet wurde, bevor wir updaten
+                if (!this._showConfigPanel) {
+                  this.requestUpdate();
+                } else {
+                  this._debug('[Config] set hass: Panel wurde geöffnet - überspringe requestUpdate()');
+                }
+    } else {
                 this._debug('[Config] set hass: Konfiguration konnte nicht geparst werden - erwartetes Format: { calendars: [...] }');
-              }
-          } catch (error) {
+                }
+} catch (error) {
             this._debug('[Config] set hass: Fehler beim Parsen der neu geladenen Konfiguration:', error);
-          }
-        }
+                }
+                }
         }).catch(error => {
           this._debug('[Config] set hass: Fehler beim Neuladen der Konfiguration aus dem Storage:', error);
         });
-      }
-      
+                }
+
       // Prüfe Config-Entity und Status-Entity nur bei text_entity Modus
       // (bei Saver werden diese nicht benötigt)
       if (this._config.store_mode !== 'saver' && hass?.states) {
@@ -474,15 +548,18 @@ export class ShiftScheduleView extends ViewBase {
           this.checkStatusEntity();
         } catch (error) {
           this._debug('[Config] set hass: Fehler beim Prüfen der Config/Status-Entities:', error);
-        }
-      }
-    }
-    this.requestUpdate();
-  }
+                }
+                }
+                }
+    // Nur updaten, wenn das Panel nicht geöffnet ist
+    if (!this._showConfigPanel) {
+      this.requestUpdate();
+                }
+                }
 
   get config() {
     return this._config;
-  }
+                }
 
   set config(config) {
     this._debug('[Config] set config: === WIRD AUFGERUFEN ===');
@@ -509,7 +586,7 @@ export class ShiftScheduleView extends ViewBase {
     } else if (config && config.numberOfMonths) {
       // Stelle sicher, dass _displayedMonths nicht größer als numberOfMonths ist
       this._displayedMonths = Math.min(this._displayedMonths || 2, config.numberOfMonths);
-    }
+                }
 
     // Initialisiere _selectedCalendar - prüfe nur aktivierte Kalender
     const allCalendars = this._getAllCalendars();
@@ -527,45 +604,45 @@ export class ShiftScheduleView extends ViewBase {
           this._selectedCalendar = allCalendars[0].shortcut;
           if (config) {
             config.selectedCalendar = this._selectedCalendar;
-          }
+                }
         } else {
           // Ausgewählter Kalender ist nicht aktiviert, verwende den ersten aktivierten
           if (allCalendars.length > 0) {
             this._selectedCalendar = allCalendars[0].shortcut;
             if (config) {
               config.selectedCalendar = this._selectedCalendar;
-            }
-          } else {
+                }
+} else {
             // Kein Kalender aktiviert - keine automatische Aktivierung
             this._selectedCalendar = null;
             if (config) {
               config.selectedCalendar = null;
-            }
-          }
-        }
-      }
+                }
+                }
+                }
+                }
     } else {
       // Wenn kein selectedCalendar gesetzt ist, verwende den ersten aktivierten Kalender
       if (allCalendars.length > 0) {
         this._selectedCalendar = allCalendars[0].shortcut;
         if (config) {
           config.selectedCalendar = this._selectedCalendar;
-        }
+                }
       } else {
         // Kein Kalender aktiviert - keine automatische Aktivierung
         this._selectedCalendar = null;
         if (config) {
           config.selectedCalendar = null;
-        }
-      }
-    }
+                }
+                }
+                }
 
     // Wenn hass vorhanden ist, bedeutet das, dass die Karte bereits initialisiert wurde
     // Setze _isInitialLoad auf false, wenn hass vorhanden ist (Karte ist bereit)
     if (this._hass && this._isInitialLoad) {
       this._debug('[Config] set config: hass vorhanden - markiere initialen Load als abgeschlossen');
       this._isInitialLoad = false;
-    }
+                }
 
     if (this._hass) {
       // Initialisiere Storage-Adapter
@@ -590,16 +667,16 @@ export class ShiftScheduleView extends ViewBase {
         }, 0);
       } else if (isStillInitialLoad) {
         this._debug('[Config] set config: Initialer Load erkannt - überspringe Speichern');
-      }
+                }
     } else {
       this._debug('[Config] set config: hass noch nicht verfügbar - warte auf Initialisierung');
-    }
+                }
 
     // Markiere initialen Load als abgeschlossen NACH dem ersten Rendering
     // (nicht hier, sondern in firstUpdated oder nach dem ersten config-changed Event)
 
     this.requestUpdate();
-  }
+                }
 
   // Wird aufgerufen, wenn ein config-changed Event empfangen wird
   // (nur dann wird die Config gespeichert, nicht beim initialen Laden)
@@ -613,28 +690,28 @@ export class ShiftScheduleView extends ViewBase {
       // Markiere initialen Load als abgeschlossen NACH dem ersten Event
       this._isInitialLoad = false;
       return;
-    }
-    
+                }
+
     if (!this._hass) {
       this._debug('[Config] _handleConfigChanged: Abbruch - hass nicht verfügbar');
       return;
-    }
-    
+                }
+
     if (!this._config) {
       this._debug('[Config] _handleConfigChanged: Abbruch - config nicht verfügbar');
       return;
-    }
-    
+                }
+
     this._debug('[Config] _handleConfigChanged: Starte saveConfigToEntity()');
     this.saveConfigToEntity();
-  }
+                }
 
   // Liest eine Saver-Variable (z.B. "Schichtplan" aus saver.saver.attributes.variables)
   _readSaverVariable(key) {
     if (!this._hass || !this._hass.states || !key) {
       this._debug('[Saver] _readSaverVariable: Kein hass oder key vorhanden');
       return null;
-    }
+                }
 
     // Saver-Variablen sind in saver.saver.attributes.variables gespeichert
     const saverEntity = this._hass?.states?.['saver.saver'];
@@ -655,10 +732,10 @@ export class ShiftScheduleView extends ViewBase {
             this._debug(
               `[Saver] _readSaverVariable: Daten-Vorschau: "${preview}${value.length > 100 ? '...' : ''}"`
             );
-          }
-          return value;
-        }
-      }
+                }
+return value;
+                }
+                }
 
       // Debug: Zeige verfügbare Variablen
       const availableKeys = Object.keys(variables);
@@ -669,27 +746,27 @@ export class ShiftScheduleView extends ViewBase {
       this._debug(
         `[Saver] _readSaverVariable: saver.saver Entity nicht gefunden oder hat keine variables-Attribute`
       );
-    }
+                }
 
     this._debug(`[Saver] _readSaverVariable: Variable "${key}" nicht gefunden oder leer`);
     return null;
-  }
+                }
 
   // Prüft ob Saver verfügbar ist (mindestens eine Saver-Entity existiert)
   _isSaverAvailable() {
     if (!this._hass || !this._hass.states) {
       return false;
-    }
+                }
     // Prüfe ob irgendeine saver.* Entity existiert
     return Object.keys(this._hass.states).some(entityId => entityId.startsWith('saver.'));
-  }
+                }
 
   // Liest Daten vom Saver (wenn store_mode == 'saver' und Saver verfügbar)
   _loadDataFromSaver() {
     if (!this._config || this._config.store_mode !== 'saver') {
       this._debug('[Saver] _loadDataFromSaver: store_mode ist nicht "saver"');
       return null;
-    }
+                }
 
     const saverKey = this._config.saver_key || 'Schichtplan';
     this._debug(
@@ -703,18 +780,18 @@ export class ShiftScheduleView extends ViewBase {
         `[Saver] _loadDataFromSaver: Daten erfolgreich geladen, Länge: ${data.length} Zeichen`
       );
       return data;
-    }
+                }
 
     this._debug('[Saver] _loadDataFromSaver: Keine Daten gefunden');
     return null;
-  }
+                }
 
   // Liest Config vom Saver (wenn store_mode == 'saver' und Saver verfügbar)
   _loadConfigFromSaver() {
     if (!this._config || this._config.store_mode !== 'saver') {
       this._debug('[Saver] _loadConfigFromSaver: store_mode ist nicht "saver"');
       return null;
-    }
+                }
 
     const saverKey = this._config.saver_key || 'Schichtplan';
     const configKey = `${saverKey}_config`;
@@ -729,11 +806,11 @@ export class ShiftScheduleView extends ViewBase {
         `[Saver] _loadConfigFromSaver: Config erfolgreich geladen, Länge: ${config.length} Zeichen`
       );
       return config;
-    }
+                }
 
     this._debug('[Saver] _loadConfigFromSaver: Keine Config gefunden');
     return null;
-  }
+                }
 
   /**
    * Aktualisiert Warnungen basierend auf dem Storage-Adapter
@@ -742,52 +819,52 @@ export class ShiftScheduleView extends ViewBase {
   _updateWarnings() {
     if (!this._storage) {
       return;
-    }
+                }
 
     const warnings = this._storage.getWarnings();
     if (warnings) {
       if (warnings.config) {
         this._configWarning = warnings.config;
         this._updateConfigWarningDirectly();
-      }
+                }
       if (warnings.status) {
         this._statusWarning = warnings.status;
         this._updateStatusWarningDirectly();
-      }
+                }
     } else {
       // Keine Warnungen - setze auf null
       if (this._configWarning) {
         this._configWarning = null;
         this._updateConfigWarningDirectly();
-      }
+                }
       if (this._statusWarning) {
         this._statusWarning = null;
         this._updateStatusWarningDirectly();
-      }
-    }
-  }
+                }
+                }
+                }
 
   async loadWorkingDays() {
     if (!this._hass || !this._config) {
       this._debug('[Laden] loadWorkingDays: Kein hass oder config vorhanden');
       return;
-    }
-    
+                }
+
     // Prüfe Entity nur bei text_entity Modus (bei Saver wird keine Entity benötigt)
     if (this._config.store_mode !== 'saver' && !this._config.entity) {
       this._debug('[Laden] loadWorkingDays: Keine entity vorhanden (text_entity Modus benötigt entity)');
       return;
-    }
+                }
 
     // Stelle sicher, dass Storage initialisiert ist
     if (!this._storage) {
       this._initializeStorage();
-    }
+                }
 
     if (!this._storage) {
       this._debug('[Laden] loadWorkingDays: Kein Storage-Adapter verfügbar');
       return;
-    }
+                }
 
     this._debug(
       `[Laden] loadWorkingDays: Start, store_mode: "${this._config.store_mode}", entity: "${this._config.entity || 'nicht benötigt (Saver-Modus)'}"`
@@ -804,10 +881,10 @@ export class ShiftScheduleView extends ViewBase {
         this._debug(
           `[Laden] loadWorkingDays: Daten von ${dataSource} geladen, Länge: ${dataString.length} Zeichen`
         );
-      }
+                }
     } catch (error) {
       this._debug(`[Laden] loadWorkingDays: Fehler beim Laden: ${error.message}`, error);
-    }
+                }
 
     // Fallback: Wenn Saver-Modus und keine Daten, versuche EntityStorage
     if ((!dataString || dataString.trim() === '') && this._config.store_mode === 'saver') {
@@ -820,16 +897,16 @@ export class ShiftScheduleView extends ViewBase {
           this._debug(
             `[Laden] loadWorkingDays: Daten von Entities (Fallback) geladen, Länge: ${dataString.length} Zeichen`
           );
-        }
+                }
       } catch (error) {
         this._debug(`[Laden] loadWorkingDays: Fehler beim Fallback-Laden: ${error.message}`, error);
-      }
-    }
+                }
+                }
 
     // Synchronisiere _knownEntityIds mit EntityStorage (falls verwendet)
     if (this._storage && this._storage._knownEntityIds) {
       this._knownEntityIds = this._storage._knownEntityIds;
-    }
+                }
 
     // Parse die Daten (egal ob von Saver oder Entities)
     if (dataString && dataString.trim() !== '') {
@@ -850,14 +927,14 @@ export class ShiftScheduleView extends ViewBase {
           sampleDays.forEach(day => {
             this._debug(`[Laden] loadWorkingDays: Monat "${key}", Tag ${day}:`, monthData[day]);
           });
-        }
+                }
       });
     } else {
       this._debug(
         '[Laden] loadWorkingDays: Keine Daten zum Parsen vorhanden, setze _workingDays auf {}'
       );
       this._workingDays = {};
-    }
+                }
 
     // Prüfe Speicherverbrauch und zeige Warnung bei 90%+
     // Nur bei text_entity Modus (Saver hat keine Längenbegrenzung)
@@ -866,7 +943,7 @@ export class ShiftScheduleView extends ViewBase {
     } else {
       // Bei Saver-Modus keine Speicherwarnung nötig
       this._storageWarning = null;
-    }
+                }
 
     // Bereinige alte Monate: entferne alle Monate, die nicht angezeigt werden
     // Die Karte zeigt numberOfMonths Monate an (ab aktueller Monat)
@@ -889,7 +966,7 @@ export class ShiftScheduleView extends ViewBase {
       } else {
         previousMonth = currentMonth - 1;
         previousYear = currentYear;
-      }
+                }
 
       // Erstelle Liste aller Monate, die behalten werden sollen
       const monthsToKeep = [];
@@ -903,7 +980,7 @@ export class ShiftScheduleView extends ViewBase {
         const year = date.getFullYear() % 100;
         const month = date.getMonth() + 1;
         monthsToKeep.push({ year, month });
-      }
+                }
 
       let hasChanges = false;
 
@@ -927,13 +1004,13 @@ export class ShiftScheduleView extends ViewBase {
           if (!shouldKeep) {
             delete this._workingDays[key];
             hasChanges = true;
-          }
+                }
         } else {
           // Ungültiges Format, entfernen
           delete this._workingDays[key];
           hasChanges = true;
-        }
-      }
+                }
+                }
 
       // Wenn Änderungen vorgenommen wurden, speichere die bereinigten Daten
       if (hasChanges) {
@@ -943,12 +1020,12 @@ export class ShiftScheduleView extends ViewBase {
             entity_id: this._config.entity,
             value: cleanedValue,
           });
-        } catch (error) {}
-      }
-    }
+        } catch (error) {                              }
+                }
+                }
 
     this.requestUpdate();
-  }
+                }
 
   _parseWorkingDaysIntoObject(dataString, targetObject) {
     if (!dataString || dataString.trim() === '') return;
@@ -974,8 +1051,8 @@ export class ShiftScheduleView extends ViewBase {
             const year = now.getFullYear() % 100;
             const key = `${this.formatTwoDigits(year)}:${this.formatTwoDigits(monthNum)}`;
             targetObject[key] = this._parseDaysWithElements(daysStr);
-          }
-        }
+                }
+                }
       } else if (colons.length >= 3) {
         // Prüfe ob erstes Element ein Jahr ist (kleiner als 13) oder ein Monat
         const first = parseInt(colons[0].trim());
@@ -989,7 +1066,7 @@ export class ShiftScheduleView extends ViewBase {
           if (daysStr && monthNum >= 1 && monthNum <= 12 && !isNaN(yearNum)) {
             const key = `${this.formatTwoDigits(yearNum)}:${this.formatTwoDigits(monthNum)}`;
             targetObject[key] = this._parseDaysWithElements(daysStr);
-          }
+                }
         } else if (first > 12 && second <= 12) {
           // Neues Format: <jahr>:<monat>:<tag><elementen>,<tag><elementen>
           const yearNum = first;
@@ -998,14 +1075,14 @@ export class ShiftScheduleView extends ViewBase {
           if (daysStr && monthNum >= 1 && monthNum <= 12 && !isNaN(yearNum)) {
             const key = `${this.formatTwoDigits(yearNum)}:${this.formatTwoDigits(monthNum)}`;
             targetObject[key] = this._parseDaysWithElements(daysStr);
-          }
-        }
-      }
-    }
-  }
+                }
+                }
+                }
+                }
+                }
 
-  // Parst Tage mit Elementen: "01a,02ah,03b" -> {1: ["a"], 2: ["a", "h"], 3: ["b"]}
-  // Oder altes Format ohne Elemente: "01,02,03" -> {1: [], 2: [], 3: []}
+  // Parst Tage mit Elementen: "01a,02ah,03b" -> {1: ["a"], 2: ["a", "h"], 3: ["b"]                              }
+  // Oder altes Format ohne Elemente: "01,02,03" -> {1: [], 2: [], 3: []                              }
   _parseDaysWithElements(daysStr) {
     const result = {};
     const dayEntries = daysStr.split(',').filter(d => d.trim() !== '');
@@ -1032,36 +1109,36 @@ export class ShiftScheduleView extends ViewBase {
             result[dayNum] = [...new Set([...result[dayNum], ...elements])];
           } else {
             result[dayNum] = elements;
-          }
-        }
+                }
+                }
       } else {
         // Debug-Log wenn kein Match gefunden wurde
         if (trimmed.includes('03')) {
           this._debug(`[Parsing] Kein Match für "${trimmed}"`);
-        }
-      }
-    }
+                }
+                }
+                }
 
     return result;
-  }
+                }
 
   parseWorkingDays(dataString) {
     this._workingDays = {};
     this._parseWorkingDaysIntoObject(dataString, this._workingDays);
-  }
+                }
 
   findAdditionalEntities(baseEntityId) {
     const additionalEntities = [];
 
     if (!this._hass || !this._hass.states) {
       return additionalEntities;
-    }
+                }
 
     // Extrahiere den Domain-Teil (z.B. "input_text.arbeitszeiten")
     const entityParts = baseEntityId.split('.');
     if (entityParts.length !== 2) {
       return additionalEntities;
-    }
+                }
 
     const [domain, baseName] = entityParts;
 
@@ -1076,45 +1153,45 @@ export class ShiftScheduleView extends ViewBase {
         // Wenn eine Entity nicht existiert, breche ab (Entities sind sequenziell)
         // Es macht keinen Sinn weiterzusuchen, wenn _001 fehlt
         break;
-      }
-    }
+                }
+                }
 
     return additionalEntities;
-  }
+                }
 
   getEntityMaxLength(entityId) {
     if (!this._hass || !this._hass.states || !entityId) {
       return null;
-    }
+                }
 
     const entity = this._hass?.states?.[entityId];
     if (!entity || !entity.attributes) {
       return null;
-    }
+                }
 
     // input_text Entities haben ein 'max' Attribut, das die maximale Länge definiert
     const maxLength = entity.attributes.max;
 
     if (maxLength !== undefined && maxLength !== null) {
       return parseInt(maxLength);
-    }
+                }
 
     return null;
-  }
+                }
 
   getAllEntityMaxLengths() {
     const maxLengths = {};
 
     if (!this._hass || !this._config || !this._config.entity) {
       return maxLengths;
-    }
+                }
 
     // Prüfe Haupt-Entity
     const mainEntityId = this._config.entity;
     const mainMaxLength = this.getEntityMaxLength(mainEntityId);
     if (mainMaxLength !== null) {
       maxLengths[mainEntityId] = mainMaxLength;
-    }
+                }
 
     // Prüfe zusätzliche Entities
     const additionalEntities = this.findAdditionalEntities(mainEntityId);
@@ -1122,11 +1199,11 @@ export class ShiftScheduleView extends ViewBase {
       const additionalMaxLength = this.getEntityMaxLength(additionalEntityId);
       if (additionalMaxLength !== null) {
         maxLengths[additionalEntityId] = additionalMaxLength;
-      }
-    }
+                }
+                }
 
     return maxLengths;
-  }
+                }
 
   checkStorageUsage(serializedDataLength = null) {
     // Warnungen nur bei text_entity Modus (Saver hat keine Längenbegrenzung)
@@ -1134,13 +1211,13 @@ export class ShiftScheduleView extends ViewBase {
       this._storageWarning = null;
       this._updateStorageWarningDirectly();
       return;
-    }
+                }
 
     if (!this._hass || !this._config || !this._config.entity) {
       this._storageWarning = null;
       this._updateStorageWarningDirectly();
       return;
-    }
+                }
 
     // Verwende _knownEntityIds falls verfügbar, sonst suche neu
     let allEntityIds;
@@ -1149,14 +1226,14 @@ export class ShiftScheduleView extends ViewBase {
     } else {
       // Fallback: Suche Entities neu
       allEntityIds = [this._config.entity, ...this.findAdditionalEntities(this._config.entity)];
-    }
+                }
 
     const maxLengths = this.getAllEntityMaxLengths();
     if (Object.keys(maxLengths).length === 0) {
       this._storageWarning = null;
       this._updateStorageWarningDirectly();
       return;
-    }
+                }
 
     // Berechne Gesamtlänge und maximale Gesamtlänge
     let totalCurrentLength = 0;
@@ -1172,23 +1249,23 @@ export class ShiftScheduleView extends ViewBase {
         const entity = this._hass?.states?.[entityId];
         if (entity && entity.state) {
           totalCurrentLength += entity.state.length;
-        }
-      }
-    }
+                }
+                }
+                }
 
     // Berechne maximale Gesamtlänge
     for (const entityId of allEntityIds) {
       const maxLength = maxLengths[entityId];
       if (maxLength !== undefined && maxLength !== null) {
         totalMaxLength += maxLength;
-      }
-    }
+                }
+                }
 
     if (totalMaxLength === 0) {
       this._storageWarning = null;
       this._updateStorageWarningDirectly();
       return;
-    }
+                }
 
     const percentage = (totalCurrentLength / totalMaxLength) * 100;
 
@@ -1202,31 +1279,31 @@ export class ShiftScheduleView extends ViewBase {
       };
     } else {
       this._storageWarning = null;
-    }
+                }
 
     // Aktualisiere Warnung direkt im DOM ohne Re-Rendering
     this._updateStorageWarningDirectly();
-  }
+                }
 
   getConfigEntityId() {
     // Leite die Config-Entity-ID aus der Haupt-Entity ab
     if (!this._config || !this._config.entity) {
       return null;
-    }
+                }
     // Füge "_config" an die Entity-ID an
     // z.B. "input_text.arbeitszeiten" -> "input_text.arbeitszeiten_config"
     return this._config.entity + '_config';
-  }
+                }
 
   getStatusEntityId() {
     // Leite die Status-Entity-ID aus der Haupt-Entity ab
     if (!this._config || !this._config.entity) {
       return null;
-    }
+                }
     // Füge "_status" an die Entity-ID an
     // z.B. "input_text.arbeitszeiten" -> "input_text.arbeitszeiten_status"
     return this._config.entity + '_status';
-  }
+                }
 
   checkConfigEntity() {
     // Warnungen nur bei text_entity Modus (bei Saver wird Config anders gespeichert)
@@ -1234,21 +1311,21 @@ export class ShiftScheduleView extends ViewBase {
       this._configWarning = null;
       this._updateConfigWarningDirectly();
       return;
-    }
+                }
 
     // Prüfe ob die Config-Entity existiert
     if (!this._config || !this._config.entity) {
       this._configWarning = null;
       this._updateConfigWarningDirectly();
       return;
-    }
+                }
 
     const configEntityId = this.getConfigEntityId();
     if (!configEntityId) {
       this._configWarning = null;
       this._updateConfigWarningDirectly();
       return;
-    }
+                }
 
     // Wenn kein hass vorhanden ist (z.B. im Editor), zeige Warnung im Editor-Modus
     if (!this._hass || !this._hass.states) {
@@ -1260,10 +1337,10 @@ export class ShiftScheduleView extends ViewBase {
         };
       } else {
         this._configWarning = null;
-      }
+                }
       this._updateConfigWarningDirectly();
       return;
-    }
+                }
 
     const configEntity = this._hass.states[configEntityId];
     if (!configEntity) {
@@ -1278,11 +1355,11 @@ export class ShiftScheduleView extends ViewBase {
         // Behalte die Größen-Warnung
       } else {
         this._configWarning = null;
-      }
-    }
+                }
+                }
 
     this._updateConfigWarningDirectly();
-  }
+                }
 
   // Rendert eine Warnung für eine fehlende Entity
   _renderMissingEntityWarning(entityId, entityName, maxLength = 255, isConfig = false) {
@@ -1307,7 +1384,7 @@ export class ShiftScheduleView extends ViewBase {
         </div>
       </div>
     `;
-  }
+                }
 
   checkStatusEntity() {
     // Warnungen nur bei text_entity Modus (bei Saver wird Status anders gespeichert)
@@ -1315,21 +1392,21 @@ export class ShiftScheduleView extends ViewBase {
       this._statusWarning = null;
       this._updateStatusWarningDirectly();
       return;
-    }
+                }
 
     // Prüfe ob die Status-Entity existiert
     if (!this._config || !this._config.entity) {
       this._statusWarning = null;
       this._updateStatusWarningDirectly();
       return;
-    }
+                }
 
     const statusEntityId = this.getStatusEntityId();
     if (!statusEntityId) {
       this._statusWarning = null;
       this._updateStatusWarningDirectly();
       return;
-    }
+                }
 
     // Wenn kein hass vorhanden ist (z.B. im Editor), zeige Warnung im Editor-Modus
     if (!this._hass || !this._hass.states) {
@@ -1341,10 +1418,10 @@ export class ShiftScheduleView extends ViewBase {
         };
       } else {
         this._statusWarning = null;
-      }
+                }
       this._updateStatusWarningDirectly();
       return;
-    }
+                }
 
     const statusEntity = this._hass.states[statusEntityId];
     if (!statusEntity) {
@@ -1355,10 +1432,10 @@ export class ShiftScheduleView extends ViewBase {
       };
     } else {
       this._statusWarning = null;
-    }
+                }
 
     this._updateStatusWarningDirectly();
-  }
+                }
 
   // Erstellt die Config-Daten im komprimierten Format (für text_input Entities)
   _createCompressedConfig(activeShifts) {
@@ -1368,7 +1445,7 @@ export class ShiftScheduleView extends ViewBase {
     // Entferne die äußere Klammer (erstes [ und letztes ])
     if (configJson.startsWith('[') && configJson.endsWith(']')) {
       configJson = configJson.slice(1, -1);
-    }
+                }
 
     // Entferne "null" aus dem String (behalte Kommas)
     // Wiederhole die Ersetzung, bis keine null mehr vorhanden sind (für mehrere null hintereinander)
@@ -1398,12 +1475,12 @@ export class ShiftScheduleView extends ViewBase {
     configJson = configJson.replace(/",/g, ',');
 
     return configJson;
-  }
+                }
 
   // Erstellt die Config-Daten im vollständigen JSON-Format (für Saver)
   _createFullJsonConfig(activeShifts) {
     // Vollständiges JSON-Format: Objekt mit shifts, setup und lastchange
-    // Format: {shifts:[], setup:{}, lastchange:123456789}
+    // Format: {shifts:[], setup:{}, lastchange:123456789                              }
     const configObject = {
       shifts: activeShifts,
       setup: {
@@ -1413,7 +1490,7 @@ export class ShiftScheduleView extends ViewBase {
       lastchange: Math.floor(Date.now() / 1000), // Unix-Timestamp (Sekunden seit 1970-01-01)
     };
     return JSON.stringify(configObject);
-  }
+                }
 
   async saveConfigToEntity() {
     this._debug('[Config] saveConfigToEntity: === START: Speichere Konfiguration ===');
@@ -1423,7 +1500,7 @@ export class ShiftScheduleView extends ViewBase {
     if (this._isInitialLoad) {
       this._debug('[Config] saveConfigToEntity: Initialer Load, überspringe Config-Speichern');
       return;
-    }
+                }
     if (!this._hass || !this._config || !this._config.entity) {
       this._debug('[Config] saveConfigToEntity: Abbruch - hass, config oder entity fehlt', {
         hasHass: !!this._hass,
@@ -1431,7 +1508,7 @@ export class ShiftScheduleView extends ViewBase {
         hasEntity: !!(this._config && this._config.entity),
       });
       return;
-    }
+                }
 
     this._debug('[Config] saveConfigToEntity: Prüfe Konfiguration', {
       store_mode: this._config.store_mode,
@@ -1458,7 +1535,7 @@ export class ShiftScheduleView extends ViewBase {
       });
     } else {
       this._debug('[Config] saveConfigToEntity: Keine Kalender-Daten vorhanden');
-    }
+                }
 
     // Verwende direkt das calendars-Format vom Config-Panel (keine Konvertierung mehr nötig)
     const calendars = this._config.calendars || [];
@@ -1482,12 +1559,12 @@ export class ShiftScheduleView extends ViewBase {
     if (!this._storage) {
       this._debug('[Config] saveConfigToEntity: Storage nicht initialisiert, initialisiere...');
       this._initializeStorage();
-    }
+                }
 
     if (!this._storage) {
       this._debug('[Config] saveConfigToEntity: Kein Storage-Adapter verfügbar');
       return;
-    }
+                }
 
     this._debug('[Config] saveConfigToEntity: Storage-Adapter gefunden, starte Speichern...', {
       storageType: this._config.store_mode,
@@ -1507,8 +1584,8 @@ export class ShiftScheduleView extends ViewBase {
         // TODO: Könnte später auch auf calendars-Format umgestellt werden
         const allShifts = this._convertCalendarsToShifts(calendars);
         await this._storage.saveConfig(allShifts);
-      }
-      
+                }
+
       // Aktualisiere Warnungen
       this._updateWarnings();
       
@@ -1529,12 +1606,12 @@ export class ShiftScheduleView extends ViewBase {
         } catch (fallbackError) {
           this._debug(`[Config] saveConfigToEntity: Auch Fallback fehlgeschlagen: ${fallbackError.message}`, fallbackError);
           this.checkConfigEntity();
-        }
+                }
       } else {
         this.checkConfigEntity();
-      }
-    }
-  }
+                }
+                }
+                }
 
   /**
    * Konvertiert calendars-Format zu komprimiertem shifts-Format (für Entity-Storage)
@@ -1564,8 +1641,8 @@ export class ShiftScheduleView extends ViewBase {
               } else if (Array.isArray(range1) && range1.length >= 2) {
                 start1 = range1[0] && range1[0].trim() !== '' ? range1[0].trim() : null;
                 end1 = range1[1] && range1[1].trim() !== '' ? range1[1].trim() : null;
-              }
-            }
+                }
+                }
             shiftData.push(start1, end1);
 
             // Zeitraum 2
@@ -1579,12 +1656,12 @@ export class ShiftScheduleView extends ViewBase {
               } else if (Array.isArray(range2) && range2.length >= 2) {
                 start2 = range2[0] && range2[0].trim() !== '' ? range2[0].trim() : null;
                 end2 = range2[1] && range2[1].trim() !== '' ? range2[1].trim() : null;
-              }
-            }
+                }
+                }
             shiftData.push(start2, end2);
           } else {
             shiftData.push(null, null, null, null);
-          }
+                }
 
           // statusRelevant
           const statusRelevant = calendar.statusRelevant !== false ? 1 : 0;
@@ -1595,18 +1672,18 @@ export class ShiftScheduleView extends ViewBase {
           shiftData.push(enabled);
 
           allShifts.push(shiftData);
-        }
-      }
-    }
+                }
+                }
+                }
     return allShifts;
-  }
+                }
 
   async _saveConfigToEntityFallback(activeShifts) {
     const configEntityId = this.getConfigEntityId();
     if (!configEntityId) {
       this._debug('[Config] _saveConfigToEntityFallback: Keine configEntityId');
       return;
-    }
+                }
 
     this._debug(`[Config] _saveConfigToEntityFallback: Start, configEntityId: "${configEntityId}"`);
 
@@ -1619,7 +1696,7 @@ export class ShiftScheduleView extends ViewBase {
       );
       this.checkConfigEntity();
       return;
-    }
+                }
 
     // Komprimiertes Format für text_input Entities
     const configJson = this._createCompressedConfig(activeShifts);
@@ -1643,7 +1720,7 @@ export class ShiftScheduleView extends ViewBase {
       };
       this._updateConfigWarningDirectly();
       return;
-    }
+                }
 
     try {
       this._debug(
@@ -1664,8 +1741,8 @@ export class ShiftScheduleView extends ViewBase {
         error
       );
       this.checkConfigEntity();
-    }
-  }
+                }
+                }
 
   serializeWorkingDays() {
     const parts = [];
@@ -1681,7 +1758,7 @@ export class ShiftScheduleView extends ViewBase {
       const days = this._workingDays[key];
       if (!days || typeof days !== 'object' || Array.isArray(days)) continue;
 
-      // Struktur: {day: [elements]}
+      // Struktur: {day: [elements]                              }
       const dayEntries = Object.keys(days)
         .map(d => parseInt(d))
         .filter(d => !isNaN(d))
@@ -1702,20 +1779,20 @@ export class ShiftScheduleView extends ViewBase {
             } else {
               // Tag ohne Elemente
               return dayStr;
-            }
-          })
+                }
+})
           .join(',');
         parts.push(`${key}:${formattedDays}`);
-      }
-    }
+                }
+                }
     return parts.join(';');
-  }
+                }
 
   async distributeDataToEntities(serializedData) {
     if (!this._hass || !this._config || !this._config.entity) {
       this._debug('[Speichern] distributeDataToEntities: Kein hass, config oder entity vorhanden');
       return;
-    }
+                }
 
     this._debug(
       `[Speichern] distributeDataToEntities: Start, Datenlänge: ${serializedData ? serializedData.length : 0} Zeichen`
@@ -1729,7 +1806,7 @@ export class ShiftScheduleView extends ViewBase {
     if (this._writeLockTimer) {
       clearTimeout(this._writeLockTimer);
       this._writeLockTimer = null;
-    }
+                }
 
     try {
       // Verwende die gecachte Liste der Entities, falls verfügbar
@@ -1747,14 +1824,14 @@ export class ShiftScheduleView extends ViewBase {
           const newEntities = currentAdditionalEntities.slice(knownAdditionalCount);
           allEntityIds.push(...newEntities);
           this._knownEntityIds = [...allEntityIds];
-        }
+                }
       } else {
         // Keine gecachte Liste vorhanden, sammle Entities neu
         allEntityIds = [this._config.entity];
         const additionalEntities = this.findAdditionalEntities(this._config.entity);
         allEntityIds.push(...additionalEntities);
         this._knownEntityIds = [...allEntityIds];
-      }
+                }
 
       this._debug(
         `[Speichern] distributeDataToEntities: Verwende ${allEntityIds.length} Entities: ${allEntityIds.join(', ')}`
@@ -1772,8 +1849,8 @@ export class ShiftScheduleView extends ViewBase {
           // Wenn keine max-Länge bekannt ist, verwende einen Standardwert (z.B. 255)
           maxLengths[entityId] = 255;
           totalMaxLength += 255;
-        }
-      }
+                }
+                }
 
       // Debug: Zeige wie viele Zeichen wir schreiben wollen vs. können
       const dataLength = serializedData ? serializedData.length : 0;
@@ -1799,8 +1876,8 @@ export class ShiftScheduleView extends ViewBase {
             this._debug(
               `[Speichern] distributeDataToEntities: Fehler beim Leeren von "${entityId}": ${error.message}`
             );
-          }
-        }
+                }
+                }
         // Setze Timer auch wenn keine Daten vorhanden waren
         this._writeLockTimer = setTimeout(() => {
           this._isWriting = false;
@@ -1810,7 +1887,7 @@ export class ShiftScheduleView extends ViewBase {
           );
         }, 5000);
         return;
-      }
+                }
 
       // Verteile die Daten zeichenweise auf die Entities (umgekehrt zum Einlesen)
       // Wir haben einen Datenstring über alles und schreiben nur so viele Zeichen wie aufgenommen werden können
@@ -1833,8 +1910,8 @@ export class ShiftScheduleView extends ViewBase {
         // Wenn noch Daten übrig sind, wechsle zur nächsten Entity
         if (remainingData.length > 0) {
           currentEntityIndex++;
-        }
-      }
+                }
+                }
 
       // Wenn am Ende noch Text über ist, prüfe ob zwischenzeitlich eine zusätzliche Entität angelegt wurde
       if (remainingData.length > 0) {
@@ -1857,8 +1934,8 @@ export class ShiftScheduleView extends ViewBase {
               maxLengths[newEntityId] = maxLength;
             } else {
               maxLengths[newEntityId] = 255;
-            }
-          }
+                }
+                }
 
           // Verteile die verbleibenden Daten auf die neuen Entities
           currentEntityIndex = allEntityIds.length - newEntities.length;
@@ -1874,11 +1951,11 @@ export class ShiftScheduleView extends ViewBase {
 
             if (remainingData.length > 0) {
               currentEntityIndex++;
-            }
-          }
+                }
+                }
         } else {
-        }
-      }
+                }
+                }
 
       // Schreibe die Werte in die Entities (sequenziell, um sicherzustellen, dass alle Calls abgeschlossen sind)
       this._debug(
@@ -1907,7 +1984,7 @@ export class ShiftScheduleView extends ViewBase {
             this._debug(
               `[Speichern] distributeDataToEntities: Fehler beim Schreiben in "${entityId}": ${error.message}`
             );
-          }
+                }
         } else {
           this._debug(
             `[Speichern] distributeDataToEntities: Schreibe in "${entityId}" (${value.length} Zeichen)`
@@ -1924,9 +2001,9 @@ export class ShiftScheduleView extends ViewBase {
             this._debug(
               `[Speichern] distributeDataToEntities: Fehler beim Schreiben in "${entityId}": ${error.message}`
             );
-          }
-        }
-      }
+                }
+                }
+                }
 
       // Leere alle zusätzlichen Entities, die nicht verwendet wurden (um alte Daten zu entfernen)
       // Wir müssen alle bekannten zusätzlichen Entities prüfen, nicht nur die in allEntityIds
@@ -1952,16 +2029,16 @@ export class ShiftScheduleView extends ViewBase {
             this._debug(
               `[Speichern] distributeDataToEntities: Fehler beim Leeren von "${additionalEntityId}": ${error.message}`
             );
-          }
-        }
-      }
+                }
+                }
+                }
 
       // Wenn noch Daten übrig sind, die nicht gespeichert werden konnten
       if (remainingData.length > 0) {
         this._debug(
           `[Speichern] distributeDataToEntities: WARNUNG - ${remainingData.length} Zeichen konnten nicht gespeichert werden!`
         );
-      }
+                }
     } catch (error) {
       this._debug(
         `[Speichern] distributeDataToEntities: Fehler beim Verteilen der Daten: ${error.message}`,
@@ -1977,8 +2054,8 @@ export class ShiftScheduleView extends ViewBase {
       this._debug(
         '[Speichern] distributeDataToEntities: Abgeschlossen, Schreib-Lock wird in 5 Sekunden entfernt'
       );
-    }
-  }
+                }
+                }
 
   async toggleDay(month, day, year = null) {
     // Stelle sicher, dass month und day Zahlen sind
@@ -1987,7 +2064,7 @@ export class ShiftScheduleView extends ViewBase {
 
     if (isNaN(monthNum) || isNaN(dayNum)) {
       return;
-    }
+                }
 
     // Prüfe ob dieser Monat der Vormonat ist (schreibgeschützt)
     const now = new Date();
@@ -1998,7 +2075,7 @@ export class ShiftScheduleView extends ViewBase {
     // Bestimme das Jahr (Kurzform, z.B. 25 für 2025)
     if (!year) {
       year = currentYear;
-    }
+                }
     const yearNum = parseInt(year);
 
     let isPreviousMonth = false;
@@ -2008,22 +2085,22 @@ export class ShiftScheduleView extends ViewBase {
     } else {
       // Vormonat ist aktueller Monat - 1 im gleichen Jahr
       isPreviousMonth = monthNum === currentMonth - 1 && yearNum === currentYear;
-    }
+                }
 
     if (isPreviousMonth) {
       return;
-    }
+                }
 
     // Prüfe ob hass und config vorhanden sind
     // Im Saver-Modus wird keine entity benötigt
     if (!this._hass || !this._config) {
       return;
-    }
+                }
 
     // Bei text_entity Modus muss eine entity vorhanden sein
     if (this._config.store_mode !== 'saver' && !this._config.entity) {
       return;
-    }
+                }
 
     // yearNum wurde bereits oben deklariert
     const key = `${this.formatTwoDigits(yearNum)}:${this.formatTwoDigits(monthNum)}`;
@@ -2031,7 +2108,7 @@ export class ShiftScheduleView extends ViewBase {
     // Stelle sicher, dass die Struktur ein Objekt ist (nicht Array)
     if (!this._workingDays[key] || Array.isArray(this._workingDays[key])) {
       this._workingDays[key] = {};
-    }
+                }
 
     // Hole das ausgewählte Kalender-Shortcut
     const selectedCalendarShortcut = this._getSelectedCalendarShortcut();
@@ -2039,12 +2116,12 @@ export class ShiftScheduleView extends ViewBase {
     if (!selectedCalendarShortcut) {
       // Kein Kalender ausgewählt - kann nicht togglen
       return;
-    }
+                }
 
     // Tag mit Kalender
     if (!this._workingDays[key][dayNum]) {
       this._workingDays[key][dayNum] = [];
-    }
+                }
 
     // WICHTIG: Erstelle eine Kopie des Arrays, um sicherzustellen, dass wir mit dem richtigen Array arbeiten
     const elements = [...(this._workingDays[key][dayNum] || [])];
@@ -2069,24 +2146,24 @@ export class ShiftScheduleView extends ViewBase {
         // Wenn keine Tage mehr vorhanden sind, entferne den Monat
         if (Object.keys(this._workingDays[key]).length === 0) {
           delete this._workingDays[key];
-        }
+                }
       } else {
         // Aktualisiere das Array im _workingDays
         this._workingDays[key][dayNum] = elements;
-      }
+                }
     } else {
       // Kalender hinzufügen (nur wenn noch nicht vorhanden)
       if (!elements.includes(selectedCalendarShortcut)) {
         elements.push(selectedCalendarShortcut);
         // Aktualisiere das Array im _workingDays
         this._workingDays[key][dayNum] = elements;
-      }
+                }
       // Speichere die finalen Elemente
       finalElements =
         this._workingDays[key] && this._workingDays[key][dayNum]
           ? this._workingDays[key][dayNum]
           : elements;
-    }
+                }
 
     // OPTIMIERUNG: Direkte DOM-Manipulation statt komplettes Re-Rendering
     // Verwende die finalen elements (bereits vor dem möglichen Löschen gespeichert)
@@ -2094,7 +2171,7 @@ export class ShiftScheduleView extends ViewBase {
 
     // OPTIMIERUNG: Debounced Speichern - warte nach dem letzten Klick, bevor gespeichert wird
     this._scheduleDebouncedSave();
-  }
+                }
 
   // Plant ein debounced Speichern der Daten
   _scheduleDebouncedSave() {
@@ -2105,20 +2182,20 @@ export class ShiftScheduleView extends ViewBase {
     if (debounceTime === 0) {
       this._saveToHA();
       return;
-    }
+                }
 
     // Lösche vorhandenen Timer
     if (this._saveDebounceTimer) {
       clearTimeout(this._saveDebounceTimer);
       this._saveDebounceTimer = null;
-    }
+                }
 
     // Setze neuen Timer
     this._saveDebounceTimer = setTimeout(() => {
       this._saveDebounceTimer = null;
       this._saveToHA();
     }, debounceTime);
-  }
+                }
 
   // Speichert die Daten asynchron in Home Assistant
   async _saveToHA() {
@@ -2128,12 +2205,12 @@ export class ShiftScheduleView extends ViewBase {
       // Stelle sicher, dass Storage initialisiert ist
       if (!this._storage) {
         this._initializeStorage();
-      }
-      
+                }
+
       if (!this._storage) {
         this._debug('[Speichern] _saveToHA: Kein Storage-Adapter verfügbar');
         return;
-      }
+                }
 
       const serializedData = this.serializeWorkingDays();
       this._debug(
@@ -2144,7 +2221,7 @@ export class ShiftScheduleView extends ViewBase {
       this._isWriting = true;
       if (this._writeLockTimer) {
         clearTimeout(this._writeLockTimer);
-      }
+                }
 
       try {
         // Verwende Storage-Adapter zum Speichern
@@ -2158,8 +2235,8 @@ export class ShiftScheduleView extends ViewBase {
         } else {
           this._storageWarning = null;
           this._updateStorageWarningDirectly();
-        }
-        
+                }
+
         this._debug('[Speichern] _saveToHA: Erfolgreich abgeschlossen');
       } catch (error) {
         // Fehler beim Speichern - versuche Fallback
@@ -2172,7 +2249,7 @@ export class ShiftScheduleView extends ViewBase {
           await fallbackStorage.saveData(serializedData);
         } else {
           throw error; // Bei EntityStorage gibt es keinen Fallback
-        }
+                }
       } finally {
         // Setze Timer für Schreib-Lock (5 Sekunden)
         this._writeLockTimer = setTimeout(() => {
@@ -2180,20 +2257,20 @@ export class ShiftScheduleView extends ViewBase {
           this._writeLockTimer = null;
           this._debug('[Speichern] _saveToHA: Schreib-Lock entfernt');
         }, 5000);
-      }
+                }
     } catch (error) {
       this._debug(`[Speichern] _saveToHA: Fehler beim Speichern: ${error.message}`, error);
       console.error('[TG Schichtplan] Fehler beim Speichern:', error);
       // Optional: Hier könnte man eine Fehlermeldung anzeigen
-    }
-  }
+                }
+                }
 
   // Speichert Daten in den Saver
   async _saveDataToSaver(serializedData) {
     if (!this._hass || !this._config || !this._config.saver_key) {
       this._debug('[Speichern] _saveDataToSaver: Kein hass, config oder saver_key vorhanden');
       return;
-    }
+                }
 
     const saverKey = this._config.saver_key || 'Schichtplan';
     this._debug(
@@ -2210,8 +2287,8 @@ export class ShiftScheduleView extends ViewBase {
         const existingValue = saverEntity.attributes.variables[saverKey];
         if (existingValue !== undefined && existingValue !== null) {
           oldValue = String(existingValue).trim();
-        }
-      }
+                }
+                }
 
       this._debug(
         `[Speichern] _saveDataToSaver: Saver-Variable "${saverKey}" existiert: ${oldValue !== ''}, alte Länge: ${oldValue.length} Zeichen`
@@ -2231,7 +2308,7 @@ export class ShiftScheduleView extends ViewBase {
         this._debug(
           `[Speichern] _saveDataToSaver: Kein Schreiben nötig, Wert hat sich nicht geändert`
         );
-      }
+                }
     } catch (error) {
       // Fehler beim Schreiben in Saver - Fallback zu Entities
       this._debug(
@@ -2240,19 +2317,19 @@ export class ShiftScheduleView extends ViewBase {
       );
       console.warn('[TG Schichtplan] Fehler beim Schreiben in Saver, Fallback zu Entities:', error);
       await this.distributeDataToEntities(serializedData);
-    }
-  }
+                }
+                }
 
   // Liest die Debounce-Zeit aus der Config
   _getSaveDebounceTime() {
     // Versuche aus Config zu lesen
     if (this._config && typeof this._config.saveDebounceTime === 'number') {
       return Math.max(0, this._config.saveDebounceTime); // Mindestens 0
-    }
+                }
 
     // Fallback: Verwende Standard-Wert aus card-config.js
     return SaveDebounceTime || 300; // Standard: 300ms
-  }
+                }
 
   // Aktualisiert einen einzelnen Button direkt im DOM ohne komplettes Re-Rendering
   _updateDayButtonDirectly(monthNum, dayNum, yearNum, key, dayElements) {
@@ -2260,14 +2337,14 @@ export class ShiftScheduleView extends ViewBase {
       // Shadow DOM noch nicht bereit, Fallback zu requestUpdate
       this.requestUpdate();
       return;
-    }
+                }
 
     // Button sollte bereits in _directDOMUpdateInProgress sein (wurde in toggleDay gesetzt)
     // Falls nicht, füge ihn hinzu (Fallback für direkte Aufrufe)
     const buttonKey = `${yearNum}:${monthNum}:${dayNum}`;
     if (!this._directDOMUpdateInProgress.has(buttonKey)) {
       this._directDOMUpdateInProgress.add(buttonKey);
-    }
+                }
 
     // Finde den Button im DOM
     const button = this.shadowRoot.querySelector(
@@ -2279,7 +2356,7 @@ export class ShiftScheduleView extends ViewBase {
       this._directDOMUpdateInProgress.delete(buttonKey);
       this.requestUpdate();
       return;
-    }
+                }
 
     // Berechne die neuen Werte für diesen Button
     const selectedShortcut = this._getSelectedCalendarShortcut();
@@ -2295,9 +2372,9 @@ export class ShiftScheduleView extends ViewBase {
         if (calendar && calendar.enabled) {
           firstActiveShift = shortcut;
           break;
-        }
-      }
-    }
+                }
+                }
+                }
 
     // Bestimme welche Schicht den Tag färben soll
     let activeShiftForColor = null;
@@ -2305,7 +2382,7 @@ export class ShiftScheduleView extends ViewBase {
       activeShiftForColor = selectedShortcut;
     } else if (firstActiveShift) {
       activeShiftForColor = firstActiveShift;
-    }
+                }
 
     const isWorking = activeShiftForColor !== null;
 
@@ -2314,7 +2391,7 @@ export class ShiftScheduleView extends ViewBase {
       button.classList.add('working');
     } else {
       button.classList.remove('working');
-    }
+                }
 
     // Aktualisiere Hintergrundfarbe
     if (activeShiftForColor) {
@@ -2323,17 +2400,17 @@ export class ShiftScheduleView extends ViewBase {
         button.style.backgroundColor = activeCalendar.color;
       } else {
         button.style.backgroundColor = '';
-      }
+                }
     } else {
       button.style.backgroundColor = '';
-    }
+                }
 
     // Aktualisiere Shift-Indikatoren
     // Entferne zuerst alle vorhandenen Container und Indikatoren
     const existingContainer = button.querySelector('.shifts-container');
     if (existingContainer) {
       existingContainer.remove();
-    }
+                }
 
     // Erstelle neue Indikatoren für alle Schichten außer der, die den Tag färbt
     const shiftIndicators = dayElements
@@ -2346,7 +2423,7 @@ export class ShiftScheduleView extends ViewBase {
           indicator.style.backgroundColor = calendar.color;
           indicator.title = calendar.name || `Schicht ${shortcut.toUpperCase()}`;
           return indicator;
-        }
+                }
         return null;
       })
       .filter(indicator => indicator !== null);
@@ -2359,22 +2436,22 @@ export class ShiftScheduleView extends ViewBase {
       container.setAttribute('data-manual-update', 'true');
       shiftIndicators.forEach(ind => container.appendChild(ind));
       button.appendChild(container);
-    }
+                }
 
     // Entferne Markierung nach Abschluss der direkten DOM-Manipulation
     // Verzögert, damit Lit-Updates, die durch _workingDays-Änderung ausgelöst werden, übersprungen werden können
     setTimeout(() => {
       this._directDOMUpdateInProgress.delete(buttonKey);
     }, 100); // Länger warten, damit Lit-Updates abgeschlossen sind
-  }
+                }
 
   getDaysInMonth(year, month) {
     return new Date(year, month + 1, 0).getDate();
-  }
+                }
 
   getFirstDayOfMonth(year, month) {
     return new Date(year, month, 1).getDay();
-  }
+                }
 
   getWeekNumber(date) {
     const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
@@ -2382,7 +2459,7 @@ export class ShiftScheduleView extends ViewBase {
     d.setUTCDate(d.getUTCDate() + 4 - dayNum);
     const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
     return Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
-  }
+                }
 
   getMonthName(month) {
     const months = [
@@ -2400,7 +2477,7 @@ export class ShiftScheduleView extends ViewBase {
       'Dezember',
     ];
     return months[month];
-  }
+                }
 
   /**
    * Rendert einen einzelnen Tag-Button für den Kalender
@@ -2439,9 +2516,9 @@ export class ShiftScheduleView extends ViewBase {
         if (calendar && calendar.enabled) {
           firstActiveShift = shortcut;
           break;
-        }
-      }
-    }
+                }
+                }
+                }
 
     // Bestimme welche Schicht den Tag färben soll
     let activeShiftForColor = null;
@@ -2451,7 +2528,7 @@ export class ShiftScheduleView extends ViewBase {
     } else if (firstActiveShift) {
       // Ansonsten verwende die erste aktivierte Schicht
       activeShiftForColor = firstActiveShift;
-    }
+                }
 
     // isWorking ist true, wenn eine Schicht den Tag färbt
     const isWorking = activeShiftForColor !== null;
@@ -2461,8 +2538,8 @@ export class ShiftScheduleView extends ViewBase {
       const activeCalendar = this._getCalendarByShortcut(activeShiftForColor);
       if (activeCalendar && activeCalendar.color) {
         buttonStyle = `background-color: ${activeCalendar.color};`;
-      }
-    }
+                }
+                }
 
     // Prüfe ob es ein Wochenende oder Feiertag ist
     const isWeekend = this._isWeekend(year, month, currentDay);
@@ -2484,7 +2561,7 @@ export class ShiftScheduleView extends ViewBase {
             >
             </span>
           `;
-        }
+                }
         return null; // Nicht anzeigen, wenn Kalender deaktiviert ist
       })
       .filter(indicator => indicator !== null); // Entferne null-Werte
@@ -2512,19 +2589,19 @@ export class ShiftScheduleView extends ViewBase {
                     // Stelle sicher, dass das Element fokussierbar ist
                     if (!wrapper.hasAttribute('tabindex')) {
                       wrapper.setAttribute('tabindex', '-1');
-                    }
-                    wrapper.focus();
+                }
+          wrapper.focus();
                   } else {
                     // Fallback: Setze Fokus auf die Komponente selbst
                     if (this.focus) {
                       this.focus();
-                    }
-                  }
                 }
-              }, 0);
-            }
-          }}
-          ?disabled=${isPreviousMonth}
+                }
+                }
+    }, 0);
+                }
+}                              }
+          ?disabled=${isPreviousMonth                              }
           data-month="${monthKey}"
           data-day="${currentDay}"
           data-year="${yearKey}"
@@ -2536,8 +2613,8 @@ export class ShiftScheduleView extends ViewBase {
             const buttonKey = `${yearKey}:${monthKey}:${currentDay}`;
             if (this._directDOMUpdateInProgress && this._directDOMUpdateInProgress.has(buttonKey)) {
               return '';
-            }
-            // Prüfe auch, ob im DOM bereits ein manuell erstellter Container existiert
+                }
+  // Prüfe auch, ob im DOM bereits ein manuell erstellter Container existiert
             if (this.shadowRoot) {
               const existingButton = this.shadowRoot.querySelector(
                 `button[data-month="${monthKey}"][data-day="${currentDay}"][data-year="${yearKey}"]`
@@ -2547,16 +2624,16 @@ export class ShiftScheduleView extends ViewBase {
                 existingButton.querySelector('.shifts-container[data-manual-update="true"]')
               ) {
                 return '';
-              }
-            }
+                }
+                }
             return shiftIndicators.length > 0
               ? html`<div class="shifts-container">${shiftIndicators}</div>`
               : '';
-          })()}
+          })()                              }
         </button>
       </td>
     `;
-  }
+                }
 
   renderMonth(year, month) {
     const daysInMonth = this.getDaysInMonth(year, month);
@@ -2574,12 +2651,12 @@ export class ShiftScheduleView extends ViewBase {
         // Kompatibilität: Altes Format [days]
         workingDays = this._workingDays[key].map(d => parseInt(d)).filter(d => !isNaN(d));
       } else if (typeof this._workingDays[key] === 'object') {
-        // Neue Struktur: {day: [elements]}
+        // Neue Struktur: {day: [elements]                              }
         workingDays = Object.keys(this._workingDays[key])
           .map(d => parseInt(d))
           .filter(d => !isNaN(d));
-      }
-    }
+                }
+                }
 
     const now = new Date();
     const today = now.getDate();
@@ -2594,7 +2671,7 @@ export class ShiftScheduleView extends ViewBase {
     } else {
       // Vormonat ist aktueller Monat - 1 im gleichen Jahr
       isPreviousMonth = month === currentMonth - 1 && year === currentYear;
-    }
+                }
 
     const rows = [];
     let day = 1;
@@ -2606,17 +2683,17 @@ export class ShiftScheduleView extends ViewBase {
 
     for (let i = 0; i < firstDayMonday; i++) {
       firstRowCells.push(html`<td></td>`);
-    }
+                }
 
     for (let i = firstDayMonday; i < 7 && day <= daysInMonth; i++) {
       firstRowCells.push(
         this.renderDay(day, monthKey, yearKey, key, workingDays, isPreviousMonth, year, month)
       );
       day++;
-    }
+                }
     rows.push(
       html`<tr>
-        ${firstRowCells}
+        ${firstRowCells                              }
       </tr>`
     );
 
@@ -2636,14 +2713,14 @@ export class ShiftScheduleView extends ViewBase {
         } else {
           // Leere Zelle am Ende der letzten Woche
           rowCells.push(html`<td></td>`);
-        }
-      }
+                }
+                }
       rows.push(
         html`<tr>
-          ${rowCells}
+          ${rowCells                              }
         </tr>`
       );
-    }
+                }
 
     return html`
       <div class="month-container">
@@ -2662,12 +2739,12 @@ export class ShiftScheduleView extends ViewBase {
             </tr>
           </thead>
           <tbody>
-            ${rows}
+            ${rows                              }
           </tbody>
         </table>
       </div>
     `;
-  }
+                }
 
   changeDisplayedMonths(delta) {
     const maxMonths = this._config?.numberOfMonths || 14;
@@ -2675,8 +2752,8 @@ export class ShiftScheduleView extends ViewBase {
     if (newValue !== this._displayedMonths) {
       this._displayedMonths = newValue;
       this.requestUpdate();
-    }
-  }
+                }
+                }
 
   changeStartMonth(delta) {
     const maxMonths = this._config?.numberOfMonths || 14;
@@ -2694,8 +2771,8 @@ export class ShiftScheduleView extends ViewBase {
     if (newOffset !== currentOffset) {
       this._startMonthOffset = newOffset;
       this.requestUpdate();
-    }
-  }
+                }
+                }
 
   getNavigationBounds() {
     const maxMonths = this._config?.numberOfMonths || 14;
@@ -2709,7 +2786,7 @@ export class ShiftScheduleView extends ViewBase {
       canGoBack: currentOffset > minOffset,
       canGoForward: currentOffset < maxOffset,
     };
-  }
+                }
 
   _getSelectedCalendarShortcut() {
     // Gibt den Shortcut des ausgewählten Kalenders zurück
@@ -2721,43 +2798,43 @@ export class ShiftScheduleView extends ViewBase {
       this._selectedCalendar !== ''
     ) {
       return this._selectedCalendar;
-    }
+                }
 
     // Falls _selectedCalendar nicht gesetzt ist, prüfe die Config
     if (this._config?.selectedCalendar) {
       this._selectedCalendar = this._config.selectedCalendar;
       return this._selectedCalendar;
-    }
+                }
 
     // Fallback: Verwende den ersten aktivierten Kalender
     const allCalendars = this._getAllCalendars();
     if (allCalendars.length > 0) {
       return allCalendars[0].shortcut;
-    }
+                }
     // Wenn kein Kalender aktiviert ist, gibt es keinen Fallback
     return null;
-  }
+                }
 
   _getCalendarByShortcut(shortcut) {
     // Gibt das Kalender-Objekt für einen gegebenen Shortcut zurück
     if (!this._config?.calendars) {
       return null;
-    }
+                }
 
     return this._config.calendars.find(cal => cal.shortcut === shortcut) || null;
-  }
+                }
 
   _getDefaultColorForShortcut(shortcut) {
     // Gibt die Standardfarbe für einen gegebenen Shortcut zurück
     const defaultCalendar = ShiftScheduleView.CALENDARS.find(cal => cal.shortcut === shortcut);
     return defaultCalendar ? defaultCalendar.defaultColor : '#ff9800';
-  }
+                }
 
   _getAllCalendars() {
     // Gibt nur aktivierte Kalender zurück
     if (!this._config?.calendars) {
       return [];
-    }
+                }
 
     // Filtere nur aktivierte Kalender und sortiere nach Shortcut (a, b, c, d, e)
     return this._config.calendars
@@ -2768,7 +2845,7 @@ export class ShiftScheduleView extends ViewBase {
           (cal.enabled === true || cal.enabled === 'true' || cal.enabled === 1)
       )
       .sort((a, b) => a.shortcut.localeCompare(b.shortcut));
-  }
+                }
 
   _getSelectedCalendarValue() {
     const allCalendars = this._getAllCalendars();
@@ -2779,11 +2856,11 @@ export class ShiftScheduleView extends ViewBase {
         this._selectedCalendar = null;
         if (this._config) {
           this._config.selectedCalendar = null;
-        }
+                }
         this.requestUpdate();
-      }
+                }
       return null;
-    }
+                }
 
     // Wenn _selectedCalendar noch nicht gesetzt ist, setze es auf den ersten aktivierten Kalender
     if (this._selectedCalendar === null || this._selectedCalendar === undefined) {
@@ -2791,11 +2868,11 @@ export class ShiftScheduleView extends ViewBase {
       // Speichere es auch in der Config
       if (this._config) {
         this._config.selectedCalendar = this._selectedCalendar;
-      }
+                }
       // Aktualisiere die Ansicht
       this.requestUpdate();
       return this._selectedCalendar;
-    }
+                }
 
     // Prüfe ob der ausgewählte Kalender aktiviert ist
     const exists = allCalendars.some(cal => cal.shortcut === this._selectedCalendar);
@@ -2804,13 +2881,13 @@ export class ShiftScheduleView extends ViewBase {
       this._selectedCalendar = allCalendars[0].shortcut;
       if (this._config) {
         this._config.selectedCalendar = this._selectedCalendar;
-      }
+                }
       this.requestUpdate();
       return this._selectedCalendar;
-    }
+                }
 
     return this._selectedCalendar;
-  }
+                }
 
   _onCalendarSelectedByIndex(shortcut) {
     if (shortcut !== '' && shortcut !== null && shortcut !== undefined) {
@@ -2835,8 +2912,8 @@ export class ShiftScheduleView extends ViewBase {
           );
           // Speichere die Config in die Entity (nur bei Benutzeraktionen)
           this.saveConfigToEntity();
-        }
-      }
+                }
+                }
 
       // Aktualisiere alle Buttons, die die neue aktive Schicht haben
       // Dies ist notwendig, um die Hintergrundfarben und Indikatoren korrekt zu aktualisieren
@@ -2853,9 +2930,9 @@ export class ShiftScheduleView extends ViewBase {
         setTimeout(() => {
           this._updateAllDayButtonsForCalendarChange();
         }, 0);
-      }
-    }
-  }
+                }
+                }
+                }
 
   // Aktualisiert alle Tag-Buttons nach Kalender-Auswahl (nur Farben/Klassen, kein komplettes Re-Rendering)
   _updateAllDayButtonsForCalendarChange() {
@@ -2886,9 +2963,9 @@ export class ShiftScheduleView extends ViewBase {
           if (calendar && calendar.enabled) {
             firstActiveShift = shortcut;
             break;
-          }
-        }
-      }
+                }
+                }
+                }
 
       // Bestimme welche Schicht den Tag färben soll
       let activeShiftForColor = null;
@@ -2896,7 +2973,7 @@ export class ShiftScheduleView extends ViewBase {
         activeShiftForColor = selectedShortcut;
       } else if (firstActiveShift) {
         activeShiftForColor = firstActiveShift;
-      }
+                }
 
       const isWorking = activeShiftForColor !== null;
 
@@ -2905,7 +2982,7 @@ export class ShiftScheduleView extends ViewBase {
         button.classList.add('working');
       } else {
         button.classList.remove('working');
-      }
+                }
 
       // Aktualisiere Hintergrundfarbe
       if (activeShiftForColor) {
@@ -2914,17 +2991,17 @@ export class ShiftScheduleView extends ViewBase {
           button.style.backgroundColor = activeCalendar.color;
         } else {
           button.style.backgroundColor = '';
-        }
+                }
       } else {
         button.style.backgroundColor = '';
-      }
+                }
 
       // Aktualisiere Shift-Indikatoren (ähnlich wie in _updateDayButtonDirectly)
       // Entferne zuerst alle vorhandenen Container und Indikatoren
       const existingContainer = button.querySelector('.shifts-container');
       if (existingContainer) {
         existingContainer.remove();
-      }
+                }
 
       const shiftIndicators = dayElements
         .filter(shortcut => shortcut !== activeShiftForColor)
@@ -2936,8 +3013,8 @@ export class ShiftScheduleView extends ViewBase {
             indicator.style.backgroundColor = calendar.color;
             indicator.title = calendar.name || `Schicht ${shortcut.toUpperCase()}`;
             return indicator;
-          }
-          return null;
+                }
+return null;
         })
         .filter(indicator => indicator !== null);
 
@@ -2949,10 +3026,10 @@ export class ShiftScheduleView extends ViewBase {
         container.setAttribute('data-manual-update', 'true');
         shiftIndicators.forEach(ind => container.appendChild(ind));
         button.appendChild(container);
-      }
+                }
       // Wenn keine Indikatoren vorhanden sind, wurde der Container bereits oben entfernt
     });
-  }
+                }
 
   // Aktualisiert die Storage-Warnung direkt im DOM ohne Re-Rendering
   _updateStorageWarningDirectly() {
@@ -2960,14 +3037,14 @@ export class ShiftScheduleView extends ViewBase {
       // Shadow DOM noch nicht bereit, Fallback zu requestUpdate
       this.requestUpdate();
       return;
-    }
+                }
 
     const wrapper = this.shadowRoot.querySelector('.calendar-wrapper');
     if (!wrapper) {
       // Wrapper nicht gefunden, Fallback zu requestUpdate
       this.requestUpdate();
       return;
-    }
+                }
 
     const isEditorMode = this._isInEditorMode();
     const hasStorageWarning = this._storageWarning && this._storageWarning.show;
@@ -2977,7 +3054,7 @@ export class ShiftScheduleView extends ViewBase {
       wrapper.classList.add('storage-warning-active');
     } else {
       wrapper.classList.remove('storage-warning-active');
-    }
+                }
 
     // Finde oder erstelle Storage-Warnung
     let storageWarningEl = wrapper.querySelector('.storage-warning[data-warning-type="storage"]');
@@ -2989,7 +3066,7 @@ export class ShiftScheduleView extends ViewBase {
         storageWarningEl.className = 'storage-warning';
         storageWarningEl.setAttribute('data-warning-type', 'storage');
         wrapper.insertBefore(storageWarningEl, wrapper.firstChild);
-      }
+                }
 
       // Aktualisiere Inhalt
       const additionalEntities = this.findAdditionalEntities(this._config.entity);
@@ -3010,8 +3087,8 @@ export class ShiftScheduleView extends ViewBase {
     } else if (storageWarningEl) {
       // Entferne Warnung wenn nicht mehr nötig
       storageWarningEl.remove();
-    }
-  }
+                }
+                }
 
   // Aktualisiert die Config-Warnung direkt im DOM ohne Re-Rendering
   _updateConfigWarningDirectly() {
@@ -3019,14 +3096,14 @@ export class ShiftScheduleView extends ViewBase {
       // Shadow DOM noch nicht bereit, Fallback zu requestUpdate
       this.requestUpdate();
       return;
-    }
+                }
 
     const wrapper = this.shadowRoot.querySelector('.calendar-wrapper');
     if (!wrapper) {
       // Wrapper nicht gefunden, Fallback zu requestUpdate
       this.requestUpdate();
       return;
-    }
+                }
 
     const isEditorMode = this._isInEditorMode();
     const hasConfigWarning =
@@ -3058,8 +3135,8 @@ export class ShiftScheduleView extends ViewBase {
           storageWarning.insertAdjacentElement('afterend', warningEl);
         } else {
           wrapper.insertBefore(warningEl, wrapper.firstChild);
-        }
-      }
+                }
+                }
       warningEl.innerHTML = `
         <div class="warning-icon">⚠️</div>
         <div class="warning-content">
@@ -3081,7 +3158,7 @@ export class ShiftScheduleView extends ViewBase {
       `;
     } else if (configWarningSize) {
       configWarningSize.remove();
-    }
+                }
 
     if (hasConfigWarning && this._configWarning.type === 'missing' && isEditorMode) {
       // Missing-Warnung anzeigen/aktualisieren
@@ -3096,8 +3173,8 @@ export class ShiftScheduleView extends ViewBase {
           lastWarning.insertAdjacentElement('afterend', warningEl);
         } else {
           wrapper.insertBefore(warningEl, wrapper.firstChild);
-        }
-      }
+                }
+                }
       // Erstelle HTML-String für missing entity warning
       const entityNameShort = this._configWarning.configEntityId.replace('input_text.', '');
       warningEl.innerHTML = `
@@ -3120,8 +3197,8 @@ export class ShiftScheduleView extends ViewBase {
       `;
     } else if (configWarningMissing) {
       configWarningMissing.remove();
-    }
-  }
+                }
+                }
 
   // Aktualisiert die Status-Warnung direkt im DOM ohne Re-Rendering
   _updateStatusWarningDirectly() {
@@ -3129,14 +3206,14 @@ export class ShiftScheduleView extends ViewBase {
       // Shadow DOM noch nicht bereit, Fallback zu requestUpdate
       this.requestUpdate();
       return;
-    }
+                }
 
     const wrapper = this.shadowRoot.querySelector('.calendar-wrapper');
     if (!wrapper) {
       // Wrapper nicht gefunden, Fallback zu requestUpdate
       this.requestUpdate();
       return;
-    }
+                }
 
     const isEditorMode = this._isInEditorMode();
     const hasStatusWarning = this._statusWarning && this._statusWarning.show && isEditorMode;
@@ -3155,8 +3232,8 @@ export class ShiftScheduleView extends ViewBase {
           lastWarning.insertAdjacentElement('afterend', warningEl);
         } else {
           wrapper.insertBefore(warningEl, wrapper.firstChild);
-        }
-      }
+                }
+                }
       warningEl.innerHTML = `
         <div class="warning-icon">⚠️</div>
         <div class="warning-content">
@@ -3177,8 +3254,8 @@ export class ShiftScheduleView extends ViewBase {
       `;
     } else if (statusWarningEl) {
       statusWarningEl.remove();
-    }
-  }
+                }
+                }
 
   _getDayElements(monthKey, day) {
     // Gibt die Elemente für einen bestimmten Tag zurück
@@ -3187,34 +3264,52 @@ export class ShiftScheduleView extends ViewBase {
     
     if (shouldDebug) {
       this._debug(`[Render] _getDayElements: Suche nach monthKey="${monthKey}", day=${day}`);
-    }
-    
+                }
+
     if (!this._workingDays[monthKey] || typeof this._workingDays[monthKey] !== 'object') {
       if (shouldDebug) {
         this._debug(`[Render] _getDayElements: Keine Daten für monthKey="${monthKey}" gefunden oder kein Objekt`);
         this._debug(`[Render] _getDayElements: Verfügbare Keys in _workingDays:`, Object.keys(this._workingDays));
-      }
+                }
       return [];
-    }
+                }
 
     if (Array.isArray(this._workingDays[monthKey])) {
       // Altes Format: Array von Tagen
       if (shouldDebug) {
         this._debug(`[Render] _getDayElements: Altes Format (Array) für monthKey="${monthKey}"`);
-      }
+                }
       return [];
-    }
+                }
 
     const elements = this._workingDays[monthKey][day] || [];
     if (shouldDebug && elements.length > 0) {
       this._debug(`[Render] _getDayElements: Gefundene Elemente für "${monthKey}", Tag ${day}:`, elements);
-    }
+                }
 
     return elements;
-  }
+                }
+
+  // Überschreibe requestUpdate() um Updates zu verhindern, wenn Panel geöffnet ist
+  requestUpdate(name, oldValue, options) {
+    // Verhindere alle Updates wenn das Konfigurationspanel geöffnet ist
+    // (außer wenn _showConfigPanel selbst geändert wird)
+    if (this._showConfigPanel && name !== '_showConfigPanel') {
+      return;
+                }
+    return super.requestUpdate(name, oldValue, options);
+                }
 
   // Optimierung: Verhindere unnötige Re-Renderings
   shouldUpdate(changedProperties) {
+    // WICHTIG: Verhindere alle Updates wenn das Konfigurationspanel geöffnet ist
+    // (außer wenn sich _showConfigPanel selbst ändert)
+    if (this._showConfigPanel && !changedProperties.has('_showConfigPanel')) {
+      const changedProps = Array.from(changedProperties.keys()).join(', ');
+      this._debug(`[Update-Block] shouldUpdate() blockiert (Panel ist geöffnet). Geänderte Properties: ${changedProps}`);
+      return false;
+                }
+
     // Prüfe ob sich relevante Properties geändert haben
     const relevantProps = [
       'hass',
@@ -3238,15 +3333,15 @@ export class ShiftScheduleView extends ViewBase {
     ) {
       // Überspringe Update, da direkte DOM-Manipulation verwendet wird
       return false;
-    }
+                }
 
     return relevantProps.some(prop => changedProperties.has(prop));
-  }
+                }
 
   render() {
     if (!this._config) {
       return html`<div class="error">Keine Konfiguration vorhanden</div>`;
-    }
+                }
 
     const maxMonths = this._config.numberOfMonths || 14;
     const displayedMonths = this._displayedMonths || 2;
@@ -3259,7 +3354,7 @@ export class ShiftScheduleView extends ViewBase {
       const year = date.getFullYear();
       const month = date.getMonth();
       months.push({ year, month });
-    }
+                }
 
     const isEditorMode = this._isInEditorMode();
     // Speicherwarnung wird immer angezeigt (auch im normalen Modus)
@@ -3285,7 +3380,7 @@ export class ShiftScheduleView extends ViewBase {
                   <div class="warning-title">Speicherplatz fast voll!</div>
                   <div class="warning-message">
                     ${this._storageWarning.percentage}% der verfügbaren Speicherkapazität verwendet
-                    (${this._storageWarning.currentLength} / ${this._storageWarning.maxLength}
+                    (${this._storageWarning.currentLength} / ${this._storageWarning.maxLength                              }
                     Zeichen).
                   </div>
                   <div class="warning-action">
@@ -3297,7 +3392,7 @@ export class ShiftScheduleView extends ViewBase {
                 </div>
               </div>
             `
-          : ''}
+          : ''                              }
         ${hasConfigWarning && this._configWarning.type === 'size'
           ? html`
               <div class="storage-warning" data-warning-type="config-size">
@@ -3308,7 +3403,7 @@ export class ShiftScheduleView extends ViewBase {
                     Die Konfiguration passt nicht in die Entity
                     <code>${this._configWarning.configEntityId}</code>.
                     ${this._configWarning.percentage}% der verfügbaren Speicherkapazität benötigt
-                    (${this._configWarning.currentLength} / ${this._configWarning.maxLength}
+                    (${this._configWarning.currentLength} / ${this._configWarning.maxLength                              }
                     Zeichen).
                   </div>
                   <div class="warning-action">
@@ -3332,7 +3427,7 @@ export class ShiftScheduleView extends ViewBase {
                 </div>
               </div>
             `
-          : ''}
+          : ''                              }
         ${hasConfigWarning && this._configWarning.type === 'missing'
           ? html`
               <div class="storage-warning" data-warning-type="config-missing">
@@ -3341,10 +3436,10 @@ export class ShiftScheduleView extends ViewBase {
                   'Konfigurations-Entity',
                   255,
                   true
-                )}
+                )                              }
               </div>
             `
-          : ''}
+          : ''                              }
         ${hasStatusWarning
           ? html`
               <div class="storage-warning" data-warning-type="status">
@@ -3353,10 +3448,10 @@ export class ShiftScheduleView extends ViewBase {
                   'Status-Entity',
                   255,
                   false
-                )}
+                )                              }
               </div>
             `
-          : ''}
+          : ''                              }
         ${!this._showConfigPanel
           ? html`
               <div class="schichtplan-wrapper">
@@ -3367,16 +3462,16 @@ export class ShiftScheduleView extends ViewBase {
                       <div class="menu-controls">
                         <button
                           class="menu-button navigation-button"
-                          @click=${() => this.changeStartMonth(-1)}
-                          ?disabled=${!navBounds.canGoBack}
+                          @click=${() => this.changeStartMonth(-1)                              }
+                          ?disabled=${!navBounds.canGoBack                              }
                           title="Vorheriger Monat"
                         >
                           ←
                         </button>
                         <button
                           class="menu-button decrease-button"
-                          @click=${() => this.changeDisplayedMonths(-1)}
-                          ?disabled=${displayedMonths <= 1}
+                          @click=${() => this.changeDisplayedMonths(-1)                              }
+                          ?disabled=${displayedMonths <= 1                              }
                           title="Weniger Monate anzeigen"
                         >
                           −
@@ -3384,16 +3479,16 @@ export class ShiftScheduleView extends ViewBase {
                         <div class="menu-number">${displayedMonths}</div>
                         <button
                           class="menu-button increase-button"
-                          @click=${() => this.changeDisplayedMonths(1)}
-                          ?disabled=${displayedMonths >= maxMonths}
+                          @click=${() => this.changeDisplayedMonths(1)                              }
+                          ?disabled=${displayedMonths >= maxMonths                              }
                           title="Mehr Monate anzeigen"
                         >
                           +
                         </button>
                         <button
                           class="menu-button navigation-button"
-                          @click=${() => this.changeStartMonth(1)}
-                          ?disabled=${!navBounds.canGoForward}
+                          @click=${() => this.changeStartMonth(1)                              }
+                          ?disabled=${!navBounds.canGoForward                              }
                           title="Nächster Monat"
                         >
                           →
@@ -3410,7 +3505,7 @@ export class ShiftScheduleView extends ViewBase {
                           this._configPanelCalendars = JSON.parse(JSON.stringify(this._config?.calendars || []));
                           this._showConfigPanel = true;
                           this.requestUpdate();
-                        }}
+                        }                              }
                         title="Schichtkonfiguration"
                       >
                         ⚙️
@@ -3428,42 +3523,42 @@ export class ShiftScheduleView extends ViewBase {
                               <button
                                 class="color-button ${isSelected ? 'selected' : ''}"
                                 style="background-color: ${calendar.color || '#ff9800'}; color: ${textColor};"
-                                @click=${() => this._onCalendarSelectedByIndex(calendar.shortcut)}
+                                @click=${() => this._onCalendarSelectedByIndex(calendar.shortcut)                              }
                                 title="${calendar.name || `Schicht ${calendar.shortcut.toUpperCase()}`}"
                               >${calendar.name || `Schicht ${calendar.shortcut.toUpperCase()}`}</button>
                             `;
-                          })}
+                          })                              }
                         </div>
                       `;
                     })(),
-                  })}
+                  })                              }
                 </div>
                 <div class="schichtplan-panel">
-                  ${months.map(({ year, month }) => this.renderMonth(year, month))}
+                  ${months.map(({ year, month }) => this.renderMonth(year, month))                              }
                 </div>
               </div>
             `
-          : html``}
+          : html``                              }
         ${this._showConfigPanel
           ? html`
               <div class="config-wrapper">
                 <shift-config-panel
-                  .calendars=${this._configPanelCalendars || this._config?.calendars || []}
-                  .selectedShortcut=${this._getSelectedCalendarShortcut()}
-                  .hass=${this._hass}
+                  .calendars=${this._configPanelCalendars || []                              }
+                  .selectedShortcut=${this._getSelectedCalendarShortcut()                              }
+                  .hass=${this._hass                              }
                   @close=${() => {
                     this._showConfigPanel = false;
                     this._configPanelCalendars = null;
                     this.requestUpdate();
-                  }}
-                  @save=${e => this._handleConfigPanelSave(e.detail.calendars)}
+                  }                              }
+                  @save=${e => this._handleConfigPanelSave(e.detail.calendars)                              }
                 ></shift-config-panel>
               </div>
             `
-          : html``}
+          : html``                              }
       </div>
     `;
-  }
+                }
 
   _handleConfigPanelSave(calendars) {
     // Aktualisiere die Config mit den neuen Kalendern
@@ -3478,8 +3573,8 @@ export class ShiftScheduleView extends ViewBase {
       
       // Aktualisiere die Ansicht
       this.requestUpdate();
-    }
-  }
+                }
+                }
 
   static styles = [
     super.styles || [],
@@ -3490,26 +3585,26 @@ export class ShiftScheduleView extends ViewBase {
         --tgshiftschedule-default-selected-day-color: ${unsafeCSS(
           ShiftScheduleView.DEFAULT_SELECTED_DAY_COLOR
         )};
-      }
+                }
 
       .calendar-wrapper {
         display: block;
         transition: border-color 0.3s ease;
-      }
+                }
 
       .calendar-wrapper.storage-warning-active {
         border: 3px solid var(--error-color, #f44336);
         border-radius: 4px;
         padding: 8px;
         box-shadow: 0 0 10px rgba(244, 67, 54, 0.3);
-      }
+                }
 
       .schichtplan-wrapper {
         display: flex;
         flex-direction: column;
         gap: 0;
         margin-bottom: 16px;
-      }
+                }
 
       .schichtplan-menu-bar,
       .config-menu-bar {
@@ -3522,7 +3617,7 @@ export class ShiftScheduleView extends ViewBase {
         border-radius: 4px 4px 0 0;
         border: 1px solid var(--divider-color, #e0e0e0);
         border-bottom: none;
-      }
+                }
 
       /* Gemeinsame Menu-Styles und Farbleisten-Styles werden aus shared-menu-styles.js importiert */
 
@@ -3532,12 +3627,12 @@ export class ShiftScheduleView extends ViewBase {
         min-width: 40px;
         text-align: center;
         color: var(--primary-text-color, #212121);
-      }
+                }
 
       .element-selector {
         margin-left: 20px;
         min-width: 200px;
-      }
+                }
 
       .config-button {
         font-size: 20px;
@@ -3547,13 +3642,13 @@ export class ShiftScheduleView extends ViewBase {
         width: auto !important;
         height: auto !important;
         padding: 4px !important;
-      }
+                }
 
       .config-button:hover {
         background: none !important;
         color: var(--primary-color, #03a9f4) !important;
         transform: scale(1.1);
-      }
+                }
 
       .schichtplan-panel {
         display: flex;
@@ -3564,29 +3659,29 @@ export class ShiftScheduleView extends ViewBase {
         border-radius: 0 0 4px 4px;
         border: 1px solid var(--divider-color, #e0e0e0);
         border-top: none;
-      }
+                }
 
       .config-wrapper {
         margin-bottom: 16px;
-      }
+                }
 
       .month-container {
         display: flex;
         flex-direction: column;
-      }
+                }
 
       .month-header {
         font-size: 18px;
         font-weight: bold;
         margin-bottom: 12px;
         text-align: center;
-      }
+                }
 
       .calendar-table {
         width: 100%;
         border-collapse: collapse;
         table-layout: fixed;
-      }
+                }
 
       .calendar-table th {
         padding: 8px 4px;
@@ -3594,13 +3689,13 @@ export class ShiftScheduleView extends ViewBase {
         font-weight: bold;
         font-size: 12px;
         border-bottom: 2px solid var(--divider-color, #e0e0e0);
-      }
+                }
 
       .calendar-table td {
         padding: 4px;
         text-align: center;
         vertical-align: middle;
-      }
+                }
 
       .day-button {
         width: 100%;
@@ -3619,13 +3714,13 @@ export class ShiftScheduleView extends ViewBase {
         align-items: center;
         justify-content: center;
         gap: 2px;
-      }
+                }
 
       .day-number {
         font-size: 12px;
         font-weight: bold;
         line-height: 1;
-      }
+                }
 
       .shifts-container {
         display: flex;
@@ -3634,7 +3729,7 @@ export class ShiftScheduleView extends ViewBase {
         justify-content: center;
         align-items: center;
         max-width: 100%;
-      }
+                }
 
       .shift-indicator {
         display: inline-block;
@@ -3643,84 +3738,84 @@ export class ShiftScheduleView extends ViewBase {
         border-radius: 50%;
         border: 1px solid rgba(0, 0, 0, 0.2);
         flex-shrink: 0;
-      }
+                }
 
       .day-button:hover:not(.working) {
         background-color: var(--primary-color, #03a9f4);
         color: var(--text-primary-color, #ffffff);
-      }
+                }
 
       .day-button.working:hover {
         /* Behalte die Hintergrundfarbe bei, aber mache sie etwas dunkler */
         opacity: 0.9;
         filter: brightness(0.9);
-      }
+                }
 
       /* Verhindere visuelle Markierung nach Klick auf mobilen Geräten */
       .day-button:active,
       .day-button:focus {
         outline: none !important;
         box-shadow: none !important;
-      }
+                }
 
       /* Touch-spezifische Behandlung: Verhindere aktiven State nach Touch */
       .day-button {
         -webkit-tap-highlight-color: transparent;
         -webkit-touch-callout: none;
         touch-action: manipulation;
-      }
+                }
 
       .day-button.working {
         /* background-color wird jetzt dynamisch per style gesetzt, wenn eine Schicht ausgewählt ist */
         color: var(--text-primary-color, #ffffff);
         font-weight: bold;
-      }
+                }
 
       /* Fallback: Wenn keine Schicht ausgewählt ist, verwende die Standardfarbe */
       .day-button.working:not([style*='background-color']) {
         background-color: var(--accent-color, var(--tgshiftschedule-default-selected-day-color));
-      }
+                }
 
       /* Basis: Heute-Markierung mit Outline (wird außerhalb des Borders gerendert) */
       .day-button.today {
         outline: 3px solid var(--primary-color, #03a9f4);
         outline-offset: 2px;
-      }
+                }
 
       .day-button.weekend {
         border: 4px solid var(--secondary-color, #757575);
-      }
+                }
 
       /* Feiertage haben Vorrang vor Wochenenden */
       .day-button.holiday {
         border: 4px solid var(--error-color, #f44336);
-      }
+                }
 
       /* Wenn sowohl Wochenende als auch Feiertag, verwende Feiertagsfarbe (stärkere Umrandung) */
       .day-button.weekend.holiday {
         border: 5px solid var(--error-color, #f44336);
-      }
+                }
 
       /* Heute + Wochenende: Border für Wochenende, Outline für heute */
       .day-button.today.weekend {
         border: 4px solid var(--secondary-color, #757575);
         outline: 3px solid var(--primary-color, #03a9f4);
         outline-offset: 2px;
-      }
+                }
 
       /* Heute + Feiertag: Border für Feiertag, Outline für heute */
       .day-button.today.holiday {
         border: 4px solid var(--error-color, #f44336);
         outline: 3px solid var(--primary-color, #03a9f4);
         outline-offset: 2px;
-      }
+                }
 
       /* Heute + Wochenende + Feiertag: Border für Feiertag (stärker), Outline für heute */
       .day-button.today.weekend.holiday {
         border: 5px solid var(--error-color, #f44336);
         outline: 3px solid var(--primary-color, #03a9f4);
         outline-offset: 2px;
-      }
+                }
 
       .day-button.readonly,
       .day-button:disabled {
@@ -3728,19 +3823,19 @@ export class ShiftScheduleView extends ViewBase {
         cursor: not-allowed;
         background-color: var(--disabled-color, #f5f5f5);
         color: var(--secondary-text-color, #888888);
-      }
+                }
 
       .day-button.readonly:hover,
       .day-button:disabled:hover {
         background-color: var(--disabled-color, #f5f5f5);
         color: var(--secondary-text-color, #888888);
-      }
+                }
 
       .day-number {
         font-size: 12px;
         font-weight: bold;
         line-height: 1;
-      }
+                }
 
       .shifts-container {
         display: flex;
@@ -3749,7 +3844,7 @@ export class ShiftScheduleView extends ViewBase {
         justify-content: center;
         align-items: center;
         max-width: 100%;
-      }
+                }
 
       .shift-indicator {
         display: inline-block;
@@ -3758,11 +3853,11 @@ export class ShiftScheduleView extends ViewBase {
         border-radius: 50%;
         border: 1px solid rgba(0, 0, 0, 0.2);
         flex-shrink: 0;
-      }
+                }
 
       .day-button.working .day-number {
         color: var(--text-primary-color, #ffffff);
-      }
+                }
 
       .week-label {
         font-size: 11px;
@@ -3770,13 +3865,13 @@ export class ShiftScheduleView extends ViewBase {
         padding-right: 8px;
         text-align: right;
         width: 40px;
-      }
+                }
 
       .error {
         text-align: center;
         padding: 20px;
         color: var(--error-color);
-      }
+                }
 
       .storage-warning {
         display: flex;
@@ -3788,28 +3883,28 @@ export class ShiftScheduleView extends ViewBase {
         color: var(--text-primary-color, #ffffff);
         border-radius: 4px;
         border-left: 4px solid var(--error-color, #f44336);
-      }
+                }
 
       .warning-icon {
         font-size: 24px;
         flex-shrink: 0;
-      }
+                }
 
       .warning-content {
         flex: 1;
-      }
+                }
 
       .warning-title {
         font-weight: bold;
         font-size: 16px;
         margin-bottom: 8px;
-      }
+                }
 
       .warning-message {
         font-size: 14px;
         margin-bottom: 8px;
         line-height: 1.5;
-      }
+                }
 
       .warning-action {
         font-size: 14px;
@@ -3817,18 +3912,18 @@ export class ShiftScheduleView extends ViewBase {
         margin-top: 8px;
         padding-top: 8px;
         border-top: 1px solid rgba(255, 255, 255, 0.3);
-      }
+                }
 
       .warning-action ul {
         margin: 8px 0 0 0;
         padding-left: 20px;
         list-style-type: disc;
-      }
+                }
 
       .warning-action li {
         margin: 4px 0;
         line-height: 1.5;
-      }
+                }
 
       .warning-action code {
         background-color: rgba(0, 0, 0, 0.2);
@@ -3836,12 +3931,12 @@ export class ShiftScheduleView extends ViewBase {
         border-radius: 3px;
         font-family: 'Courier New', monospace;
         font-size: 13px;
-      }
+                }
     `,
   ];
-}
+                }
 
 // Registriere ShiftScheduleView als Custom Element
 if (!customElements.get('shiftschedule-view')) {
   customElements.define('shiftschedule-view', ShiftScheduleView);
-}
+                }

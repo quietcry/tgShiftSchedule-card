@@ -11,7 +11,19 @@ import { Version } from '../../card-config.js';
 
 export class ShiftConfigPanel extends LitElement {
   static properties = {
-    calendars: { type: Array },
+    calendars: {
+      type: Array,
+      hasChanged(newVal, oldVal) {
+        // Verhindere Updates wenn Panel bereits initialisiert wurde
+        // Nur beim ersten Setzen (oldVal ist undefined) erlauben wir Updates
+        if (oldVal === undefined) {
+          return true; // Erste Initialisierung erlauben
+        }
+        // Nach der Initialisierung: Ignoriere externe Updates
+        // Das Panel verwaltet seine eigenen calendars intern
+        return false;
+      }
+    },
     selectedShortcut: { type: String },
     hass: { type: Object },
     _validationErrors: { type: Object, state: true },
@@ -392,7 +404,31 @@ export class ShiftConfigPanel extends LitElement {
   updated(changedProperties) {
     super.updated(changedProperties);
 
-    if (changedProperties.has('calendars') || changedProperties.has('selectedShortcut')) {
+    // Ignoriere calendars-Updates von außen, wenn Panel bereits initialisiert wurde
+    // (nur beim ersten Setzen akzeptieren wir externe calendars)
+    if (changedProperties.has('calendars')) {
+      const oldCalendars = changedProperties.get('calendars');
+      console.log('[ConfigPanel] updated() aufgerufen mit calendars-Änderung', {
+        oldCalendars: oldCalendars?.length,
+        newCalendars: this.calendars?.length,
+        hasChanged: this.constructor.properties.calendars.hasChanged
+      });
+
+      // Wenn calendars bereits gesetzt waren und sich jetzt ändern, könnte es ein externes Update sein
+      // Prüfe ob die Daten wirklich unterschiedlich sind
+      if (oldCalendars && oldCalendars.length > 0 && this.calendars && this.calendars.length > 0) {
+        const oldStr = JSON.stringify(oldCalendars);
+        const newStr = JSON.stringify(this.calendars);
+        // Wenn die Daten gleich sind, ignoriere das Update (nur Referenz-Änderung)
+        if (oldStr === newStr) {
+          console.log('[ConfigPanel] calendars: Update ignoriert (Daten identisch)');
+          return; // Ignoriere Update, da Daten identisch sind
+        }
+      }
+      this._updateValidationErrors();
+    }
+
+    if (changedProperties.has('selectedShortcut')) {
       this._updateValidationErrors();
     }
   }
@@ -455,13 +491,6 @@ export class ShiftConfigPanel extends LitElement {
     const colorInput = this.shadowRoot.querySelector(`input[type="color"]`);
     if (colorInput) {
       colorInput.click();
-    }
-  }
-
-  updated(changedProperties) {
-    super.updated(changedProperties);
-    if (changedProperties.has('calendars') || changedProperties.has('selectedShortcut')) {
-      this._updateValidationErrors();
     }
   }
 
