@@ -286,6 +286,11 @@ export class ShiftScheduleView extends ViewBase {
     const wasHassSet = !!this._hass;
     this._hass = hass;
 
+    // Ignoriere alle weiteren Updates wenn das Konfigurationspanel offen ist
+    if (this._showConfigPanel) {
+      return;
+    }
+
     // Cache-Invalidierung: Holiday-Entities Cache zurücksetzen bei hass-Update
     this._cachedHolidayEntities = null;
     
@@ -303,7 +308,8 @@ export class ShiftScheduleView extends ViewBase {
 
     if (this._config) {
       // Lade Daten beim ersten Setzen von hass oder wenn sich ein State geändert hat
-      if ((!wasHassSet || hasAnyEntityChanged) && hass?.states) {
+      // ABER: Nicht wenn das Konfigurationspanel offen ist, um ungespeicherte Änderungen nicht zu überschreiben
+      if ((!wasHassSet || hasAnyEntityChanged) && hass?.states && !this._showConfigPanel) {
         try {
           this.loadWorkingDays();
         } catch (error) {
